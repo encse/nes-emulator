@@ -50,13 +50,14 @@ var Mos6502 = (function () {
         N	Negative Flag	    Set if bit 7 set
     */
     Mos6502.prototype.ADC = function (b) {
-        var uSum = this.rA + b + this.flgCarry;
-        var sSum = (this.rA >= 128 ? this.rA - 256 : this.rA) + (b >= 128 ? b - 256 : b) + this.flgCarry;
-        this.flgOverflow = sSum < -128 || sSum > 127 ? 1 : 0;
-        this.flgCarry = uSum > 255 ? 1 : 0;
-        this.rA = (uSum + 256) % 256;
+        var sum = this.rA + b + this.flgCarry;
+        var bothPositive = b < 128 && this.rA < 128;
+        var bothNegative = b >= 128 && this.rA >= 128;
+        this.flgCarry = sum > 255 ? 1 : 0;
+        this.rA = sum % 256;
         this.flgNegative = this.rA >= 128 ? 1 : 0;
         this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
     };
     /**
      * SBC - Subtract with Carry
@@ -76,13 +77,7 @@ var Mos6502 = (function () {
         N	Negative Flag	    Set if bit 7 set
      */
     Mos6502.prototype.SBC = function (b) {
-        var uSub = this.rA - b + this.flgCarry - 1;
-        var sSub = (this.rA >= 128 ? this.rA - 256 : this.rA) - (b >= 128 ? b - 256 : b) + this.flgCarry - 1;
-        this.flgOverflow = sSub < -128 || sSub > 127 ? 1 : 0;
-        this.flgCarry = this.rA >= b ? 1 : 0;
-        this.rA = (uSub + 256) % 256;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.ADC(255 - b);
     };
     /**
      * AND - Logical AND
