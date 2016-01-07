@@ -25,19 +25,22 @@
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="packages.config" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
     <None Include="web.Release.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
+    <Content Include="wwwroot\index.html" />
+    <Content Include="wwwroot\js\app.js" />
+    <None Include="wwwroot\nestest.bin" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\mos6502.ts" />
+    <TypeScriptCompile Include="Scripts\typings\jquery\jquery.d.ts" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="wwwroot\js\" />
-  </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>
@@ -54,7 +57,7 @@
           <AutoAssignPort>True</AutoAssignPort>
           <DevelopmentServerPort>52610</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost:52610/</IISUrl>
+          <IISUrl>http://localhost:52610/wwwroot</IISUrl>
           <NTLMAuthentication>False</NTLMAuthentication>
           <UseCustomServer>False</UseCustomServer>
           <CustomServerUrl>

@@ -1,0 +1,93 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+	<meta charset="utf-8" />
+</head>
+<body>
+	<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+	<script src="js/app.js"></script>
+	<script language="javascript">
+		
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', 'nestest.bin', true);
+		xhr.responseType = 'arraybuffer';
+
+		xhr.onload = function (e) {
+			if (this.status === 200) {
+				// get binary data as a response
+				var blob = new Uint8Array(this.response);
+				blob = blob.slice(16, 16384);
+
+				var memory = new Memory();
+				memory.memory.set(blob, 0xc000);
+				debugger;
+				var cpu = new Mos6502(memory, 0xc000);
+			//	while (true) {
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step(); cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				cpu.step();
+				//}
+
+			}
+		};
+
+		xhr.send();
+	</script>
+</body>
+</html>

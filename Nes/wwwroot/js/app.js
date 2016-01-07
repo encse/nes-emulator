@@ -1,6 +1,6 @@
 var Memory = (function () {
     function Memory() {
-        this.memory = new Int8Array(65535);
+        this.memory = new Uint8Array(65535);
     }
     Memory.prototype.getByte = function (addr) {
         return this.memory[addr];
@@ -18,11 +18,14 @@ var Memory = (function () {
     return Memory;
 })();
 var Mos6502 = (function () {
-    function Mos6502() {
+    function Mos6502(memory, ip) {
+        this.memory = memory;
+        this.ip = ip;
+        this.addrRA = -1;
         this.rA = 0;
         this.rX = 0;
         this.rY = 0;
-        this.ip = 0;
+        this.sp = 0;
         this.flgCarry = 0;
         this.flgZero = 0;
         this.flgInterruptDisable = 0;
@@ -164,12 +167,14 @@ var Mos6502 = (function () {
         V	Overflow Flag	Not affected
         N	Negative Flag	Set if bit 7 of the result is set
     */
-    Mos6502.prototype.ASL = function (byte) {
-        this.rA = byte << 1;
-        this.flgCarry = this.rA > 255 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-        this.rA %= 256;
-        this.flgZero = this.rA === 0 ? 1 : 0;
+    Mos6502.prototype.ASL = function (addr) {
+        var byte = this.getByte(addr);
+        var res = byte << 1;
+        this.flgCarry = res > 255 ? 1 : 0;
+        this.flgNegative = res >= 128 ? 1 : 0;
+        res %= 256;
+        this.flgZero = res === 0 ? 1 : 0;
+        this.setByte(addr, res);
     };
     /* BCC - Branch if Carry Clear
 
@@ -404,11 +409,11 @@ var Mos6502 = (function () {
             N	Negative Flag	Set if bit 7 of the result is set
      */
     Mos6502.prototype.DEC = function (addr) {
-        var byte = this.memory.getByte(addr);
+        var byte = this.getByte(addr);
         byte = byte === 0 ? 255 : byte - 1;
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
-        this.memory.setByte(addr, byte);
+        this.setByte(addr, byte);
     };
     /**
       DEX - Decrement X Register
@@ -475,11 +480,11 @@ var Mos6502 = (function () {
 
     */
     Mos6502.prototype.INC = function (addr) {
-        var byte = this.memory.getByte(addr);
+        var byte = this.getByte(addr);
         byte = byte === 255 ? 0 : byte + 1;
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
-        this.memory.setByte(addr, byte);
+        this.setByte(addr, byte);
     };
     /**
         INX - Increment X Register
@@ -527,25 +532,391 @@ var Mos6502 = (function () {
         this.flgZero = this.rY === 0 ? 1 : 0;
         this.flgNegative = this.rY >= 128 ? 1 : 0;
     };
+    /*
+     LDA - Load Accumulator
+
+        A,Z,N = M
+
+        Loads a byte of memory into the accumulator setting the zero and negative flags as appropriate.
+
+        C	Carry Flag	Not affected
+        Z	Zero Flag	Set if A = 0
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Not affected
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Set if bit 7 of A is set
+
+     */
+    Mos6502.prototype.LDA = function (byte) {
+        this.rA = byte;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    /*
+        LDX - Load X Register
+
+            X,Z,N = M
+
+            Loads a byte of memory into the X register setting the zero and negative flags as appropriate.
+
+            C	Carry Flag	Not affected
+            Z	Zero Flag	Set if X = 0
+            I	Interrupt Disable	Not affected
+            D	Decimal Mode Flag	Not affected
+            B	Break Command	Not affected
+            V	Overflow Flag	Not affected
+            N	Negative Flag	Set if bit 7 of X is set
+   */
+    Mos6502.prototype.LDX = function (byte) {
+        this.rX = byte;
+        this.flgZero = this.rX === 0 ? 1 : 0;
+        this.flgNegative = this.rX >= 128 ? 1 : 0;
+    };
+    /*
+          LDY - Load Y Register
+   
+           Y,Z,N = M
+   
+           Loads a byte of memory into the Y register setting the zero and negative flags as appropriate.
+   
+           C	Carry Flag	Not affected
+           Z	Zero Flag	Set if Y = 0
+           I	Interrupt Disable	Not affected
+           D	Decimal Mode Flag	Not affected
+           B	Break Command	Not affected
+           V	Overflow Flag	Not affected
+           N	Negative Flag	Set if bit 7 of Y is set
+   
+       */
+    Mos6502.prototype.LDY = function (byte) {
+        this.rY = byte;
+        this.flgZero = this.rY === 0 ? 1 : 0;
+        this.flgNegative = this.rY >= 128 ? 1 : 0;
+    };
+    /*
+     LSR - Logical Shift Right
+
+        A,C,Z,N = A/2 or M,C,Z,N = M/2
+
+        Each of the bits in A or M is shift one place to the right. The bit that was in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
+
+        Processor Status after use:
+
+        C	Carry Flag	Set to contents of old bit 0
+        Z	Zero Flag	Set if result = 0
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Not affected
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Set if bit 7 of the result is set
+
+    */
+    Mos6502.prototype.LSR = function (addr) {
+        var byte = this.getByte(addr);
+        this.flgCarry = byte % 2;
+        byte >>= 1;
+        this.flgZero = byte === 0 ? 1 : 0;
+        this.flgNegative = byte >= 128 ? 1 : 0;
+        this.setByte(addr, byte);
+    };
+    /*
+       ORA - Logical Inclusive OR
+   
+           A,Z,N = A|M
+   
+           An inclusive OR is performed, bit by bit, on the accumulator contents using the contents of a byte of memory.
+   
+           Processor Status after use:
+   
+           C	Carry Flag	Not affected
+           Z	Zero Flag	Set if A = 0
+           I	Interrupt Disable	Not affected
+           D	Decimal Mode Flag	Not affected
+           B	Break Command	Not affected
+           V	Overflow Flag	Not affected
+           N	Negative Flag	Set if bit 7 set
+   
+   
+       */
+    Mos6502.prototype.ORA = function (byte) {
+        this.rA |= byte;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    /*
+    ROL - Rotate Left
+
+        Move each of the bits in either A or M one place to the left. Bit 0 is filled with the current value of the carry flag whilst the old bit 7 becomes the new carry flag value.
+
+        Processor Status after use:
+
+        C	Carry Flag	Set to contents of old bit 7
+        Z	Zero Flag	Set if A = 0
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Not affected
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Set if bit 7 of the result is set
+
+
+   */
+    Mos6502.prototype.ROL = function (addr) {
+        var byte = this.getByte(addr);
+        byte <<= 1;
+        byte |= this.flgCarry;
+        this.flgCarry = (byte & 256) === 256 ? 1 : 0;
+        byte &= 255;
+        this.flgZero = byte === 0 ? 1 : 0;
+        this.flgNegative = byte >= 128 ? 1 : 0;
+        this.setByte(addr, byte);
+    };
+    /*
+          ROR - Rotate Right
+
+        Move each of the bits in either A or M one place to the right. Bit 7 is filled with the current value of the carry flag whilst the old bit 0 becomes the new carry flag value.
+
+        Processor Status after use:
+
+        C	Carry Flag	Set to contents of old bit 0
+        Z	Zero Flag	Set if A = 0
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Not affected
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Set if bit 7 of the result is set
+
+  */
+    Mos6502.prototype.ROR = function (addr) {
+        var byte = this.getByte(addr);
+        byte |= (this.flgCarry << 8);
+        this.flgCarry = byte & 1;
+        byte >>= 1;
+        this.flgZero = byte === 0 ? 1 : 0;
+        this.flgNegative = byte >= 128 ? 1 : 0;
+        this.setByte(addr, byte);
+    };
+    /*
+      STA - Store Accumulator
+
+            M = A
+
+            Stores the contents of the accumulator into memory.
+
+            Processor Status after use:
+
+            C	Carry Flag	Not affected
+            Z	Zero Flag	Not affected
+            I	Interrupt Disable	Not affected
+            D	Decimal Mode Flag	Not affected
+            B	Break Command	Not affected
+            V	Overflow Flag	Not affected
+            N	Negative Flag	Not affected
+
+     */
+    Mos6502.prototype.STA = function (addr) {
+        this.setByte(addr, this.rA);
+    };
+    Mos6502.prototype.STX = function (addr) {
+        this.setByte(addr, this.rX);
+    };
+    Mos6502.prototype.STY = function (addr) {
+        this.setByte(addr, this.rY);
+    };
+    Mos6502.prototype.TAX = function () {
+        this.rX = this.rA;
+        this.flgZero = this.rX === 0 ? 1 : 0;
+        this.flgNegative = this.rX >= 128 ? 1 : 0;
+    };
+    Mos6502.prototype.TAY = function () {
+        this.rY = this.rA;
+        this.flgZero = this.rY === 0 ? 1 : 0;
+        this.flgNegative = this.rY >= 128 ? 1 : 0;
+    };
+    Mos6502.prototype.TSX = function () {
+        this.rX = this.sp;
+        this.flgZero = this.rX === 0 ? 1 : 0;
+        this.flgNegative = this.rX >= 128 ? 1 : 0;
+    };
+    Mos6502.prototype.TXA = function () {
+        this.rA = this.rX;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    Mos6502.prototype.TXS = function () {
+        this.sp = this.rX;
+    };
+    Mos6502.prototype.TYA = function () {
+        this.rA = this.rY;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    /*JSR - Jump to Subroutine
+        The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
+     */
+    Mos6502.prototype.JSR = function (addr) {
+        this.pushWord(this.ip + 3 - 1);
+        this.ip = addr;
+    };
+    /**
+     * RTS - Return from Subroutine
+        The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
+     */
+    Mos6502.prototype.RTS = function () {
+        this.ip = this.popWord() + 1;
+    };
+    /**
+         PHA - Push Accumulator
+
+        Pushes a copy of the accumulator on to the stack.
+     */
+    Mos6502.prototype.PHA = function () {
+        this.pushByte(this.rA);
+    };
+    /**
+     PLA  - Pull Accumulator
+     Pulls an 8 bit value from the stack and into the accumulator. The zero and negative flags are set as appropriate.
+
+        C	Carry Flag	Not affected
+        Z	Zero Flag	Set if A = 0
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Not affected
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Set if bit 7 of A is set
+
+ */
+    Mos6502.prototype.PLA = function () {
+        this.rA = this.popByte();
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    /**
+       PHP - Push Processor Status
+
+        Pushes a copy of the status flags on to the stack.
+   */
+    Mos6502.prototype.PHP = function () {
+        this.pushByte((this.flgNegative << 7) +
+            (this.flgOverflow << 6) +
+            (1 << 5) +
+            (this.flgBreakCommand << 4) +
+            (this.flgDecimalMode << 3) +
+            (this.flgInterruptDisable << 2) +
+            (this.flgZero << 1) +
+            (this.flgCarry << 0));
+    };
+    /**
+      PLP - Pull Processor Status
+
+        Pulls an 8 bit value from the stack and into the processor flags.
+        The flags will take on new states as determined by the value pulled.
+
+   */
+    Mos6502.prototype.PLP = function () {
+        var byte = this.popByte();
+        this.flgNegative = (byte >> 7) & 1;
+        this.flgOverflow = (byte >> 6) & 1;
+        //skip (byte >> 5) & 1;
+        //skip this.flgBreakCommand = (byte >> 4) & 1;
+        this.flgDecimalMode = (byte >> 3) & 1;
+        this.flgInterruptDisable = (byte >> 2) & 1;
+        this.flgZero = (byte >> 1) & 1;
+        this.flgCarry = (byte >> 0) & 1;
+    };
+    /**
+    BRK - Force Interrupt
+
+        The BRK instruction forces the generation of an interrupt request.
+        The program counter and processor status are pushed on the stack then the IRQ interrupt vector
+         at $FFFE/F is loaded into the PC and the break flag in the status set to one.
+
+        C	Carry Flag	Not affected
+        Z	Zero Flag	Not affected
+        I	Interrupt Disable	Not affected
+        D	Decimal Mode Flag	Not affected
+        B	Break Command	Set to 1
+        V	Overflow Flag	Not affected
+        N	Negative Flag	Not affected
+
+        http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
+
+        No actual "B" flag exists inside the 6502's processor status register. The B
+        flag only exists in the status flag byte pushed to the stack. Naturally,
+        when the flags are restored (via PLP or RTI), the B bit is discarded.
+
+        Depending on the means, the B status flag will be pushed to the stack as
+        either 0 or 1.
+
+        software instructions BRK & PHP will push the B flag as being 1.
+        hardware interrupts IRQ & NMI will push the B flag as being 0.
+
+        Regardless of what ANY 6502 documentation says, BRK is a 2 byte opcode. The
+        first is #$00, and the second is a padding byte. This explains why interrupt
+        routines called by BRK always return 2 bytes after the actual BRK opcode,
+        and not just 1.
+
+   */
+    Mos6502.prototype.BRK = function () {
+        this.pushWord(this.ip + 2);
+        this.flgBreakCommand = 1;
+        this.PHP();
+        this.flgBreakCommand = 0;
+        this.ip = this.memory.getWord(0xfffe);
+    };
+    /**
+     * RTI - Return from Interrupt
+
+        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed by the program counter.
+
+        Processor Status after use:
+
+        C	Carry Flag	Set from stack
+        Z	Zero Flag	Set from stack
+        I	Interrupt Disable	Set from stack
+        D	Decimal Mode Flag	Set from stack
+        B	Break Command	Set from stack
+        V	Overflow Flag	Set from stack
+        N	Negative Flag	Set from stack
+
+     */
+    Mos6502.prototype.RTI = function () {
+        this.PLP();
+        this.ip = this.popWord();
+    };
+    Mos6502.prototype.getByte = function (addr) {
+        if (addr === this.addrRA)
+            return this.rA;
+        else
+            return this.memory.getByte(addr);
+    };
+    Mos6502.prototype.setByte = function (addr, byte) {
+        if (addr === this.addrRA)
+            this.rA = byte;
+        else
+            this.memory.setByte(addr, byte);
+    };
     Mos6502.prototype.getSByteRelative = function () { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; };
     Mos6502.prototype.getByteImmediate = function () { return this.memory.getByte(this.ip + 1); };
     Mos6502.prototype.getWordImmediate = function () { return this.memory.getWord(this.ip + 1); };
     Mos6502.prototype.getAddrZeroPage = function () { return this.getByteImmediate(); };
     Mos6502.prototype.getByteZeroPage = function () { return this.memory.getByte(this.getAddrZeroPage()); };
     Mos6502.prototype.getWordZeroPage = function () { return this.memory.getWord(this.getAddrZeroPage()); };
-    Mos6502.prototype.getAddrZeroPageX = function () { return (this.rX + this.getByteImmediate()) % 256; };
+    Mos6502.prototype.getAddrZeroPageX = function () { return (this.rX + this.getByteImmediate()) & 0xff; };
     Mos6502.prototype.getByteZeroPageX = function () { return this.memory.getByte(this.getAddrZeroPageX()); };
     Mos6502.prototype.getWordZeroPageX = function () { return this.memory.getWord(this.getAddrZeroPageX()); };
-    Mos6502.prototype.getByteZeroPageY = function () { return this.memory.getByte((this.rY + this.getByteImmediate()) % 256); };
-    Mos6502.prototype.getWordZeroPageY = function () { return this.memory.getWord((this.rY + this.getByteImmediate()) % 256); };
+    Mos6502.prototype.getAddrZeroPageY = function () { return (this.rY + this.getByteImmediate()) & 0xff; };
+    Mos6502.prototype.getByteZeroPageY = function () { return this.memory.getByte(this.getAddrZeroPageY()); };
+    Mos6502.prototype.getWordZeroPageY = function () { return this.memory.getWord(this.getAddrZeroPageY()); };
     Mos6502.prototype.getAddrAbsolute = function () { return this.getWordImmediate(); };
-    Mos6502.prototype.getByteAbsolute = function () { return this.memory.getByte(this.getAddrAbsolute()); };
-    Mos6502.prototype.getWordAbsolute = function () { return this.memory.getWord(this.getAddrAbsolute()); };
-    Mos6502.prototype.getAddrAbsoluteX = function () { return (this.rX + this.getWordImmediate()) % 65536; };
+    Mos6502.prototype.getByteAbsolute = function () { return this.getByteImmediate(); };
+    Mos6502.prototype.getWordAbsolute = function () { return this.getAddrAbsolute(); };
+    Mos6502.prototype.getAddrAbsoluteX = function () { return (this.rX + this.getWordImmediate()) & 0xffff; };
     Mos6502.prototype.getByteAbsoluteX = function () { return this.memory.getByte(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getWordAbsoluteX = function () { return this.memory.getWord(this.getAddrAbsoluteX()); };
-    Mos6502.prototype.getByteAbsoluteY = function () { return this.memory.getByte((this.rY + this.getWordImmediate()) % 65536); };
-    Mos6502.prototype.getWordAbsoluteY = function () { return this.memory.getWord((this.rY + this.getWordImmediate()) % 65536); };
+    Mos6502.prototype.getAddrAbsoluteY = function () { return (this.rY + this.getWordImmediate()) & 0xffff; };
+    Mos6502.prototype.getByteAbsoluteY = function () { return this.memory.getByte(this.getAddrAbsoluteY()); };
+    Mos6502.prototype.getWordAbsoluteY = function () { return this.memory.getWord(this.getAddrAbsoluteY()); };
     Mos6502.prototype.getByteIndirect = function () { return this.memory.getByte(this.memory.getWord(this.getWordImmediate())); };
     Mos6502.prototype.getWordIndirect = function () { return this.memory.getWord(this.memory.getWord(this.getWordImmediate())); };
     Mos6502.prototype.getWordIndirectWithxxFFBug = function () {
@@ -558,16 +929,33 @@ var Mos6502 = (function () {
         */
         var addrLocation = this.getWordImmediate();
         var addr;
-        if (addrLocation % 256 === 255)
+        if ((addrLocation & 0xff) === 0xff)
             addr = this.memory.getByte(addrLocation) + 256 * this.memory.getByte((addrLocation >> 8) << 8);
         else
             addr = this.memory.getWord(addrLocation);
         return this.memory.getWord(addr);
     };
-    Mos6502.prototype.getByteIndirectX = function () { return this.memory.getByte(this.memory.getWord((this.getByteImmediate() + this.rX) % 256)); };
-    Mos6502.prototype.getWordIndirectX = function () { return this.memory.getWord(this.memory.getWord((this.getByteImmediate() + this.rX) % 256)); };
-    Mos6502.prototype.getByteIndirectY = function () { return this.memory.getByte((this.memory.getWord(this.getByteImmediate()) + this.rY) % 65536); };
-    Mos6502.prototype.getWordIndirectY = function () { return this.memory.getWord((this.memory.getWord(this.getByteImmediate()) + this.rY) % 65536); };
+    Mos6502.prototype.getAddrIndirectX = function () { return this.memory.getWord((this.getByteImmediate() + this.rX) & 0xff); };
+    Mos6502.prototype.getByteIndirectX = function () { return this.memory.getByte(this.getAddrIndirectX()); };
+    Mos6502.prototype.getWordIndirectX = function () { return this.memory.getWord(this.getAddrIndirectX()); };
+    Mos6502.prototype.getAddrIndirectY = function () { return (this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff; };
+    Mos6502.prototype.getByteIndirectY = function () { return this.memory.getByte(this.getAddrIndirectY()); };
+    Mos6502.prototype.getWordIndirectY = function () { return this.memory.getWord(this.getAddrIndirectY()); };
+    Mos6502.prototype.pushByte = function (byte) {
+        this.memory.setByte(0x100 + this.sp, byte & 0xff);
+        this.sp = this.sp === 0 ? 0xff : this.sp - 1;
+    };
+    Mos6502.prototype.popByte = function () {
+        this.sp = this.sp === 0xff ? 0 : this.sp + 1;
+        return this.memory.getByte(0x100 + this.sp);
+    };
+    Mos6502.prototype.pushWord = function (word) {
+        this.pushByte((word >> 8) & 0xff);
+        this.pushByte(word & 0xff);
+    };
+    Mos6502.prototype.popWord = function () {
+        return this.popByte() + (this.popByte() << 8);
+    };
     Mos6502.prototype.step = function () {
         switch (this.memory.getByte(this.ip)) {
             case 0x69:
@@ -600,38 +988,6 @@ var Mos6502 = (function () {
                 break;
             case 0x71:
                 this.ADC(this.getByteIndirectY());
-                this.ip += 2;
-                break;
-            case 0xe9:
-                this.SBC(this.getByteImmediate());
-                this.ip += 2;
-                break;
-            case 0xe5:
-                this.SBC(this.getByteZeroPage());
-                this.ip += 2;
-                break;
-            case 0xf5:
-                this.SBC(this.getByteZeroPageX());
-                this.ip += 2;
-                break;
-            case 0xed:
-                this.SBC(this.getByteAbsolute());
-                this.ip += 3;
-                break;
-            case 0xfd:
-                this.SBC(this.getByteAbsoluteX());
-                this.ip += 3;
-                break;
-            case 0xf9:
-                this.SBC(this.getByteAbsoluteY());
-                this.ip += 3;
-                break;
-            case 0xe1:
-                this.SBC(this.getByteIndirectX());
-                this.ip += 2;
-                break;
-            case 0xf1:
-                this.SBC(this.getByteIndirectY());
                 this.ip += 2;
                 break;
             case 0x29:
@@ -667,19 +1023,19 @@ var Mos6502 = (function () {
                 this.ip += 2;
                 break;
             case 0x0a:
-                this.ASL(this.rA);
+                this.ASL(this.addrRA);
                 this.ip += 1;
                 break;
             case 0x06:
-                this.ASL(this.getByteZeroPage());
+                this.ASL(this.getAddrZeroPage());
                 this.ip += 2;
                 break;
             case 0x0e:
-                this.ASL(this.getByteAbsolute());
+                this.ASL(this.getAddrAbsolute());
                 this.ip += 3;
                 break;
             case 0x1e:
-                this.ASL(this.getByteAbsoluteX());
+                this.ASL(this.getAddrAbsoluteX());
                 this.ip += 3;
                 break;
             case 0x90:
@@ -879,6 +1235,321 @@ var Mos6502 = (function () {
                 break;
             case 0x6c:
                 this.ip = this.getWordIndirectWithxxFFBug();
+                break;
+            case 0xa9:
+                this.LDA(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xa5:
+                this.LDA(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0xb5:
+                this.LDA(this.getByteZeroPageX());
+                this.ip += 2;
+                break;
+            case 0xad:
+                this.LDA(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0xbd:
+                this.LDA(this.getByteAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0xb9:
+                this.LDA(this.getByteAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xa1:
+                this.LDA(this.getByteIndirectX());
+                this.ip += 2;
+                break;
+            case 0xb1:
+                this.LDA(this.getByteIndirectY());
+                this.ip += 2;
+                break;
+            case 0xa2:
+                this.LDX(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xa6:
+                this.LDX(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0xb6:
+                this.LDX(this.getByteZeroPageY());
+                this.ip += 2;
+                break;
+            case 0xae:
+                this.LDX(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0xbe:
+                this.LDX(this.getByteAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xa0:
+                this.LDY(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xa4:
+                this.LDY(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0xb4:
+                this.LDY(this.getByteZeroPageX());
+                this.ip += 2;
+                break;
+            case 0xac:
+                this.LDY(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0xbc:
+                this.LDY(this.getByteAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x4a:
+                this.LSR(this.addrRA);
+                this.ip += 1;
+                break;
+            case 0x46:
+                this.LSR(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x56:
+                this.LSR(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x4e:
+                this.LSR(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x5e:
+                this.LSR(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0xea:
+                this.ip += 1;
+                break;
+            case 0x09:
+                this.ORA(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x05:
+                this.ORA(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0x15:
+                this.ORA(this.getByteZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x0d:
+                this.ORA(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0x1d:
+                this.ORA(this.getByteAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x19:
+                this.ORA(this.getByteAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x01:
+                this.ORA(this.getByteIndirectX());
+                this.ip += 2;
+                break;
+            case 0x11:
+                this.ORA(this.getByteIndirectY());
+                this.ip += 2;
+                break;
+            case 0x48:
+                this.PHA();
+                this.ip += 1;
+                break;
+            case 0x08:
+                this.PHP();
+                this.ip += 1;
+                break;
+            case 0x68:
+                this.PLA();
+                this.ip += 1;
+                break;
+            case 0x28:
+                this.PLP();
+                this.ip += 1;
+                break;
+            case 0x2a:
+                this.ROL(this.addrRA);
+                this.ip += 1;
+                break;
+            case 0x26:
+                this.ROL(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x36:
+                this.ROL(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x2e:
+                this.ROL(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x3e:
+                this.ROL(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x6a:
+                this.ROR(this.addrRA);
+                this.ip += 1;
+                break;
+            case 0x66:
+                this.ROR(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x76:
+                this.ROR(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x6e:
+                this.ROR(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x7e:
+                this.ROR(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x00:
+                this.BRK();
+                break;
+            case 0x40:
+                this.RTI();
+                break;
+            case 0xe9:
+                this.SBC(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xe5:
+                this.SBC(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0xf5:
+                this.SBC(this.getByteZeroPageX());
+                this.ip += 2;
+                break;
+            case 0xed:
+                this.SBC(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0xfd:
+                this.SBC(this.getByteAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0xf9:
+                this.SBC(this.getByteAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xe1:
+                this.SBC(this.getByteIndirectX());
+                this.ip += 2;
+                break;
+            case 0xf1:
+                this.SBC(this.getByteIndirectY());
+                this.ip += 2;
+                break;
+            case 0x38:
+                this.flgCarry = 1;
+                this.ip += 1;
+                break;
+            case 0xf8:
+                this.flgDecimalMode = 1;
+                this.ip += 1;
+                break;
+            case 0x78:
+                this.flgInterruptDisable = 1;
+                this.ip += 1;
+                break;
+            case 0x85:
+                this.STA(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x95:
+                this.STA(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x8d:
+                this.STA(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x9d:
+                this.STA(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x99:
+                this.STA(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x81:
+                this.STA(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x91:
+                this.STA(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0x86:
+                this.STX(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x96:
+                this.STX(this.getAddrZeroPageY());
+                this.ip += 2;
+                break;
+            case 0x8e:
+                this.STX(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x84:
+                this.STY(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x94:
+                this.STY(this.getAddrZeroPageY());
+                this.ip += 2;
+                break;
+            case 0x8c:
+                this.STY(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0xaa:
+                this.TAX();
+                this.ip += 1;
+                break;
+            case 0xa8:
+                this.TAY();
+                this.ip += 1;
+                break;
+            case 0xba:
+                this.TSX();
+                this.ip += 1;
+                break;
+            case 0x8a:
+                this.TXA();
+                this.ip += 1;
+                break;
+            case 0x9a:
+                this.TXS();
+                this.ip += 1;
+                break;
+            case 0x98:
+                this.TYA();
+                this.ip += 1;
+                break;
+            case 0x20:
+                this.JSR(this.getWordAbsolute());
+                break;
+            case 0x60:
+                this.RTS();
                 break;
         }
     };
