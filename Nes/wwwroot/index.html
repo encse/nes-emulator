@@ -33,6 +33,7 @@
 					lines = lines.split('\n');
 					for (var iline = 0; iline < lines.length; iline++) {
 						var line = lines[iline];
+						
 						var groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
 						groups.shift();
 						groups = groups.map(x => parseInt(x, 16));
@@ -66,6 +67,8 @@
 						}
 						cpu.step();
 					};
+
+					log('done');
 				});
 
 			}

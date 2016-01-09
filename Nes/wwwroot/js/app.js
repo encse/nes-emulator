@@ -105,6 +105,21 @@ var Mos6502 = (function () {
     Mos6502.prototype.SBC = function (b) {
         this.ADC(255 - b);
     };
+    Mos6502.prototype.ISC = function (addr) {
+        this.SBC(this.INC(addr));
+    };
+    Mos6502.prototype.SLO = function (addr) {
+        this.ORA(this.ASL(addr));
+    };
+    Mos6502.prototype.RLA = function (addr) {
+        this.AND(this.ROL(addr));
+    };
+    Mos6502.prototype.SRE = function (addr) {
+        this.EOR(this.LSR(addr));
+    };
+    Mos6502.prototype.RRA = function (addr) {
+        this.ADC(this.ROR(addr));
+    };
     /**
      * AND - Logical AND
        A,Z,N = A&M
@@ -201,6 +216,7 @@ var Mos6502 = (function () {
         this.flgZero = res === 0 ? 1 : 0;
         this.flgNegative = res & 128 ? 1 : 0;
         this.setByte(addr, res);
+        return res;
     };
     /* BCC - Branch if Carry Clear
 
@@ -376,6 +392,14 @@ var Mos6502 = (function () {
         this.flgZero = this.rA === byte ? 1 : 0;
         this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
     };
+    Mos6502.prototype.DCP = function (addr) {
+        var byte = this.getByte(addr);
+        byte = byte === 0 ? 255 : byte - 1;
+        this.setByte(addr, byte);
+        this.flgCarry = this.rA >= byte ? 1 : 0;
+        this.flgZero = this.rA === byte ? 1 : 0;
+        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
+    };
     /* CMP - Compare X Register
 
         Z,C,N = X-M
@@ -511,6 +535,7 @@ var Mos6502 = (function () {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     };
     /**
         INX - Increment X Register
@@ -576,6 +601,12 @@ var Mos6502 = (function () {
      */
     Mos6502.prototype.LDA = function (byte) {
         this.rA = byte;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    };
+    Mos6502.prototype.LAX = function (byte) {
+        this.rA = byte;
+        this.rX = byte;
         this.flgZero = this.rA === 0 ? 1 : 0;
         this.flgNegative = this.rA >= 128 ? 1 : 0;
     };
@@ -645,6 +676,7 @@ var Mos6502 = (function () {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     };
     /*
        ORA - Logical Inclusive OR
@@ -696,6 +728,7 @@ var Mos6502 = (function () {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     };
     /*
           ROR - Rotate Right
@@ -721,6 +754,7 @@ var Mos6502 = (function () {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     };
     /*
       STA - Store Accumulator
@@ -748,6 +782,9 @@ var Mos6502 = (function () {
     };
     Mos6502.prototype.STY = function (addr) {
         this.setByte(addr, this.rY);
+    };
+    Mos6502.prototype.SAX = function (addr) {
+        this.setByte(addr, this.rX & this.rA);
     };
     Mos6502.prototype.TAX = function () {
         this.rX = this.rA;
@@ -954,10 +991,9 @@ var Mos6502 = (function () {
         //If the zero- page address was hex FF (i.e.last address of zero- page FF), the processor 
         //would not fetch data from the address pointed to by 00FF and 0100 + Y, but rather the one in 00FF and 0000 + Y.
         //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
-        //return(this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff;
-        var addrLo = this.getByteImmediate();
+        var addrLo = this.getByteImmediate() & 0xff;
         var addrHi = (addrLo + 1) & 0xff;
-        return (this.memory.getWord(addrLo + 256 * addrHi) + this.rY) & 0xffff;
+        return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     };
     Mos6502.prototype.getByteIndirectY = function () { return this.memory.getByte(this.getAddrIndirectY()); };
     Mos6502.prototype.getWordIndirectY = function () { return this.memory.getWord(this.getAddrIndirectY()); };
@@ -1048,6 +1084,10 @@ var Mos6502 = (function () {
                 break;
             case 0x06:
                 this.ASL(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x16:
+                this.ASL(this.getAddrZeroPageX());
                 this.ip += 2;
                 break;
             case 0x0e:
@@ -1534,7 +1574,7 @@ var Mos6502 = (function () {
                 this.ip += 2;
                 break;
             case 0x94:
-                this.STY(this.getAddrZeroPageY());
+                this.STY(this.getAddrZeroPageX());
                 this.ip += 2;
                 break;
             case 0x8c:
@@ -1570,6 +1610,288 @@ var Mos6502 = (function () {
                 break;
             case 0x60:
                 this.RTS();
+                break;
+            //unofficial opcodes below
+            case 0x1a:
+                this.ip += 1;
+                break;
+            case 0x3a:
+                this.ip += 1;
+                break;
+            case 0x5a:
+                this.ip += 1;
+                break;
+            case 0x7a:
+                this.ip += 1;
+                break;
+            case 0xda:
+                this.ip += 1;
+                break;
+            case 0xfa:
+                this.ip += 1;
+                break;
+            case 0x04:
+                this.ip += 2;
+                break;
+            case 0x14:
+                this.ip += 2;
+                break;
+            case 0x34:
+                this.ip += 2;
+                break;
+            case 0x44:
+                this.ip += 2;
+                break;
+            case 0x54:
+                this.ip += 2;
+                break;
+            case 0x64:
+                this.ip += 2;
+                break;
+            case 0x74:
+                this.ip += 2;
+                break;
+            case 0xd4:
+                this.ip += 2;
+                break;
+            case 0xf4:
+                this.ip += 2;
+                break;
+            case 0x80:
+                this.ip += 2;
+                break;
+            case 0x0c:
+                this.ip += 3;
+                break;
+            case 0x1c:
+                this.ip += 3;
+                break;
+            case 0x3c:
+                this.ip += 3;
+                break;
+            case 0x5c:
+                this.ip += 3;
+                break;
+            case 0x7c:
+                this.ip += 3;
+                break;
+            case 0xdc:
+                this.ip += 3;
+                break;
+            case 0xfc:
+                this.ip += 3;
+                break;
+            case 0xeb:
+                this.SBC(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xc3:
+                this.DCP(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0xc7:
+                this.DCP(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0xcf:
+                this.DCP(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0xd3:
+                this.DCP(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0xd7:
+                this.DCP(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0xdb:
+                this.DCP(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xdf:
+                this.DCP(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0xe3:
+                this.ISC(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0xe7:
+                this.ISC(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0xef:
+                this.ISC(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0xf3:
+                this.ISC(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0xf7:
+                this.ISC(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0xfb:
+                this.ISC(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xff:
+                this.ISC(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0xa7:
+                this.LAX(this.getByteZeroPage());
+                this.ip += 2;
+                break;
+            case 0xb7:
+                this.LAX(this.getByteZeroPageY());
+                this.ip += 2;
+                break;
+            case 0xaf:
+                this.LAX(this.getByteAbsolute());
+                this.ip += 3;
+                break;
+            case 0xbf:
+                this.LAX(this.getByteAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0xa3:
+                this.LAX(this.getByteIndirectX());
+                this.ip += 2;
+                break;
+            case 0xb3:
+                this.LAX(this.getByteIndirectY());
+                this.ip += 2;
+                break;
+            case 0x83:
+                this.SAX(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x87:
+                this.SAX(this.getAddrZeroPage());
+                this.ip += 2;
+                break;
+            case 0x8f:
+                this.SAX(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x97:
+                this.SAX(this.getAddrZeroPageY());
+                this.ip += 2;
+                break;
+            case 0x03:
+                this.SLO(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x07:
+                this.SLO(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x0f:
+                this.SLO(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x13:
+                this.SLO(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0x17:
+                this.SLO(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x1b:
+                this.SLO(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x1f:
+                this.SLO(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x23:
+                this.RLA(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x27:
+                this.RLA(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x2f:
+                this.RLA(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x33:
+                this.RLA(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0x37:
+                this.RLA(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x3b:
+                this.RLA(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x3f:
+                this.RLA(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x63:
+                this.RRA(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x67:
+                this.RRA(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x6f:
+                this.RRA(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x73:
+                this.RRA(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0x77:
+                this.RRA(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x7b:
+                this.RRA(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x7f:
+                this.RRA(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x43:
+                this.SRE(this.getAddrIndirectX());
+                this.ip += 2;
+                break;
+            case 0x47:
+                this.SRE(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x4f:
+                this.SRE(this.getAddrAbsolute());
+                this.ip += 3;
+                break;
+            case 0x53:
+                this.SRE(this.getAddrIndirectY());
+                this.ip += 2;
+                break;
+            case 0x57:
+                this.SRE(this.getAddrZeroPageX());
+                this.ip += 2;
+                break;
+            case 0x5b:
+                this.SRE(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            case 0x5f:
+                this.SRE(this.getAddrAbsoluteX());
+                this.ip += 3;
                 break;
         }
     };

@@ -112,6 +112,27 @@ class Mos6502 {
     private SBC(b: number): void {
         this.ADC(255 - b);
     }
+
+    private ISC(addr: number): void {
+        this.SBC(this.INC(addr));
+    }
+
+
+    private SLO(addr: number): void {
+        this.ORA(this.ASL(addr));
+    }
+
+    private RLA(addr: number): void {
+        this.AND(this.ROL(addr));
+    }
+
+    private SRE(addr: number): void {
+        this.EOR(this.LSR(addr));
+    }
+
+    private RRA(addr: number): void {
+        this.ADC(this.ROR(addr));
+    }
     /**
      * AND - Logical AND
        A,Z,N = A&M
@@ -208,7 +229,7 @@ class Mos6502 {
         V	Overflow Flag	Not affected
         N	Negative Flag	Set if bit 7 of the result is set
     */
-    private ASL(addr: number): void {
+    private ASL(addr: number): number {
         var byte = this.getByte(addr);
         var res = byte << 1;
         this.flgCarry = res > 255 ? 1 : 0;
@@ -217,6 +238,7 @@ class Mos6502 {
         this.flgNegative = res & 128 ? 1 : 0;
 
         this.setByte(addr, res);
+        return res;
     }
 
     /* BCC - Branch if Carry Clear
@@ -403,6 +425,17 @@ class Mos6502 {
         this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
     }
 
+    private DCP(addr: number): void {
+        var byte = this.getByte(addr);
+        byte = byte === 0 ? 255 : byte - 1;
+        this.setByte(addr, byte);
+
+        this.flgCarry = this.rA >= byte ? 1 : 0;
+        this.flgZero = this.rA === byte ? 1 : 0;
+        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
+
+    }
+
 
     /* CMP - Compare X Register
 
@@ -539,12 +572,13 @@ class Mos6502 {
         N	Negative Flag	Set if bit 7 of the result is set
 
     */
-    private INC(addr: number): void {
+    private INC(addr: number): number {
         var byte = this.getByte(addr);
         byte = byte === 255 ? 0 : byte + 1;
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     }
 
     /**
@@ -619,6 +653,13 @@ class Mos6502 {
         this.flgNegative = this.rA >= 128 ? 1 : 0;
     }
 
+    private LAX(byte: number): void {
+        this.rA = byte;
+        this.rX = byte;
+        this.flgZero = this.rA === 0 ? 1 : 0;
+        this.flgNegative = this.rA >= 128 ? 1 : 0;
+    }
+
     /*
         LDX - Load X Register
 
@@ -682,13 +723,14 @@ class Mos6502 {
         N	Negative Flag	Set if bit 7 of the result is set
 
     */
-    private LSR(addr: number): void {
+    private LSR(addr: number): number {
         var byte = this.getByte(addr);
         this.flgCarry = byte % 2;
         byte >>= 1;
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     }
  /*
     ORA - Logical Inclusive OR
@@ -732,7 +774,7 @@ class Mos6502 {
 
 
    */
-    private ROL(addr: number): void {
+    private ROL(addr: number): number {
         var byte = this.getByte(addr);
         byte <<= 1;
         byte |= this.flgCarry;
@@ -741,6 +783,7 @@ class Mos6502 {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     }
 
     /*
@@ -759,7 +802,7 @@ class Mos6502 {
         N	Negative Flag	Set if bit 7 of the result is set
 
   */
-    private ROR(addr: number): void {
+    private ROR(addr: number): number {
         var byte = this.getByte(addr);
         byte |= (this.flgCarry << 8);
         this.flgCarry = byte & 1;
@@ -767,6 +810,7 @@ class Mos6502 {
         this.flgZero = byte === 0 ? 1 : 0;
         this.flgNegative = byte >= 128 ? 1 : 0;
         this.setByte(addr, byte);
+        return byte;
     }
 
 
@@ -798,6 +842,10 @@ class Mos6502 {
     }
     private STY(addr: number): void {
         this.setByte(addr, this.rY);
+    }
+
+    private SAX(addr: number): void {
+        this.setByte(addr, this.rX & this.rA);
     }
 
     private TAX(): void {
@@ -1036,11 +1084,9 @@ class Mos6502 {
         //would not fetch data from the address pointed to by 00FF and 0100 + Y, but rather the one in 00FF and 0000 + Y.
         //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
         
-        //return(this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff;
-
-        var addrLo: number = this.getByteImmediate();
+        var addrLo: number = this.getByteImmediate() & 0xff;
         var addrHi: number = (addrLo + 1) & 0xff;
-        return (this.memory.getWord(addrLo + 256 * addrHi) + this.rY) & 0xffff;
+        return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     }
     private getByteIndirectY(): number { return this.memory.getByte(this.getAddrIndirectY()); }
     private getWordIndirectY(): number { return this.memory.getWord(this.getAddrIndirectY()); }
@@ -1086,6 +1132,7 @@ class Mos6502 {
 
             case 0x0a: this.ASL(this.addrRA); this.ip += 1; break;
             case 0x06: this.ASL(this.getAddrZeroPage()); this.ip += 2; break;
+            case 0x16: this.ASL(this.getAddrZeroPageX()); this.ip += 2; break;
             case 0x0e: this.ASL(this.getAddrAbsolute()); this.ip += 3; break;
             case 0x1e: this.ASL(this.getAddrAbsoluteX()); this.ip += 3; break;
 
@@ -1177,6 +1224,7 @@ class Mos6502 {
             case 0x5e: this.LSR(this.getAddrAbsoluteX()); this.ip += 3; break;
 
             case 0xea: /*NOP*/ this.ip += 1; break;
+        
       
             case 0x09: this.ORA(this.getByteImmediate()); this.ip += 2; break;
             case 0x05: this.ORA(this.getByteZeroPage()); this.ip += 2; break;
@@ -1234,7 +1282,7 @@ class Mos6502 {
             case 0x8e: this.STX(this.getAddrAbsolute()); this.ip += 3; break;
 
             case 0x84: this.STY(this.getAddrZeroPage()); this.ip += 2; break;
-            case 0x94: this.STY(this.getAddrZeroPageY()); this.ip += 2; break;
+            case 0x94: this.STY(this.getAddrZeroPageX()); this.ip += 2; break;
             case 0x8c: this.STY(this.getAddrAbsolute()); this.ip += 3; break;
 
             case 0xaa: this.TAX(); this.ip += 1; break;
@@ -1246,6 +1294,95 @@ class Mos6502 {
 
             case 0x20: this.JSR(this.getAddrAbsolute());  break;
             case 0x60: this.RTS(); break;
+
+            //unofficial opcodes below
+
+            case 0x1a: /* *NOP*/ this.ip += 1; break;
+            case 0x3a: /* *NOP*/ this.ip += 1; break;
+            case 0x5a: /* *NOP*/ this.ip += 1; break;
+            case 0x7a: /* *NOP*/ this.ip += 1; break;
+            case 0xda: /* *NOP*/ this.ip += 1; break;
+            case 0xfa: /* *NOP*/ this.ip += 1; break;
+            case 0x04: /* *NOP*/ this.ip += 2; break;
+            case 0x14: /* *NOP*/ this.ip += 2; break;
+            case 0x34: /* *NOP*/ this.ip += 2; break;
+            case 0x44: /* *NOP*/ this.ip += 2; break;
+            case 0x54: /* *NOP*/ this.ip += 2; break;
+            case 0x64: /* *NOP*/ this.ip += 2; break;
+            case 0x74: /* *NOP*/ this.ip += 2; break;
+            case 0xd4: /* *NOP*/ this.ip += 2; break;
+            case 0xf4: /* *NOP*/ this.ip += 2; break;
+            case 0x80: /* *NOP*/ this.ip += 2; break;
+            case 0x0c: /* *NOP*/ this.ip += 3; break;
+            case 0x1c: /* *NOP*/ this.ip += 3; break;
+            case 0x3c: /* *NOP*/ this.ip += 3; break;
+            case 0x5c: /* *NOP*/ this.ip += 3; break;
+            case 0x7c: /* *NOP*/ this.ip += 3; break;
+            case 0xdc: /* *NOP*/ this.ip += 3; break;
+            case 0xfc: /* *NOP*/ this.ip += 3; break;
+            case 0xeb: this.SBC(this.getByteImmediate()); this.ip += 2; break;
+            case 0xc3: this.DCP(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0xc7: this.DCP(this.getAddrZeroPage()); this.ip += 2; break;
+            case 0xcf: this.DCP(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0xd3: this.DCP(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0xd7: this.DCP(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0xdb: this.DCP(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0xdf: this.DCP(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            case 0xe3: this.ISC(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0xe7: this.ISC(this.getAddrZeroPage()); this.ip += 2; break;
+            case 0xef: this.ISC(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0xf3: this.ISC(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0xf7: this.ISC(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0xfb: this.ISC(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0xff: this.ISC(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            case 0xa7: this.LAX(this.getByteZeroPage()); this.ip += 2; break;
+            case 0xb7: this.LAX(this.getByteZeroPageY()); this.ip += 2; break;
+            case 0xaf: this.LAX(this.getByteAbsolute()); this.ip += 3; break;
+            case 0xbf: this.LAX(this.getByteAbsoluteY()); this.ip += 3; break;
+            case 0xa3: this.LAX(this.getByteIndirectX()); this.ip += 2; break;
+            case 0xb3: this.LAX(this.getByteIndirectY()); this.ip += 2; break;
+
+            case 0x83: this.SAX(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0x87: this.SAX(this.getAddrZeroPage()); this.ip += 2; break;
+            case 0x8f: this.SAX(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0x97: this.SAX(this.getAddrZeroPageY()); this.ip += 2; break;
+
+            case 0x03: this.SLO(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0x07: this.SLO(this.getByteImmediate()); this.ip += 2; break;
+            case 0x0f: this.SLO(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0x13: this.SLO(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0x17: this.SLO(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0x1b: this.SLO(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0x1f: this.SLO(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            case 0x23: this.RLA(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0x27: this.RLA(this.getByteImmediate()); this.ip += 2; break;
+            case 0x2f: this.RLA(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0x33: this.RLA(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0x37: this.RLA(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0x3b: this.RLA(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0x3f: this.RLA(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            case 0x63: this.RRA(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0x67: this.RRA(this.getByteImmediate()); this.ip += 2; break;
+            case 0x6f: this.RRA(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0x73: this.RRA(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0x77: this.RRA(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0x7b: this.RRA(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0x7f: this.RRA(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            case 0x43: this.SRE(this.getAddrIndirectX()); this.ip += 2; break;
+            case 0x47: this.SRE(this.getByteImmediate()); this.ip += 2; break;
+            case 0x4f: this.SRE(this.getAddrAbsolute()); this.ip += 3; break;
+            case 0x53: this.SRE(this.getAddrIndirectY()); this.ip += 2; break;
+            case 0x57: this.SRE(this.getAddrZeroPageX()); this.ip += 2; break;
+            case 0x5b: this.SRE(this.getAddrAbsoluteY()); this.ip += 3; break;
+            case 0x5f: this.SRE(this.getAddrAbsoluteX()); this.ip += 3; break;
+
+            //default:
+            //    throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
 
      
