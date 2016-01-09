@@ -22,21 +22,43 @@
 
 class Mos6502 {
 
-    addrRA: number = -1;
+    private addrRA: number = -1;
 
     rA: number = 0;
     rX: number = 0;
     rY: number = 0;
-    sp: number = 0;
-    flgCarry: number = 0;
-    flgZero: number = 0;
-    flgInterruptDisable: number = 0;
-    flgDecimalMode: number = 0;
-    flgBreakCommand: number = 0;
-    flgOverflow: number = 0;
-    flgNegative: number = 0;
 
-    public constructor(public memory, public ip) {
+    private flgCarry: number = 0;
+    private flgZero: number = 0;
+    private flgInterruptDisable: number = 1;
+    private flgDecimalMode: number = 0;
+    private flgBreakCommand: number = 0;
+    private flgOverflow: number = 0;
+    private flgNegative: number = 0;
+
+    public get rP(): number {
+        return (this.flgNegative << 7) +
+            (this.flgOverflow << 6) +
+            (1 << 5) +
+            (this.flgBreakCommand << 4) +
+            (this.flgDecimalMode << 3) +
+            (this.flgInterruptDisable << 2) +
+            (this.flgZero << 1) +
+            (this.flgCarry << 0);
+    }
+
+    public set rP(byte: number) {
+        this.flgNegative = (byte >> 7) & 1;
+        this.flgOverflow = (byte >> 6) & 1;
+        //skip (byte >> 5) & 1;
+        //skip this.flgBreakCommand = (byte >> 4) & 1;
+        this.flgDecimalMode = (byte >> 3) & 1;
+        this.flgInterruptDisable = (byte >> 2) & 1;
+        this.flgZero = (byte >> 1) & 1;
+        this.flgCarry = (byte >> 0) & 1;
+    }
+
+    public constructor(public memory:Memory, public ip: number, public sp: number) {
         
     }
 
@@ -142,7 +164,9 @@ class Mos6502 {
 
         A & M, N = M7, V = M6
 
-        This instructions is used to test if one or more bits are set in a target memory location. The mask pattern in A is ANDed with the value in memory to set or clear the zero flag, but the result is not kept. Bits 7 and 6 of the value from memory are copied into the N and V flags.
+        This instructions is used to test if one or more bits are set in a target memory location. 
+        The mask pattern in A is ANDed with the value in memory to set or clear the zero flag, but the result is not kept. 
+        Bits 7 and 6 of the value from memory are copied into the N and V flags.
 
         Processor Status after use:
 
@@ -158,8 +182,8 @@ class Mos6502 {
     private BIT(byte: number): void {
         var res  = this.rA & byte;
         this.flgZero = res === 0 ? 1 : 0;
-        this.flgNegative = res & 128 ? 1 : 0;
-        this.flgOverflow = res & 64 ? 1 : 0;
+        this.flgNegative = byte & 128 ? 1 : 0;
+        this.flgOverflow = byte & 64 ? 1 : 0;
     }
 
 
@@ -188,9 +212,9 @@ class Mos6502 {
         var byte = this.getByte(addr);
         var res = byte << 1;
         this.flgCarry = res > 255 ? 1 : 0;
-        this.flgNegative = res >= 128 ? 1 : 0;
-        res %= 256;
+        res &= 0xff;
         this.flgZero = res === 0 ? 1 : 0;
+        this.flgNegative = res & 128 ? 1 : 0;
 
         this.setByte(addr, res);
     }
@@ -376,7 +400,7 @@ class Mos6502 {
     private CMP(byte: number): void {
         this.flgCarry = this.rA >= byte ? 1 : 0;
         this.flgZero = this.rA === byte ? 1 : 0;
-        this.flgNegative = this.rA < byte ? 1 : 0;
+        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
     }
 
 
@@ -399,7 +423,7 @@ class Mos6502 {
     private CPX(byte: number): void {
         this.flgCarry = this.rX >= byte ? 1 : 0;
         this.flgZero = this.rX === byte ? 1 : 0;
-        this.flgNegative = this.rX < byte ? 1 : 0;
+        this.flgNegative = (this.rX - byte) & 128 ? 1 : 0;
     }
 
 
@@ -421,7 +445,7 @@ class Mos6502 {
     private CPY(byte: number): void {
         this.flgCarry = this.rY >= byte ? 1 : 0;
         this.flgZero = this.rY === byte ? 1 : 0;
-        this.flgNegative = this.rY < byte ? 1 : 0;
+        this.flgNegative = (this.rY - byte) & 128 ? 1 : 0;
     }
 
     /**
@@ -856,15 +880,9 @@ class Mos6502 {
         Pushes a copy of the status flags on to the stack. 
    */
     private PHP(): void {
-        this.pushByte(
-            (this.flgNegative << 7) +
-            (this.flgOverflow << 6) +
-            (1 << 5) +
-            (this.flgBreakCommand << 4) +
-            (this.flgDecimalMode << 3) +
-            (this.flgInterruptDisable << 2) +
-            (this.flgZero << 1) +
-            (this.flgCarry << 0));
+        this.flgBreakCommand = 1;
+        this.pushByte(this.rP);
+        this.flgBreakCommand = 0;
     }
 
 
@@ -876,15 +894,8 @@ class Mos6502 {
 
    */
     private PLP(): void {
-        var byte = this.popByte();
-        this.flgNegative = (byte >> 7) & 1;
-        this.flgOverflow = (byte >> 6) & 1;
-        //skip (byte >> 5) & 1;
-        //skip this.flgBreakCommand = (byte >> 4) & 1;
-        this.flgDecimalMode = (byte >> 3) & 1;
-        this.flgInterruptDisable = (byte >> 2) & 1;
-        this.flgZero = (byte >> 1) & 1;
-        this.flgCarry = (byte >> 0) & 1;
+        this.rP = this.popByte();
+        
     }
 
 
@@ -923,9 +934,7 @@ class Mos6502 {
    */
     private BRK(): void {
         this.pushWord(this.ip + 2);
-        this.flgBreakCommand = 1;
         this.PHP();
-        this.flgBreakCommand = 0;
 
         this.ip = this.memory.getWord(0xfffe);
     }
@@ -983,8 +992,8 @@ class Mos6502 {
     private getWordZeroPageY(): number { return this.memory.getWord(this.getAddrZeroPageY()); }
 
     private getAddrAbsolute(): number { return this.getWordImmediate(); }
-    private getByteAbsolute(): number { return this.getByteImmediate(); }
-    private getWordAbsolute(): number { return this.getAddrAbsolute(); }
+    private getByteAbsolute(): number { return this.memory.getByte(this.getAddrAbsolute()); }
+    private getWordAbsolute(): number { return this.memory.getWord(this.getAddrAbsolute()); }
 
     private getAddrAbsoluteX(): number { return (this.rX + this.getWordImmediate()) & 0xffff; }
     private getByteAbsoluteX(): number { return this.memory.getByte(this.getAddrAbsoluteX()) }
@@ -994,9 +1003,7 @@ class Mos6502 {
     private getByteAbsoluteY(): number { return this.memory.getByte(this.getAddrAbsoluteY()); }
     private getWordAbsoluteY(): number { return this.memory.getWord(this.getAddrAbsoluteY()); }
 
-    private getByteIndirect(): number { return this.memory.getByte(this.memory.getWord(this.getWordImmediate())); }
-    private getWordIndirect(): number { return this.memory.getWord(this.memory.getWord(this.getWordImmediate())); }
-    private getWordIndirectWithxxFFBug(): number {
+    private getWordIndirect(): number { 
         /*
          The 6502's memory indirect jump instruction, JMP (<address>), is partially broken. 
          If <address> is hex xxFF (i.e., any word ending in FF), the processor will not jump to the address
@@ -1005,20 +1012,36 @@ class Mos6502 {
          This defect continued through the entire NMOS line, but was corrected in the CMOS derivatives.
         */
 
-        var addrLocation = this.getWordImmediate();
-        var addr: number;
-        if ( (addrLocation & 0xff) === 0xff)
-            addr = this.memory.getByte(addrLocation) + 256 * this.memory.getByte( (addrLocation >> 8)  << 8 );
-        else
-            addr = this.memory.getWord(addrLocation); 
-        return this.memory.getWord(addr);
+        var addrLo = this.getWordImmediate();
+        var addrHi = (addrLo & 0xff00) + ((addrLo + 1) & 0x00ff);
+        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
     }
 
-    private getAddrIndirectX(): number { return this.memory.getWord((this.getByteImmediate() + this.rX) & 0xff); }
+    private getAddrIndirectX(): number {
+
+        //The 6502's Indirect-Indexed-X ((Ind,X)) addressing mode is also partially broken 
+        //if the zero- page address was hex FF (i.e.last address of zero- page FF), again a case of address wrap.
+        var addrLo: number = (this.getByteImmediate() + this.rX) & 0xff;
+        var addrHi: number = (addrLo + 1) & 0xff;
+        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
+    }
     private getByteIndirectX(): number { return this.memory.getByte(this.getAddrIndirectX()); }
     private getWordIndirectX(): number { return this.memory.getWord(this.getAddrIndirectX()); }
 
-    private getAddrIndirectY(): number { return (this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff; }
+
+    private getAddrIndirectY(): number {
+        
+        //The 6502's Indirect-Indexed-Y ((Ind),Y) addressing mode is also partially broken.
+        //If the zero- page address was hex FF (i.e.last address of zero- page FF), the processor 
+        //would not fetch data from the address pointed to by 00FF and 0100 + Y, but rather the one in 00FF and 0000 + Y.
+        //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
+        
+        //return(this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff;
+
+        var addrLo: number = this.getByteImmediate();
+        var addrHi: number = (addrLo + 1) & 0xff;
+        return (this.memory.getWord(addrLo + 256 * addrHi) + this.rY) & 0xffff;
+    }
     private getByteIndirectY(): number { return this.memory.getByte(this.getAddrIndirectY()); }
     private getWordIndirectY(): number { return this.memory.getWord(this.getAddrIndirectY()); }
 
@@ -1123,8 +1146,8 @@ class Mos6502 {
             case 0x24: this.BIT(this.getByteZeroPage()); this.ip += 2; break;
             case 0x2c: this.BIT(this.getByteAbsolute()); this.ip += 3; break;
          
-            case 0x4c: /*JMP*/ this.ip = this.getWordAbsolute(); break;
-            case 0x6c: /*JMP*/ this.ip = this.getWordIndirectWithxxFFBug(); break;
+            case 0x4c: /*JMP*/ this.ip = this.getAddrAbsolute(); break;
+            case 0x6c: /*JMP*/ this.ip = this.getWordIndirect(); break;
 
             case 0xa9: this.LDA(this.getByteImmediate()); this.ip += 2; break;
             case 0xa5: this.LDA(this.getByteZeroPage()); this.ip += 2; break;
@@ -1198,7 +1221,6 @@ class Mos6502 {
             case 0xf8: /*SED*/ this.flgDecimalMode = 1; this.ip += 1; break;
             case 0x78: /*SEI*/ this.flgInterruptDisable = 1; this.ip += 1; break;
 
-
             case 0x85: this.STA(this.getAddrZeroPage()); this.ip += 2; break;
             case 0x95: this.STA(this.getAddrZeroPageX()); this.ip += 2; break;
             case 0x8d: this.STA(this.getAddrAbsolute()); this.ip += 3; break;
@@ -1222,9 +1244,12 @@ class Mos6502 {
             case 0x9a: this.TXS(); this.ip += 1; break;
             case 0x98: this.TYA(); this.ip += 1; break;
 
-            case 0x20: this.JSR(this.getWordAbsolute());  break;
+            case 0x20: this.JSR(this.getAddrAbsolute());  break;
             case 0x60: this.RTS(); break;
         }
+
+     
+
     }
 
 }

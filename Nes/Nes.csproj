@@ -35,6 +35,7 @@
     <Content Include="wwwroot\index.html" />
     <Content Include="wwwroot\js\app.js" />
     <None Include="wwwroot\nestest.bin" />
+    <Content Include="wwwroot\nestest.log" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\mos6502.ts" />

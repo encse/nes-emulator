@@ -18,22 +18,46 @@ var Memory = (function () {
     return Memory;
 })();
 var Mos6502 = (function () {
-    function Mos6502(memory, ip) {
+    function Mos6502(memory, ip, sp) {
         this.memory = memory;
         this.ip = ip;
+        this.sp = sp;
         this.addrRA = -1;
         this.rA = 0;
         this.rX = 0;
         this.rY = 0;
-        this.sp = 0;
         this.flgCarry = 0;
         this.flgZero = 0;
-        this.flgInterruptDisable = 0;
+        this.flgInterruptDisable = 1;
         this.flgDecimalMode = 0;
         this.flgBreakCommand = 0;
         this.flgOverflow = 0;
         this.flgNegative = 0;
     }
+    Object.defineProperty(Mos6502.prototype, "rP", {
+        get: function () {
+            return (this.flgNegative << 7) +
+                (this.flgOverflow << 6) +
+                (1 << 5) +
+                (this.flgBreakCommand << 4) +
+                (this.flgDecimalMode << 3) +
+                (this.flgInterruptDisable << 2) +
+                (this.flgZero << 1) +
+                (this.flgCarry << 0);
+        },
+        set: function (byte) {
+            this.flgNegative = (byte >> 7) & 1;
+            this.flgOverflow = (byte >> 6) & 1;
+            //skip (byte >> 5) & 1;
+            //skip this.flgBreakCommand = (byte >> 4) & 1;
+            this.flgDecimalMode = (byte >> 3) & 1;
+            this.flgInterruptDisable = (byte >> 2) & 1;
+            this.flgZero = (byte >> 1) & 1;
+            this.flgCarry = (byte >> 0) & 1;
+        },
+        enumerable: true,
+        configurable: true
+    });
     /*
         ADC - Add with Carry
 
@@ -129,7 +153,9 @@ var Mos6502 = (function () {
 
         A & M, N = M7, V = M6
 
-        This instructions is used to test if one or more bits are set in a target memory location. The mask pattern in A is ANDed with the value in memory to set or clear the zero flag, but the result is not kept. Bits 7 and 6 of the value from memory are copied into the N and V flags.
+        This instructions is used to test if one or more bits are set in a target memory location.
+        The mask pattern in A is ANDed with the value in memory to set or clear the zero flag, but the result is not kept.
+        Bits 7 and 6 of the value from memory are copied into the N and V flags.
 
         Processor Status after use:
 
@@ -145,8 +171,8 @@ var Mos6502 = (function () {
     Mos6502.prototype.BIT = function (byte) {
         var res = this.rA & byte;
         this.flgZero = res === 0 ? 1 : 0;
-        this.flgNegative = res & 128 ? 1 : 0;
-        this.flgOverflow = res & 64 ? 1 : 0;
+        this.flgNegative = byte & 128 ? 1 : 0;
+        this.flgOverflow = byte & 64 ? 1 : 0;
     };
     /**
         ASL - Arithmetic Shift Left
@@ -171,9 +197,9 @@ var Mos6502 = (function () {
         var byte = this.getByte(addr);
         var res = byte << 1;
         this.flgCarry = res > 255 ? 1 : 0;
-        this.flgNegative = res >= 128 ? 1 : 0;
-        res %= 256;
+        res &= 0xff;
         this.flgZero = res === 0 ? 1 : 0;
+        this.flgNegative = res & 128 ? 1 : 0;
         this.setByte(addr, res);
     };
     /* BCC - Branch if Carry Clear
@@ -348,7 +374,7 @@ var Mos6502 = (function () {
     Mos6502.prototype.CMP = function (byte) {
         this.flgCarry = this.rA >= byte ? 1 : 0;
         this.flgZero = this.rA === byte ? 1 : 0;
-        this.flgNegative = this.rA < byte ? 1 : 0;
+        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
     };
     /* CMP - Compare X Register
 
@@ -369,7 +395,7 @@ var Mos6502 = (function () {
     Mos6502.prototype.CPX = function (byte) {
         this.flgCarry = this.rX >= byte ? 1 : 0;
         this.flgZero = this.rX === byte ? 1 : 0;
-        this.flgNegative = this.rX < byte ? 1 : 0;
+        this.flgNegative = (this.rX - byte) & 128 ? 1 : 0;
     };
     /* CMP - Compare Y Register
 
@@ -389,7 +415,7 @@ var Mos6502 = (function () {
     Mos6502.prototype.CPY = function (byte) {
         this.flgCarry = this.rY >= byte ? 1 : 0;
         this.flgZero = this.rY === byte ? 1 : 0;
-        this.flgNegative = this.rY < byte ? 1 : 0;
+        this.flgNegative = (this.rY - byte) & 128 ? 1 : 0;
     };
     /**
         DEC - Decrement Memory
@@ -797,14 +823,9 @@ var Mos6502 = (function () {
         Pushes a copy of the status flags on to the stack.
    */
     Mos6502.prototype.PHP = function () {
-        this.pushByte((this.flgNegative << 7) +
-            (this.flgOverflow << 6) +
-            (1 << 5) +
-            (this.flgBreakCommand << 4) +
-            (this.flgDecimalMode << 3) +
-            (this.flgInterruptDisable << 2) +
-            (this.flgZero << 1) +
-            (this.flgCarry << 0));
+        this.flgBreakCommand = 1;
+        this.pushByte(this.rP);
+        this.flgBreakCommand = 0;
     };
     /**
       PLP - Pull Processor Status
@@ -814,15 +835,7 @@ var Mos6502 = (function () {
 
    */
     Mos6502.prototype.PLP = function () {
-        var byte = this.popByte();
-        this.flgNegative = (byte >> 7) & 1;
-        this.flgOverflow = (byte >> 6) & 1;
-        //skip (byte >> 5) & 1;
-        //skip this.flgBreakCommand = (byte >> 4) & 1;
-        this.flgDecimalMode = (byte >> 3) & 1;
-        this.flgInterruptDisable = (byte >> 2) & 1;
-        this.flgZero = (byte >> 1) & 1;
-        this.flgCarry = (byte >> 0) & 1;
+        this.rP = this.popByte();
     };
     /**
     BRK - Force Interrupt
@@ -859,9 +872,7 @@ var Mos6502 = (function () {
    */
     Mos6502.prototype.BRK = function () {
         this.pushWord(this.ip + 2);
-        this.flgBreakCommand = 1;
         this.PHP();
-        this.flgBreakCommand = 0;
         this.ip = this.memory.getWord(0xfffe);
     };
     /**
@@ -909,17 +920,15 @@ var Mos6502 = (function () {
     Mos6502.prototype.getByteZeroPageY = function () { return this.memory.getByte(this.getAddrZeroPageY()); };
     Mos6502.prototype.getWordZeroPageY = function () { return this.memory.getWord(this.getAddrZeroPageY()); };
     Mos6502.prototype.getAddrAbsolute = function () { return this.getWordImmediate(); };
-    Mos6502.prototype.getByteAbsolute = function () { return this.getByteImmediate(); };
-    Mos6502.prototype.getWordAbsolute = function () { return this.getAddrAbsolute(); };
+    Mos6502.prototype.getByteAbsolute = function () { return this.memory.getByte(this.getAddrAbsolute()); };
+    Mos6502.prototype.getWordAbsolute = function () { return this.memory.getWord(this.getAddrAbsolute()); };
     Mos6502.prototype.getAddrAbsoluteX = function () { return (this.rX + this.getWordImmediate()) & 0xffff; };
     Mos6502.prototype.getByteAbsoluteX = function () { return this.memory.getByte(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getWordAbsoluteX = function () { return this.memory.getWord(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getAddrAbsoluteY = function () { return (this.rY + this.getWordImmediate()) & 0xffff; };
     Mos6502.prototype.getByteAbsoluteY = function () { return this.memory.getByte(this.getAddrAbsoluteY()); };
     Mos6502.prototype.getWordAbsoluteY = function () { return this.memory.getWord(this.getAddrAbsoluteY()); };
-    Mos6502.prototype.getByteIndirect = function () { return this.memory.getByte(this.memory.getWord(this.getWordImmediate())); };
-    Mos6502.prototype.getWordIndirect = function () { return this.memory.getWord(this.memory.getWord(this.getWordImmediate())); };
-    Mos6502.prototype.getWordIndirectWithxxFFBug = function () {
+    Mos6502.prototype.getWordIndirect = function () {
         /*
          The 6502's memory indirect jump instruction, JMP (<address>), is partially broken.
          If <address> is hex xxFF (i.e., any word ending in FF), the processor will not jump to the address
@@ -927,18 +936,29 @@ var Mos6502 = (function () {
          JMP ($10FF) would jump to the address stored in 10FF and 1000, instead of the one stored in 10FF and 1100).
          This defect continued through the entire NMOS line, but was corrected in the CMOS derivatives.
         */
-        var addrLocation = this.getWordImmediate();
-        var addr;
-        if ((addrLocation & 0xff) === 0xff)
-            addr = this.memory.getByte(addrLocation) + 256 * this.memory.getByte((addrLocation >> 8) << 8);
-        else
-            addr = this.memory.getWord(addrLocation);
-        return this.memory.getWord(addr);
+        var addrLo = this.getWordImmediate();
+        var addrHi = (addrLo & 0xff00) + ((addrLo + 1) & 0x00ff);
+        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
     };
-    Mos6502.prototype.getAddrIndirectX = function () { return this.memory.getWord((this.getByteImmediate() + this.rX) & 0xff); };
+    Mos6502.prototype.getAddrIndirectX = function () {
+        //The 6502's Indirect-Indexed-X ((Ind,X)) addressing mode is also partially broken 
+        //if the zero- page address was hex FF (i.e.last address of zero- page FF), again a case of address wrap.
+        var addrLo = (this.getByteImmediate() + this.rX) & 0xff;
+        var addrHi = (addrLo + 1) & 0xff;
+        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
+    };
     Mos6502.prototype.getByteIndirectX = function () { return this.memory.getByte(this.getAddrIndirectX()); };
     Mos6502.prototype.getWordIndirectX = function () { return this.memory.getWord(this.getAddrIndirectX()); };
-    Mos6502.prototype.getAddrIndirectY = function () { return (this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff; };
+    Mos6502.prototype.getAddrIndirectY = function () {
+        //The 6502's Indirect-Indexed-Y ((Ind),Y) addressing mode is also partially broken.
+        //If the zero- page address was hex FF (i.e.last address of zero- page FF), the processor 
+        //would not fetch data from the address pointed to by 00FF and 0100 + Y, but rather the one in 00FF and 0000 + Y.
+        //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
+        //return(this.memory.getWord(this.getByteImmediate()) + this.rY) & 0xffff;
+        var addrLo = this.getByteImmediate();
+        var addrHi = (addrLo + 1) & 0xff;
+        return (this.memory.getWord(addrLo + 256 * addrHi) + this.rY) & 0xffff;
+    };
     Mos6502.prototype.getByteIndirectY = function () { return this.memory.getByte(this.getAddrIndirectY()); };
     Mos6502.prototype.getWordIndirectY = function () { return this.memory.getWord(this.getAddrIndirectY()); };
     Mos6502.prototype.pushByte = function (byte) {
@@ -1231,10 +1251,10 @@ var Mos6502 = (function () {
                 this.ip += 3;
                 break;
             case 0x4c:
-                this.ip = this.getWordAbsolute();
+                this.ip = this.getAddrAbsolute();
                 break;
             case 0x6c:
-                this.ip = this.getWordIndirectWithxxFFBug();
+                this.ip = this.getWordIndirect();
                 break;
             case 0xa9:
                 this.LDA(this.getByteImmediate());
@@ -1546,7 +1566,7 @@ var Mos6502 = (function () {
                 this.ip += 1;
                 break;
             case 0x20:
-                this.JSR(this.getWordAbsolute());
+                this.JSR(this.getAddrAbsolute());
                 break;
             case 0x60:
                 this.RTS();
