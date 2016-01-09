@@ -1,24 +1,4 @@
-﻿class Memory {
-    memory: Uint8Array = new Uint8Array(65535);
-
-    public getByte(addr: number): number {
-        return this.memory[addr];
-    }
-
-    public getWord(addr: number): number {
-        return this.memory[addr] + 256 * this.memory[addr + 1];
-    }
-
-    public setByte(addr: number, value: number): void {
-        this.memory[addr] = value % 256;
-    }
-
-    public setWord(addr: number, value: number): void {
-        this.memory[addr + 1] = (value >> 8) % 256;
-        this.memory[addr] = value % 256;
-    }
-}
-
+﻿///<reference path="Memory.ts"/>
 
 class Mos6502 {
 
@@ -984,7 +964,7 @@ class Mos6502 {
         this.pushWord(this.ip + 2);
         this.PHP();
 
-        this.ip = this.memory.getWord(0xfffe);
+        this.ip = this.getWord(0xfffe);
     }
 
     /**
@@ -1022,34 +1002,38 @@ class Mos6502 {
             this.memory.setByte(addr, byte);
     }
 
+    private getWord(addr: number): number {
+        return this.memory.getByte(addr) + 256 * this.memory.getByte(addr + 1);
+    }
+
     private getSByteRelative(): number { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; }
 
     private getByteImmediate(): number { return this.memory.getByte(this.ip + 1); }
-    private getWordImmediate(): number { return this.memory.getWord(this.ip + 1); }
+    private getWordImmediate(): number { return this.getWord(this.ip + 1); }
 
     private getAddrZeroPage(): number { return this.getByteImmediate(); }
     private getByteZeroPage(): number { return this.memory.getByte(this.getAddrZeroPage()); }
-    private getWordZeroPage(): number { return this.memory.getWord(this.getAddrZeroPage()); }
+    private getWordZeroPage(): number { return this.getWord(this.getAddrZeroPage()); }
 
     private getAddrZeroPageX(): number { return (this.rX + this.getByteImmediate()) & 0xff; }
     private getByteZeroPageX(): number { return this.memory.getByte(this.getAddrZeroPageX()); }
-    private getWordZeroPageX(): number { return this.memory.getWord(this.getAddrZeroPageX()); }
+    private getWordZeroPageX(): number { return this.getWord(this.getAddrZeroPageX()); }
 
     private getAddrZeroPageY(): number { return (this.rY + this.getByteImmediate()) & 0xff; }
     private getByteZeroPageY(): number { return this.memory.getByte(this.getAddrZeroPageY()); }
-    private getWordZeroPageY(): number { return this.memory.getWord(this.getAddrZeroPageY()); }
+    private getWordZeroPageY(): number { return this.getWord(this.getAddrZeroPageY()); }
 
     private getAddrAbsolute(): number { return this.getWordImmediate(); }
     private getByteAbsolute(): number { return this.memory.getByte(this.getAddrAbsolute()); }
-    private getWordAbsolute(): number { return this.memory.getWord(this.getAddrAbsolute()); }
+    private getWordAbsolute(): number { return this.getWord(this.getAddrAbsolute()); }
 
     private getAddrAbsoluteX(): number { return (this.rX + this.getWordImmediate()) & 0xffff; }
     private getByteAbsoluteX(): number { return this.memory.getByte(this.getAddrAbsoluteX()) }
-    private getWordAbsoluteX(): number { return this.memory.getWord(this.getAddrAbsoluteX()) }
+    private getWordAbsoluteX(): number { return this.getWord(this.getAddrAbsoluteX()) }
 
     private getAddrAbsoluteY(): number { return (this.rY + this.getWordImmediate()) & 0xffff; }
     private getByteAbsoluteY(): number { return this.memory.getByte(this.getAddrAbsoluteY()); }
-    private getWordAbsoluteY(): number { return this.memory.getWord(this.getAddrAbsoluteY()); }
+    private getWordAbsoluteY(): number { return this.getWord(this.getAddrAbsoluteY()); }
 
     private getWordIndirect(): number { 
         /*
@@ -1074,7 +1058,7 @@ class Mos6502 {
         return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
     }
     private getByteIndirectX(): number { return this.memory.getByte(this.getAddrIndirectX()); }
-    private getWordIndirectX(): number { return this.memory.getWord(this.getAddrIndirectX()); }
+    private getWordIndirectX(): number { return this.getWord(this.getAddrIndirectX()); }
 
 
     private getAddrIndirectY(): number {
@@ -1089,7 +1073,7 @@ class Mos6502 {
         return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     }
     private getByteIndirectY(): number { return this.memory.getByte(this.getAddrIndirectY()); }
-    private getWordIndirectY(): number { return this.memory.getWord(this.getAddrIndirectY()); }
+    private getWordIndirectY(): number { return this.getWord(this.getAddrIndirectY()); }
 
     private pushByte(byte: number) {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);

@@ -1,22 +1,40 @@
-var Memory = (function () {
-    function Memory() {
-        this.memory = new Uint8Array(65535);
+///<reference path="Memory.ts"/>
+var CompoundMemory = (function () {
+    function CompoundMemory() {
+        this.rgmemory = [];
     }
-    Memory.prototype.getByte = function (addr) {
-        return this.memory[addr];
+    CompoundMemory.prototype.add = function (memory) {
+        this.rgmemory.push(memory);
+        this.sizeI += memory.size();
+        return this;
     };
-    Memory.prototype.getWord = function (addr) {
-        return this.memory[addr] + 256 * this.memory[addr + 1];
+    CompoundMemory.prototype.size = function () {
+        return this.sizeI;
     };
-    Memory.prototype.setByte = function (addr, value) {
-        this.memory[addr] = value % 256;
+    CompoundMemory.prototype.getByte = function (addr) {
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size())
+                return memory.getByte(addr);
+            else
+                addr -= memory.size();
+        }
+        throw 'address out of bounds';
     };
-    Memory.prototype.setWord = function (addr, value) {
-        this.memory[addr + 1] = (value >> 8) % 256;
-        this.memory[addr] = value % 256;
+    CompoundMemory.prototype.setByte = function (addr, value) {
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size()) {
+                memory.setByte(addr, value);
+                return;
+            }
+            else
+                addr -= memory.size();
+        }
     };
-    return Memory;
+    return CompoundMemory;
 })();
+///<reference path="Memory.ts"/>
 var Mos6502 = (function () {
     function Mos6502(memory, ip, sp) {
         this.memory = memory;
@@ -910,7 +928,7 @@ var Mos6502 = (function () {
     Mos6502.prototype.BRK = function () {
         this.pushWord(this.ip + 2);
         this.PHP();
-        this.ip = this.memory.getWord(0xfffe);
+        this.ip = this.getWord(0xfffe);
     };
     /**
      * RTI - Return from Interrupt
@@ -944,27 +962,30 @@ var Mos6502 = (function () {
         else
             this.memory.setByte(addr, byte);
     };
+    Mos6502.prototype.getWord = function (addr) {
+        return this.memory.getByte(addr) + 256 * this.memory.getByte(addr + 1);
+    };
     Mos6502.prototype.getSByteRelative = function () { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; };
     Mos6502.prototype.getByteImmediate = function () { return this.memory.getByte(this.ip + 1); };
-    Mos6502.prototype.getWordImmediate = function () { return this.memory.getWord(this.ip + 1); };
+    Mos6502.prototype.getWordImmediate = function () { return this.getWord(this.ip + 1); };
     Mos6502.prototype.getAddrZeroPage = function () { return this.getByteImmediate(); };
     Mos6502.prototype.getByteZeroPage = function () { return this.memory.getByte(this.getAddrZeroPage()); };
-    Mos6502.prototype.getWordZeroPage = function () { return this.memory.getWord(this.getAddrZeroPage()); };
+    Mos6502.prototype.getWordZeroPage = function () { return this.getWord(this.getAddrZeroPage()); };
     Mos6502.prototype.getAddrZeroPageX = function () { return (this.rX + this.getByteImmediate()) & 0xff; };
     Mos6502.prototype.getByteZeroPageX = function () { return this.memory.getByte(this.getAddrZeroPageX()); };
-    Mos6502.prototype.getWordZeroPageX = function () { return this.memory.getWord(this.getAddrZeroPageX()); };
+    Mos6502.prototype.getWordZeroPageX = function () { return this.getWord(this.getAddrZeroPageX()); };
     Mos6502.prototype.getAddrZeroPageY = function () { return (this.rY + this.getByteImmediate()) & 0xff; };
     Mos6502.prototype.getByteZeroPageY = function () { return this.memory.getByte(this.getAddrZeroPageY()); };
-    Mos6502.prototype.getWordZeroPageY = function () { return this.memory.getWord(this.getAddrZeroPageY()); };
+    Mos6502.prototype.getWordZeroPageY = function () { return this.getWord(this.getAddrZeroPageY()); };
     Mos6502.prototype.getAddrAbsolute = function () { return this.getWordImmediate(); };
     Mos6502.prototype.getByteAbsolute = function () { return this.memory.getByte(this.getAddrAbsolute()); };
-    Mos6502.prototype.getWordAbsolute = function () { return this.memory.getWord(this.getAddrAbsolute()); };
+    Mos6502.prototype.getWordAbsolute = function () { return this.getWord(this.getAddrAbsolute()); };
     Mos6502.prototype.getAddrAbsoluteX = function () { return (this.rX + this.getWordImmediate()) & 0xffff; };
     Mos6502.prototype.getByteAbsoluteX = function () { return this.memory.getByte(this.getAddrAbsoluteX()); };
-    Mos6502.prototype.getWordAbsoluteX = function () { return this.memory.getWord(this.getAddrAbsoluteX()); };
+    Mos6502.prototype.getWordAbsoluteX = function () { return this.getWord(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getAddrAbsoluteY = function () { return (this.rY + this.getWordImmediate()) & 0xffff; };
     Mos6502.prototype.getByteAbsoluteY = function () { return this.memory.getByte(this.getAddrAbsoluteY()); };
-    Mos6502.prototype.getWordAbsoluteY = function () { return this.memory.getWord(this.getAddrAbsoluteY()); };
+    Mos6502.prototype.getWordAbsoluteY = function () { return this.getWord(this.getAddrAbsoluteY()); };
     Mos6502.prototype.getWordIndirect = function () {
         /*
          The 6502's memory indirect jump instruction, JMP (<address>), is partially broken.
@@ -985,7 +1006,7 @@ var Mos6502 = (function () {
         return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
     };
     Mos6502.prototype.getByteIndirectX = function () { return this.memory.getByte(this.getAddrIndirectX()); };
-    Mos6502.prototype.getWordIndirectX = function () { return this.memory.getWord(this.getAddrIndirectX()); };
+    Mos6502.prototype.getWordIndirectX = function () { return this.getWord(this.getAddrIndirectX()); };
     Mos6502.prototype.getAddrIndirectY = function () {
         //The 6502's Indirect-Indexed-Y ((Ind),Y) addressing mode is also partially broken.
         //If the zero- page address was hex FF (i.e.last address of zero- page FF), the processor 
@@ -996,7 +1017,7 @@ var Mos6502 = (function () {
         return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     };
     Mos6502.prototype.getByteIndirectY = function () { return this.memory.getByte(this.getAddrIndirectY()); };
-    Mos6502.prototype.getWordIndirectY = function () { return this.memory.getWord(this.getAddrIndirectY()); };
+    Mos6502.prototype.getWordIndirectY = function () { return this.getWord(this.getAddrIndirectY()); };
     Mos6502.prototype.pushByte = function (byte) {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
@@ -1896,5 +1917,170 @@ var Mos6502 = (function () {
         }
     };
     return Mos6502;
+})();
+///<reference path="Memory.ts"/>
+var RAM = (function () {
+    function RAM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    RAM.prototype.size = function () {
+        return this.memory.length;
+    };
+    RAM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    RAM.prototype.setByte = function (addr, value) {
+        this.memory[addr] = value & 0xff;
+    };
+    return RAM;
+})();
+var NesImage = (function () {
+    function NesImage(rawBytes) {
+        this.trainer = null;
+        for (var i = 0; i < 4; i++)
+            if (rawBytes[i] !== NesImage.magic[i])
+                throw 'invalid NES header';
+        this.ROMBanks = new Array(rawBytes[4]);
+        this.VROMBanks = new Array(rawBytes[5]);
+        this.fVerticalMirroring = !!(rawBytes[6] & 1);
+        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
+        var fTrainer = !!(rawBytes[6] & 4);
+        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
+        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
+        this.fVSSystem = !!(rawBytes[7] & 1);
+        if ((rawBytes[7] & 0x0e) !== 0)
+            throw 'invalid NES header';
+        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
+        this.fPAL = !!(rawBytes[9]);
+        if ((rawBytes[9] & 0xfe) !== 0)
+            throw 'invalid NES header';
+        for (var i = 0xa; i < 0x10; i++)
+            if (rawBytes[i] !== 0)
+                throw 'invalid NES header';
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VROMBanks.length * 0x2000)
+            throw 'invalid NES format';
+        var idx = 0x10;
+        if (fTrainer) {
+            this.trainer = rawBytes.slice(idx, idx + 0x100);
+            idx += 0x100;
+        }
+        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
+            this.RAMBanks[ibank] = new RAM(0x2000);
+        }
+        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
+            this.ROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x4000));
+            idx += 0x4000;
+        }
+        for (var ibank = 0; ibank < this.VROMBanks.length; ibank++) {
+            this.VROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x2000));
+            idx += 0x2000;
+        }
+    }
+    /*
+     * 0-3      String "NES^Z" used to recognize .NES files.
+        4        Number of 16kB ROM banks.
+        5        Number of 8kB VROM banks.
+        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
+                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
+                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
+                 bit 3     1 for a four-screen VRAM layout.
+                 bit 4-7   Four lower bits of ROM Mapper Type.
+        7        bit 0     1 for VS-System cartridges.
+                 bit 1-3   Reserved, must be zeroes!
+                 bit 4-7   Four higher bits of ROM Mapper Type.
+        8        Number of 8kB RAM banks. For compatibility with the previous
+                 versions of the .NES format, assume 1x8kB RAM page when this
+                 byte is zero.
+        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
+                 bit 1-7   Reserved, must be zeroes!
+        10-15    Reserved, must be zeroes!
+        16-...   ROM banks, in ascending order. If a trainer is present, its
+                 512 bytes precede the ROM bank contents.
+        ...-EOF  VROM banks, in ascending order.
+     */
+    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
+    return NesImage;
+})();
+///<reference path="CompoundMemory.ts"/>
+///<reference path="RAM.ts"/>
+///<reference path="NesImage.ts"/>
+///<reference path="Mos6502.ts"/>
+var NesEmulator = (function () {
+    function NesEmulator(nesImage) {
+        var memory = null;
+        var ip = 0;
+        if (nesImage.mapperType === 0) {
+            if (nesImage.ROMBanks.length === 1) {
+                memory = new CompoundMemory()
+                    .add(new RAM(0xc000))
+                    .add(nesImage.ROMBanks[0]);
+                ip = 0xc000;
+            }
+        }
+        if (!memory)
+            throw 'unkown mapper ' + nesImage.mapperType;
+        this.cpu = new Mos6502(memory, ip, 0xfd);
+    }
+    NesEmulator.prototype.step = function () {
+        this.cpu.step();
+    };
+    return NesEmulator;
+})();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(memory) {
+        this.memory = memory;
+    }
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    return ROM;
+})();
+///<reference path="NesEmulator.ts"/>
+var StepTest = (function () {
+    function StepTest() {
+    }
+    StepTest.prototype.run = function (nesemu, expectedOutput, log) {
+        var lines = expectedOutput.split('\n');
+        for (var iline = 0; iline < lines.length; iline++) {
+            var line = lines[iline];
+            var groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
+            groups.shift();
+            var regs = groups.map(function (x) { return parseInt(x, 16); });
+            var ip = regs[0];
+            var rA = regs[1];
+            var rX = regs[2];
+            var rY = regs[3];
+            var rP = regs[4];
+            var sp = regs[5];
+            function tsto(ip, rA, rX, rY, rP, sp) {
+                var stRP = rP.toString(2);
+                stRP = Array(Math.max(8 - stRP.length + 1, 0)).join('0') + stRP;
+                return 'ip:' + ip.toString(16) +
+                    ' rA:' + rA.toString(16) +
+                    ' rX:' + rX.toString(16) +
+                    ' rY:' + rY.toString(16) +
+                    ' rP:' + stRP +
+                    ' sp:' + sp.toString(16);
+            }
+            var expected = tsto(ip, rA, rX, rY, rP, sp);
+            var actual = tsto(nesemu.cpu.ip, nesemu.cpu.rA, nesemu.cpu.rX, nesemu.cpu.rY, nesemu.cpu.rP, nesemu.cpu.sp);
+            if (expected !== actual) {
+                log(iline > 0 ? lines[iline - 1] : "BEGIN");
+                log(expected);
+                log(actual);
+                break;
+            }
+            nesemu.step();
+        }
+        ;
+        log('done');
+    };
+    return StepTest;
 })();
 //# sourceMappingURL=app.js.map

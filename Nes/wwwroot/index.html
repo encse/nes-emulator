@@ -19,61 +19,15 @@
 		var xhr = new XMLHttpRequest();
 		xhr.open('GET', 'nestest.bin', true);
 		xhr.responseType = 'arraybuffer';
-
-		xhr.onload = function(e) {
+		xhr.onload = function (e) {
 			if (this.status === 200) {
-
 				$.get('nestest.log').done(lines => {
 					var blob = new Uint8Array(this.response);
-					blob = blob.slice(16, 16384);
-
-					var memory = new Memory();
-					memory.memory.set(blob, 0xc000);
-					var cpu = new Mos6502(memory, 0xc000, 0xfd);
-					lines = lines.split('\n');
-					for (var iline = 0; iline < lines.length; iline++) {
-						var line = lines[iline];
-						
-						var groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
-						groups.shift();
-						groups = groups.map(x => parseInt(x, 16));
-						var ip = groups[0];
-						var rA = groups[1];
-						var rX = groups[2];
-						var rY = groups[3];
-						var rP = groups[4];
-						var sp = groups[5];
-
-						function tsto(ip, rA, rX, rY, rP, sp) {
-
-							var stRP = rP.toString(2);
-							stRP = Array(Math.max(8 - stRP.length + 1, 0)).join(0) + stRP;
-							return 'ip:' + ip.toString(16) + 
-								' rA:' + rA.toString(16) +
-								' rX:' + rX.toString(16) + 
-								' rY:' + rY.toString(16) + 
-								' rP:' + stRP +
-								' sp:' + sp.toString(16);
-						}
-
-						var expected = tsto(ip, rA, rX, rY, rP, sp);
-						var actual = tsto(cpu.ip, cpu.rA, cpu.rX, cpu.rY, cpu.rP, cpu.sp);
-
-						if (expected !== actual) {
-							log(lines[iline - 1]);
-							log(expected);
-							log(actual);
-							break;
-						}
-						cpu.step();
-					};
-
-					log('done');
+					var nesEmulator = new NesEmulator(new NesImage(blob));
+					new StepTest().run(nesEmulator, lines, function(st) { log(st) });
 				});
-
 			}
 		}
-
 		xhr.send();
 	});
 
