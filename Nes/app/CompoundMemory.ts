@@ -1,6 +1,6 @@
 ///<reference path="Memory.ts"/>
 class CompoundMemory implements Memory {
-    private rgmemory: Memory[] = [];
+    protected rgmemory: Memory[] = [];
     private sizeI: number;
 
     public add(memory: Memory): CompoundMemory {

@@ -12,20 +12,45 @@
 <script src="js/app.js"></script>
 <script language="javascript">
 
-	function log(st) {
+	function log() {
+		var st = '';
+		for (var i = 0; i < arguments.length; i++) {
+			st += ' ' + arguments[i];
+		};
 		$('#log').html($('#log').html() + st + '<br />');
 	}
 	$('#btnTest').click(() => {
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'nestest.bin', true);
+		xhr.open('GET', 'test/inst_test-v4/all_instrs.nes', true);
 		xhr.responseType = 'arraybuffer';
 		xhr.onload = function (e) {
 			if (this.status === 200) {
-				$.get('nestest.log').done(lines => {
+
+				//$.get('nestest.log').done(lines => {
+					log('start');
 					var blob = new Uint8Array(this.response);
 					var nesEmulator = new NesEmulator(new NesImage(blob));
-					new StepTest().run(nesEmulator, lines, function(st) { log(st) });
-				});
+					var ip = -1;
+					var stepCount = 0;
+					var dtStart = new Date().getTime();
+					while (ip !== nesEmulator.cpu.ip) {
+						ip = nesEmulator.cpu.ip;
+						nesEmulator.step();
+						stepCount++;
+					}
+					var dtEnd = new Date().getTime();
+					var tsTest = (dtEnd - dtStart) / 1000;
+					var res = "";
+					var i = 0x6004;
+					while (nesEmulator.cpu.getByte(i) !== 0) {
+						res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+						i++;
+					}
+					log(res);
+					log('instructions per second:', stepCount / tsTest);
+					log('done');
+					//	new StepTest().run(nesEmulator, lines, function(st) { log(st) });
+				//});
 			}
 		}
 		xhr.send();
