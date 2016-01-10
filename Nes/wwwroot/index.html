@@ -2,7 +2,12 @@
 <html>
 <head>
     <title></title>
-	<meta charset="utf-8" />
+	<meta charset="utf-8"/>
+	<style>
+		.error {
+			background: yellow;
+		}
+	</style>
 </head>
 <body>
 <button id="btnTest">Test</button>
@@ -13,47 +18,134 @@
 <script language="javascript">
 
 	function log() {
-		var st = '';
+		
+		var st = '<div>';
 		for (var i = 0; i < arguments.length; i++) {
 			st += ' ' + arguments[i];
 		};
-		$('#log').html($('#log').html() + st + '<br />');
+		st += '</div>';
+		$('#log').html($('#log').html() + st);
 	}
-	$('#btnTest').click(() => {
+	function log_error() {
+		var st = '<div class="error">';
+		for (var i = 0; i < arguments.length; i++) {
+			st += ' ' + arguments[i];
+		};
+		st += "</div>";
+		$('#log').html($('#log').html() + st);
+	}
+
+	function loadNesEmulator(url, done) {
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'test/inst_test-v4/all_instrs.nes', true);
+		xhr.open('GET', url, true);
 		xhr.responseType = 'arraybuffer';
 		xhr.onload = function (e) {
+			if (this.readyState === 4 && this.status !== 200) {
+				log_error('http error ' + this.status);
+				done(null);
+			}
 			if (this.status === 200) {
-
-				//$.get('nestest.log').done(lines => {
-					log('start');
-					var blob = new Uint8Array(this.response);
-					var nesEmulator = new NesEmulator(new NesImage(blob));
-					var ip = -1;
-					var stepCount = 0;
-					var dtStart = new Date().getTime();
-					while (ip !== nesEmulator.cpu.ip) {
-						ip = nesEmulator.cpu.ip;
-						nesEmulator.step();
-						stepCount++;
-					}
-					var dtEnd = new Date().getTime();
-					var tsTest = (dtEnd - dtStart) / 1000;
-					var res = "";
-					var i = 0x6004;
-					while (nesEmulator.cpu.getByte(i) !== 0) {
-						res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-						i++;
-					}
-					log(res);
-					log('instructions per second:', stepCount / tsTest);
-					log('done');
-					//	new StepTest().run(nesEmulator, lines, function(st) { log(st) });
-				//});
+				var blob = new Uint8Array(this.response);
+				done(new NesEmulator(new NesImage(blob)));
 			}
 		}
 		xhr.send();
+	}
+
+	function runTest(url, done) {
+		log('<h2>', url, '</h2>');
+		done = done || function () { }
+
+		loadNesEmulator(url, function (nesEmulator) {
+			try {
+				var dtStart = new Date().getTime();
+				while (true) {
+					if (nesEmulator.cpu.getByte(0x6001) === 0xde &&
+							nesEmulator.cpu.getByte(0x6002) === 0xb0,
+						nesEmulator.cpu.getByte(0x6003) === 0x61
+					) {
+						if (nesEmulator.cpu.getByte(0x6000) !== 0x80) {
+							var resultCode = nesEmulator.cpu.getByte(0x6000);
+							if (resultCode !== 0)
+								log_error('res: ' + resultCode.toString(16));
+							break;
+						}
+					}
+					nesEmulator.step();
+
+					//if ((new Date().getTime() - dtStart) / 1000 > 5) {
+					//	log_error('timeout');
+					//	break;
+					//};
+				}
+				var res = "";
+				var i = 0x6004;
+				while (nesEmulator.cpu.getByte(i) !== 0) {
+					res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+					i++;
+				}
+				log(res);
+			} catch (e) {
+				log_error(e);
+			}
+			done();
+		
+		});
+	}
+
+	function runStepTest(url) {
+		log('<h2>', url, '</h2>');
+		loadNesEmulator(url, function (nesEmulator) {
+			$.get(url.replace('.nes', '.log')).then(function(logLines) {
+				new StepTest().run(nesEmulator, logLines, function (st) { log(st) });
+			});
+		});
+		
+	}
+
+	function runAll(urls) {
+		var i = 0;
+		function runSingle() {
+			if (i < urls.length) {
+				runTest(urls[i], function () {
+					i++;
+					window.setTimeout(runSingle(), 0);
+				});
+			}			
+		}
+		runSingle();
+	}
+
+	$('#btnTest').click(() => {
+		var tests_blargg = [
+			'test/instr_test-v5/rom_singles/01-basics.nes',
+			'test/instr_test-v5/rom_singles/02-implied.nes',
+			'test/instr_test-v5/rom_singles/03-immediate.nes',
+			'test/instr_test-v5/rom_singles/04-zero_page.nes',
+			'test/instr_test-v5/rom_singles/05-zp_xy.nes',
+			'test/instr_test-v5/rom_singles/06-absolute.nes',
+			'test/instr_test-v5/rom_singles/07-abs_xy.nes',
+			'test/instr_test-v5/rom_singles/08-ind_x.nes',
+			'test/instr_test-v5/rom_singles/09-ind_y.nes',
+			'test/instr_test-v5/rom_singles/10-branches.nes',
+			'test/instr_test-v5/rom_singles/11-stack.nes',
+			'test/instr_test-v5/rom_singles/12-jmp_jsr.nes',
+			'test/instr_test-v5/rom_singles/13-rts.nes',
+			'test/instr_test-v5/rom_singles/14-rti.nes',
+			'test/instr_test-v5/rom_singles/15-brk.nes',
+			'test/instr_test-v5/rom_singles/16-special.nes',
+			'test/instr_test-v5/official_only.nes',
+			'test/instr_test-v5/all_instrs.nes'];
+
+		var tests_misc = ['test/instr_misc/01-abs_x_wrap.nes',
+			'test/instr_misc/02-branch_wrap.nes',
+			'test/instr_misc/03-dummy_reads.nes',
+			'test/instr_misc/04-dummy_reads_apu.nes',
+			'test/instr_misc/instr_misc.nes'];
+
+		runAll(tests_blargg);
+	//	runTest(tests_inst[2]);
+
 	});
 
 </script>

@@ -220,21 +220,6 @@ var MMC1 = (function (_super) {
     return MMC1;
 })(CompoundMemory);
 ///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(memory) {
-        this.memory = memory;
-    }
-    ROM.prototype.size = function () {
-        return this.memory.length;
-    };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    ROM.prototype.setByte = function (addr, value) {
-    };
-    return ROM;
-})();
-///<reference path="Memory.ts"/>
 var Mos6502 = (function () {
     function Mos6502(memory, ip, sp) {
         this.memory = memory;
@@ -268,6 +253,7 @@ var Mos6502 = (function () {
             this.flgOverflow = (byte >> 6) & 1;
             //skip (byte >> 5) & 1;
             //skip this.flgBreakCommand = (byte >> 4) & 1;
+            this.flgBreakCommand = 0;
             this.flgDecimalMode = (byte >> 3) & 1;
             this.flgInterruptDisable = (byte >> 2) & 1;
             this.flgZero = (byte >> 1) & 1;
@@ -1127,7 +1113,9 @@ var Mos6502 = (function () {
    */
     Mos6502.prototype.BRK = function () {
         this.pushWord(this.ip + 2);
+        this.flgBreakCommand = 1;
         this.PHP();
+        this.flgInterruptDisable = 1;
         this.ip = this.getWord(0xfffe);
     };
     /**
@@ -1149,6 +1137,39 @@ var Mos6502 = (function () {
     Mos6502.prototype.RTI = function () {
         this.PLP();
         this.ip = this.popWord();
+    };
+    Mos6502.prototype.ALR = function (byte) {
+        //ALR #i($4B ii; 2 cycles)
+        //Equivalent to AND #i then LSR A.
+        this.AND(byte);
+        this.LSR(this.addrRA);
+    };
+    Mos6502.prototype.ANC = function (byte) {
+        //Does AND #i, setting N and Z flags based on the result. 
+        //Then it copies N (bit 7) to C.ANC #$FF could be useful for sign- extending, much like CMP #$80.ANC #$00 acts like LDA #$00 followed by CLC.
+        this.AND(byte);
+        this.flgCarry = this.flgNegative;
+    };
+    Mos6502.prototype.ARR = function (byte) {
+        //Similar to AND #i then ROR A, except sets the flags differently. N and Z are normal, but C is bit 6 and V is bit 6 xor bit 5.
+        this.AND(byte);
+        this.ROR(this.addrRA);
+        this.flgCarry = (this.rA & (1 << 6)) !== 0 ? 1 : 0;
+        this.flgOverflow = ((this.rA & (1 << 6)) >> 6) ^ ((this.rA & (1 << 5)) >> 5);
+    };
+    Mos6502.prototype.AXS = function (byte) {
+        // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
+        var res = (this.rA & this.rX) + 256 - byte;
+        this.rX = res & 0xff;
+        this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0;
+        this.flgCarry = res > 255 ? 1 : 0;
+        this.flgZero = this.rX === 0 ? 1 : 0;
+    };
+    Mos6502.prototype.SYA = function (addr) {
+        //not implemented
+    };
+    Mos6502.prototype.SXA = function (addr) {
+        //not implemented
     };
     Mos6502.prototype.getByte = function (addr) {
         if (addr === this.addrRA)
@@ -1234,6 +1255,7 @@ var Mos6502 = (function () {
         return this.popByte() + (this.popByte() << 8);
     };
     Mos6502.prototype.step = function () {
+        var ipPrev = this.ip;
         switch (this.memory.getByte(this.ip)) {
             case 0x69:
                 this.ADC(this.getByteImmediate());
@@ -1881,6 +1903,18 @@ var Mos6502 = (function () {
             case 0x80:
                 this.ip += 2;
                 break;
+            case 0x82:
+                this.ip += 2;
+                break;
+            case 0xc2:
+                this.ip += 2;
+                break;
+            case 0xe2:
+                this.ip += 2;
+                break;
+            case 0x89:
+                this.ip += 2;
+                break;
             case 0x0c:
                 this.ip += 3;
                 break;
@@ -1961,6 +1995,10 @@ var Mos6502 = (function () {
             case 0xff:
                 this.ISC(this.getAddrAbsoluteX());
                 this.ip += 3;
+                break;
+            case 0xab:
+                this.LAX(this.getByteImmediate());
+                this.ip += 2;
                 break;
             case 0xa7:
                 this.LAX(this.getByteZeroPage());
@@ -2114,7 +2152,38 @@ var Mos6502 = (function () {
                 this.SRE(this.getAddrAbsoluteX());
                 this.ip += 3;
                 break;
+            case 0x0b:
+                this.ANC(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x2b:
+                this.ANC(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x4b:
+                this.ALR(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x6b:
+                this.ARR(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0xcb:
+                this.AXS(this.getByteImmediate());
+                this.ip += 2;
+                break;
+            case 0x9c:
+                this.SYA(this.getAddrAbsoluteX());
+                this.ip += 3;
+                break;
+            case 0x9e:
+                this.SXA(this.getAddrAbsoluteY());
+                this.ip += 3;
+                break;
+            default:
+                throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
+        this.ip &= 0xffff;
     };
     return Mos6502;
 })();
@@ -2222,14 +2291,47 @@ var NesEmulator = (function () {
     };
     return NesEmulator;
 })();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(memory) {
+        this.memory = memory;
+    }
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    return ROM;
+})();
 ///<reference path="NesEmulator.ts"/>
 var StepTest = (function () {
     function StepTest() {
+        this.ich = 0;
     }
+    StepTest.prototype.readLine = function () {
+        var st = "";
+        while (this.ich < this.expectedOutput.length) {
+            if (this.expectedOutput[this.ich] === '\n') {
+                this.ich++;
+                return st;
+            }
+            else
+                st += this.expectedOutput[this.ich];
+            this.ich++;
+        }
+        return st;
+    };
+    ;
     StepTest.prototype.run = function (nesemu, expectedOutput, log) {
-        var lines = expectedOutput.split('\n');
-        for (var iline = 0; iline < lines.length; iline++) {
-            var line = lines[iline];
+        var prevLine = "BEGIN";
+        this.expectedOutput = expectedOutput;
+        this.ich = 0;
+        var line = this.readLine();
+        nesemu.cpu.ip = parseInt(line.split(' ')[0], 16);
+        while (line) {
             var groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
             groups.shift();
             var regs = groups.map(function (x) { return parseInt(x, 16); });
@@ -2252,12 +2354,14 @@ var StepTest = (function () {
             var expected = tsto(ip, rA, rX, rY, rP, sp);
             var actual = tsto(nesemu.cpu.ip, nesemu.cpu.rA, nesemu.cpu.rX, nesemu.cpu.rY, nesemu.cpu.rP, nesemu.cpu.sp);
             if (expected !== actual) {
-                log(iline > 0 ? lines[iline - 1] : "BEGIN");
+                log(prevLine);
                 log(expected);
                 log(actual);
                 break;
             }
             nesemu.step();
+            prevLine = line;
+            line = this.readLine();
         }
         ;
         log('done');

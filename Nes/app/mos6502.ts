@@ -32,6 +32,7 @@ class Mos6502 {
         this.flgOverflow = (byte >> 6) & 1;
         //skip (byte >> 5) & 1;
         //skip this.flgBreakCommand = (byte >> 4) & 1;
+        this.flgBreakCommand = 0;
         this.flgDecimalMode = (byte >> 3) & 1;
         this.flgInterruptDisable = (byte >> 2) & 1;
         this.flgZero = (byte >> 1) & 1;
@@ -962,8 +963,9 @@ class Mos6502 {
    */
     private BRK(): void {
         this.pushWord(this.ip + 2);
+        this.flgBreakCommand = 1;
         this.PHP();
-
+        this.flgInterruptDisable = 1;
         this.ip = this.getWord(0xfffe);
     }
 
@@ -987,6 +989,46 @@ class Mos6502 {
         this.PLP();
         this.ip = this.popWord();
     }
+
+    private ALR(byte: number): void {
+        //ALR #i($4B ii; 2 cycles)
+        //Equivalent to AND #i then LSR A.
+        this.AND(byte);
+        this.LSR(this.addrRA);
+    }
+
+    private ANC(byte: number): void {
+        //Does AND #i, setting N and Z flags based on the result. 
+        //Then it copies N (bit 7) to C.ANC #$FF could be useful for sign- extending, much like CMP #$80.ANC #$00 acts like LDA #$00 followed by CLC.
+        this.AND(byte);
+        this.flgCarry = this.flgNegative;
+    }
+
+    private ARR(byte: number): void {
+        //Similar to AND #i then ROR A, except sets the flags differently. N and Z are normal, but C is bit 6 and V is bit 6 xor bit 5.
+        this.AND(byte);
+        this.ROR(this.addrRA);
+        this.flgCarry = (this.rA & (1 << 6)) !== 0 ? 1 : 0;
+        this.flgOverflow = ((this.rA & (1 << 6)) >> 6) ^ ((this.rA & (1 << 5)) >> 5);
+    }
+
+    private AXS(byte: number): void {
+       // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
+        const res = (this.rA & this.rX) + 256 - byte;
+        this.rX =  res & 0xff;
+        this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0;
+        this.flgCarry = res > 255 ? 1 : 0;
+        this.flgZero = this.rX === 0 ? 1 : 0;
+    }
+
+    private SYA(addr: number): void {
+        //not implemented
+    }
+
+    private SXA(addr: number): void {
+       //not implemented
+    }
+
 
     private getByte(addr: number) {
         if (addr === this.addrRA)
@@ -1095,6 +1137,7 @@ class Mos6502 {
     }
 
     public step() {
+        var ipPrev = this.ip;
         switch (this.memory.getByte(this.ip)) {
             case 0x69: this.ADC(this.getByteImmediate()); this.ip += 2; break;
             case 0x65: this.ADC(this.getByteZeroPage()); this.ip += 2; break;
@@ -1297,6 +1340,10 @@ class Mos6502 {
             case 0xd4: /* *NOP*/ this.ip += 2; break;
             case 0xf4: /* *NOP*/ this.ip += 2; break;
             case 0x80: /* *NOP*/ this.ip += 2; break;
+            case 0x82: /* *NOP*/ this.ip += 2; break;
+            case 0xc2: /* *NOP*/ this.ip += 2; break;
+            case 0xe2: /* *NOP*/ this.ip += 2; break;
+            case 0x89: /* *NOP*/ this.ip += 2; break;
             case 0x0c: /* *NOP*/ this.ip += 3; break;
             case 0x1c: /* *NOP*/ this.ip += 3; break;
             case 0x3c: /* *NOP*/ this.ip += 3; break;
@@ -1321,6 +1368,7 @@ class Mos6502 {
             case 0xfb: this.ISC(this.getAddrAbsoluteY()); this.ip += 3; break;
             case 0xff: this.ISC(this.getAddrAbsoluteX()); this.ip += 3; break;
 
+            case 0xab: this.LAX(this.getByteImmediate()); this.ip += 2; break;
             case 0xa7: this.LAX(this.getByteZeroPage()); this.ip += 2; break;
             case 0xb7: this.LAX(this.getByteZeroPageY()); this.ip += 2; break;
             case 0xaf: this.LAX(this.getByteAbsolute()); this.ip += 3; break;
@@ -1365,12 +1413,21 @@ class Mos6502 {
             case 0x5b: this.SRE(this.getAddrAbsoluteY()); this.ip += 3; break;
             case 0x5f: this.SRE(this.getAddrAbsoluteX()); this.ip += 3; break;
 
-            //default:
-            //    throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
+            case 0x0b: this.ANC(this.getByteImmediate()); this.ip += 2; break;
+            case 0x2b: this.ANC(this.getByteImmediate()); this.ip += 2; break;
+            case 0x4b: this.ALR(this.getByteImmediate()); this.ip += 2; break;
+            case 0x6b: this.ARR(this.getByteImmediate()); this.ip += 2; break;
+            case 0xcb: this.AXS(this.getByteImmediate()); this.ip += 2; break;
+
+            case 0x9c: this.SYA(this.getAddrAbsoluteX()); this.ip += 3; break;
+            case 0x9e: this.SXA(this.getAddrAbsoluteY()); this.ip += 3; break;
+
+            default:
+                throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
 
-     
-
+        
+        this.ip &= 0xffff;
     }
 
 }

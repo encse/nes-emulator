@@ -1,10 +1,31 @@
 ﻿///<reference path="NesEmulator.ts"/>
 class StepTest {
 
+    private expectedOutput: string;
+    private ich = 0;
+
+    private readLine():string {
+        var st = "";
+        while (this.ich < this.expectedOutput.length) {
+            if (this.expectedOutput[this.ich] === '\n') {
+                this.ich++;
+                return st;
+            } else
+                st += this.expectedOutput[this.ich];
+            this.ich++;
+        }
+        return st;
+    };
+
     public run(nesemu: NesEmulator, expectedOutput:string, log:(st: string)=>void ):void {
-        const lines = expectedOutput.split('\n');
-        for (let iline = 0; iline < lines.length; iline++) {
-            const line = lines[iline];
+        var prevLine = "BEGIN";
+        this.expectedOutput = expectedOutput;
+        this.ich = 0;
+        var line = this.readLine();
+      
+        nesemu.cpu.ip = parseInt(line.split(' ')[0], 16);
+
+        while(line) {
             const groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
             groups.shift();
             const regs = groups.map(x => parseInt(x, 16));
@@ -30,12 +51,14 @@ class StepTest {
             const actual = tsto(nesemu.cpu.ip, nesemu.cpu.rA, nesemu.cpu.rX, nesemu.cpu.rY, nesemu.cpu.rP, nesemu.cpu.sp);
 
             if (expected !== actual) {
-                log(iline > 0 ? lines[iline - 1] : "BEGIN");
+                log(prevLine);
                 log(expected);
                 log(actual);
                 break;
             }
             nesemu.step();
+            prevLine = line;
+            line = this.readLine();
         };
 
         log('done');
