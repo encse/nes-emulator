@@ -12,21 +12,23 @@ class NesEmulator {
         {
             case 0:
                 if (nesImage.ROMBanks.length === 1) {
-                    memory = new CompoundMemory()
-                        .add(new RAM(0xc000))
-                        .add(nesImage.ROMBanks[0]);
+                    memory = new CompoundMemory(
+                            new RAM(0xc000),
+                            nesImage.ROMBanks[0]);
                     ip = 0xc000;
                 }
                 else if (nesImage.ROMBanks.length === 2) {
-                    memory = new CompoundMemory()
-                        .add(new RAM(0x8000))
-                        .add(nesImage.ROMBanks[0])
-                        .add(nesImage.ROMBanks[1]);
+                    memory = new CompoundMemory(
+                        new RAM(0x8000),
+                        nesImage.ROMBanks[0],
+                        nesImage.ROMBanks[1]);
+
                     ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
                 }
                 break;
             case 1:
-                memory = new MMC1(nesImage.ROMBanks);
+                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VROMBanks);
+                memory = mmc1.memory;
                 ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
         }
 

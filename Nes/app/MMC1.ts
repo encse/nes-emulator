@@ -1,7 +1,7 @@
 ///<reference path="Memory.ts"/>
 ///<reference path="RAM.ts"/>
 ///<reference path="CompoundMemory.ts"/>
-class MMC1 extends CompoundMemory {
+class MMC1 {
 
    /**
     *  $8000-9FFF:  [...C PSMM]
@@ -53,21 +53,48 @@ class MMC1 extends CompoundMemory {
     get PRG0(): number { return this.getFlg(this.r3, 0, 3); }
     get W(): number { return this.getFlg(this.r3, 4); }
 
-    constructor(private PRGBanks: Memory[]) {
-        super();
-        this.rgmemory = [
+    memory: CompoundMemory;
+    private vmemory: CompoundMemory;
+    private nametable:CompoundMemory;
+    private nametableA:RAM;
+    private nametableB:RAM;
+    private palette:RAM;
+
+    constructor(private PRGBanks: Memory[], private VROMBanks: Memory[]) {
+        while (PRGBanks.length < 2)
+            PRGBanks.push(new RAM(0x4000));
+
+        while (VROMBanks.length < 2)
+            VROMBanks.push(new RAM(0x100));
+
+        this.memory = new CompoundMemory(
             new RAM(0x8000),
             PRGBanks[0],
             PRGBanks[1]
-        ];
+        );
+
+        this.nametableA = new RAM(0x100);
+        this.nametableB = new RAM(0x100);
+        this.palette = new RAM(0x20);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableA, this.nametableB, this.nametableB);
+       
+      
+        
+        this.vmemory = new CompoundMemory(
+            VROMBanks[0],
+            VROMBanks[1],
+            new RepeatedMemory(2, this.nametable),
+            new RepeatedMemory(8, this.palette)
+        );
+
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.memory.shadowSetter(0x2000, 0x7999, (addr: number) => {
+            console.log(addr.toString(16));
+        });
     }
 
-    public setByte(addr: number, value: number): void {
-        value &= 0xff;
-        if (addr < 0x8000)
-            return super.setByte(addr, value);
-        /*
-        Temporary reg port ($8000-FFFF):
+    private setByte(addr: number, value: number): void {
+        /*Temporary reg port ($8000-FFFF):
             [r... ...d]
                 r = reset flag
                 d = data bit
@@ -84,6 +111,7 @@ class MMC1 extends CompoundMemory {
                 - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
                 - temporary reg is reset (so that next write is the "first" write)
         */
+        value &= 0xff;
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
@@ -108,10 +136,6 @@ class MMC1 extends CompoundMemory {
         }
     }
 
-    size(): number {
-         return 0x10000;
-    }
-
     private update() {
         /*
           P = PRG Size (0=32k mode, 1=16k mode)
@@ -121,16 +145,16 @@ class MMC1 extends CompoundMemory {
             This bit is ignored when 'P' is clear (32k mode)*/
 
         if (this.P === 1) {
-            this.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
-            this.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
         }
         else if (this.S === 0) {
-            this.rgmemory[1] = this.PRGBanks[0];
-            this.rgmemory[2] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[1] = this.PRGBanks[0];
+            this.memory.rgmemory[2] = this.PRGBanks[this.PRG0];
         }
         else {
-            this.rgmemory[1] = this.PRGBanks[this.PRG0];
-            this.rgmemory[2] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[2] = this.PRGBanks[0x0f];
         }
     }
 }

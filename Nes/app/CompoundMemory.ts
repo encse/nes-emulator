@@ -1,16 +1,22 @@
 ///<reference path="Memory.ts"/>
 class CompoundMemory implements Memory {
-    protected rgmemory: Memory[] = [];
-    private sizeI: number;
+    public rgmemory: Memory[] = [];
+    private setters: {addrFirst: number, addrLast: number, setter:(addr: number, value: number) => void}[] = [];
 
-    public add(memory: Memory): CompoundMemory {
-        this.rgmemory.push(memory);
-        this.sizeI += memory.size();
-        return this;
+    private sizeI: number;
+    
+    public constructor(...rgmemory: Memory[]) {
+        this.sizeI = 0;
+        this.rgmemory = rgmemory;
+        rgmemory.forEach(memory => this.sizeI += memory.size());
     }
 
     public size():number {
         return this.sizeI;
+    }
+
+    public shadowSetter(addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void) {
+        this.setters.push({addrFirst: addrFirst, addrLast: addrLast, setter: setter });
     }
 
     public getByte(addr: number):number {
@@ -26,6 +32,15 @@ class CompoundMemory implements Memory {
     }
 
     public setByte(addr: number, value: number): void {
+
+        for (let i = 0; i < this.setters.length; i++) {
+            const setter = this.setters[i];
+            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
+                setter.setter(addr, value);
+                return;
+            }
+        }
+
         for (let i = 0; i < this.rgmemory.length; i++) {
             let memory = this.rgmemory[i];
             if (addr < memory.size()) {

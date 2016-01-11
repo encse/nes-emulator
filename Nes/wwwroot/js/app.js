@@ -1,15 +1,22 @@
 ///<reference path="Memory.ts"/>
 var CompoundMemory = (function () {
     function CompoundMemory() {
+        var _this = this;
+        var rgmemory = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            rgmemory[_i - 0] = arguments[_i];
+        }
         this.rgmemory = [];
+        this.setters = [];
+        this.sizeI = 0;
+        this.rgmemory = rgmemory;
+        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
     }
-    CompoundMemory.prototype.add = function (memory) {
-        this.rgmemory.push(memory);
-        this.sizeI += memory.size();
-        return this;
-    };
     CompoundMemory.prototype.size = function () {
         return this.sizeI;
+    };
+    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
+        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
     };
     CompoundMemory.prototype.getByte = function (addr) {
         for (var i = 0; i < this.rgmemory.length; i++) {
@@ -22,6 +29,13 @@ var CompoundMemory = (function () {
         throw 'address out of bounds';
     };
     CompoundMemory.prototype.setByte = function (addr, value) {
+        for (var i = 0; i < this.setters.length; i++) {
+            var setter = this.setters[i];
+            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
+                setter.setter(addr, value);
+                return;
+            }
+        }
         for (var i = 0; i < this.rgmemory.length; i++) {
             var memory = this.rgmemory[i];
             if (addr < memory.size()) {
@@ -50,19 +64,13 @@ var RAM = (function () {
     };
     return RAM;
 })();
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
 ///<reference path="Memory.ts"/>
 ///<reference path="RAM.ts"/>
 ///<reference path="CompoundMemory.ts"/>
-var MMC1 = (function (_super) {
-    __extends(MMC1, _super);
-    function MMC1(PRGBanks) {
-        _super.call(this);
+var MMC1 = (function () {
+    function MMC1(PRGBanks, VROMBanks) {
         this.PRGBanks = PRGBanks;
+        this.VROMBanks = VROMBanks;
         /**
          *  $8000-9FFF:  [...C PSMM]
              C = CHR Mode (0=8k mode, 1=4k mode)
@@ -95,11 +103,20 @@ var MMC1 = (function (_super) {
         this.r3 = 0;
         this.iWrite = 0;
         this.rTemp = 0;
-        this.rgmemory = [
-            new RAM(0x8000),
-            PRGBanks[0],
-            PRGBanks[1]
-        ];
+        while (PRGBanks.length < 2)
+            PRGBanks.push(new RAM(0x4000));
+        while (VROMBanks.length < 2)
+            VROMBanks.push(new RAM(0x100));
+        this.memory = new CompoundMemory(new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
+        this.nametableA = new RAM(0x100);
+        this.nametableB = new RAM(0x100);
+        this.palette = new RAM(0x20);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableA, this.nametableB, this.nametableB);
+        this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], new RepeatedMemory(2, this.nametable), new RepeatedMemory(8, this.palette));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.memory.shadowSetter(0x2000, 0x7999, function (addr) {
+            console.log(addr.toString(16));
+        });
     }
     MMC1.prototype.getFlg = function (flgs, iFirst, iLast) {
         if (iLast === void 0) { iLast = null; }
@@ -149,11 +166,7 @@ var MMC1 = (function (_super) {
         configurable: true
     });
     MMC1.prototype.setByte = function (addr, value) {
-        value &= 0xff;
-        if (addr < 0x8000)
-            return _super.prototype.setByte.call(this, addr, value);
-        /*
-        Temporary reg port ($8000-FFFF):
+        /*Temporary reg port ($8000-FFFF):
             [r... ...d]
                 r = reset flag
                 d = data bit
@@ -170,6 +183,7 @@ var MMC1 = (function (_super) {
                 - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
                 - temporary reg is reset (so that next write is the "first" write)
         */
+        value &= 0xff;
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
@@ -194,9 +208,6 @@ var MMC1 = (function (_super) {
             }
         }
     };
-    MMC1.prototype.size = function () {
-        return 0x10000;
-    };
     MMC1.prototype.update = function () {
         /*
           P = PRG Size (0=32k mode, 1=16k mode)
@@ -205,20 +216,20 @@ var MMC1 = (function (_super) {
             1 = $8000 swappable, $C000 fixed to page $0F (mode B)
             This bit is ignored when 'P' is clear (32k mode)*/
         if (this.P === 1) {
-            this.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
-            this.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
         }
         else if (this.S === 0) {
-            this.rgmemory[1] = this.PRGBanks[0];
-            this.rgmemory[2] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[1] = this.PRGBanks[0];
+            this.memory.rgmemory[2] = this.PRGBanks[this.PRG0];
         }
         else {
-            this.rgmemory[1] = this.PRGBanks[this.PRG0];
-            this.rgmemory[2] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[2] = this.PRGBanks[0x0f];
         }
     };
     return MMC1;
-})(CompoundMemory);
+})();
 ///<reference path="Memory.ts"/>
 var Mos6502 = (function () {
     function Mos6502(memory, ip, sp) {
@@ -2265,21 +2276,17 @@ var NesEmulator = (function () {
         switch (nesImage.mapperType) {
             case 0:
                 if (nesImage.ROMBanks.length === 1) {
-                    memory = new CompoundMemory()
-                        .add(new RAM(0xc000))
-                        .add(nesImage.ROMBanks[0]);
+                    memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
                     ip = 0xc000;
                 }
                 else if (nesImage.ROMBanks.length === 2) {
-                    memory = new CompoundMemory()
-                        .add(new RAM(0x8000))
-                        .add(nesImage.ROMBanks[0])
-                        .add(nesImage.ROMBanks[1]);
+                    memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
                     ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
                 }
                 break;
             case 1:
-                memory = new MMC1(nesImage.ROMBanks);
+                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VROMBanks);
+                memory = mmc1.memory;
                 ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
         }
         if (!memory)
@@ -2290,6 +2297,33 @@ var NesEmulator = (function () {
         this.cpu.step();
     };
     return NesEmulator;
+})();
+var PPU = (function () {
+    function PPU() {
+    }
+    return PPU;
+})();
+///<reference path="Memory.ts"/>
+var RepeatedMemory = (function () {
+    function RepeatedMemory(count, memory) {
+        this.count = count;
+        this.memory = memory;
+        this.sizeI = this.memory.size() * this.count;
+    }
+    RepeatedMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    RepeatedMemory.prototype.getByte = function (addr) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.getByte(addr % this.sizeI);
+    };
+    RepeatedMemory.prototype.setByte = function (addr, value) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.setByte(addr % this.sizeI, value);
+    };
+    return RepeatedMemory;
 })();
 ///<reference path="Memory.ts"/>
 var ROM = (function () {

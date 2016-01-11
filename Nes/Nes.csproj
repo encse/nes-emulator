@@ -176,8 +176,10 @@
     <Content Include="wwwroot\test\nesstress\nesstress.nes" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\MMC1.ts" />
+    <TypeScriptCompile Include="app\PPU.ts" />
     <TypeScriptCompile Include="app\ROM.ts" />
     <TypeScriptCompile Include="app\RAM.ts" />
     <TypeScriptCompile Include="app\Memory.ts" />
