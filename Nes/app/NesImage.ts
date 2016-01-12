@@ -25,7 +25,7 @@
     private static magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
 
     public ROMBanks:ROM[];
-    public VROMBanks: ROM[];
+    public VRAMBanks: RAM[];
     public RAMBanks: RAM[];
     public fVerticalMirroring:boolean;
     public fBatteryPackedRAM:boolean;
@@ -41,7 +41,7 @@
                 throw 'invalid NES header';
 
         this.ROMBanks = new Array(rawBytes[4]);
-        this.VROMBanks = new Array(rawBytes[5]);
+        this.VRAMBanks = new Array(rawBytes[5]);
 
         this.fVerticalMirroring = !!(rawBytes[6] & 1);
         this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
@@ -62,7 +62,7 @@
             if(rawBytes[i] !== 0)
                 throw 'invalid NES header';
 
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VROMBanks.length * 0x2000)
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
             throw 'invalid NES format';
         
         let idx = 0x10;
@@ -80,8 +80,8 @@
             idx += 0x4000;
         }
 
-        for (let ibank = 0; ibank < this.VROMBanks.length; ibank++) {
-            this.VROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x2000));
+        for (let ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
+            this.VRAMBanks[ibank] = RAM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
             idx += 0x2000;
         }
     }

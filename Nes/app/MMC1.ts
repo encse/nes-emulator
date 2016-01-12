@@ -54,7 +54,7 @@ class MMC1 {
     get W(): number { return this.getFlg(this.r3, 4); }
 
     memory: CompoundMemory;
-    private vmemory: CompoundMemory;
+    vmemory: CompoundMemory;
     private nametable:CompoundMemory;
     private nametableA:RAM;
     private nametableB:RAM;
@@ -88,9 +88,7 @@ class MMC1 {
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-        this.memory.shadowSetter(0x2000, 0x7999, (addr: number) => {
-            console.log(addr.toString(16));
-        });
+        
     }
 
     private setByte(addr: number, value: number): void {

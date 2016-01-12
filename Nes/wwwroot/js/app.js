@@ -53,6 +53,11 @@ var RAM = (function () {
     function RAM(size) {
         this.memory = new Uint8Array(size);
     }
+    RAM.fromBytes = function (memory) {
+        var res = new RAM(0);
+        res.memory = memory;
+        return res;
+    };
     RAM.prototype.size = function () {
         return this.memory.length;
     };
@@ -114,9 +119,6 @@ var MMC1 = (function () {
         this.nametable = new CompoundMemory(this.nametableA, this.nametableA, this.nametableB, this.nametableB);
         this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], new RepeatedMemory(2, this.nametable), new RepeatedMemory(8, this.palette));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-        this.memory.shadowSetter(0x2000, 0x7999, function (addr) {
-            console.log(addr.toString(16));
-        });
     }
     MMC1.prototype.getFlg = function (flgs, iFirst, iLast) {
         if (iLast === void 0) { iLast = null; }
@@ -2205,7 +2207,7 @@ var NesImage = (function () {
             if (rawBytes[i] !== NesImage.magic[i])
                 throw 'invalid NES header';
         this.ROMBanks = new Array(rawBytes[4]);
-        this.VROMBanks = new Array(rawBytes[5]);
+        this.VRAMBanks = new Array(rawBytes[5]);
         this.fVerticalMirroring = !!(rawBytes[6] & 1);
         this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
         var fTrainer = !!(rawBytes[6] & 4);
@@ -2221,7 +2223,7 @@ var NesImage = (function () {
         for (var i = 0xa; i < 0x10; i++)
             if (rawBytes[i] !== 0)
                 throw 'invalid NES header';
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VROMBanks.length * 0x2000)
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
             throw 'invalid NES format';
         var idx = 0x10;
         if (fTrainer) {
@@ -2235,8 +2237,8 @@ var NesImage = (function () {
             this.ROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x4000));
             idx += 0x4000;
         }
-        for (var ibank = 0; ibank < this.VROMBanks.length; ibank++) {
-            this.VROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x2000));
+        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
+            this.VRAMBanks[ibank] = RAM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
             idx += 0x2000;
         }
     }
@@ -2271,27 +2273,29 @@ var NesImage = (function () {
 ///<reference path="Mos6502.ts"/>
 var NesEmulator = (function () {
     function NesEmulator(nesImage) {
-        var memory = null;
         var ip = 0;
         switch (nesImage.mapperType) {
             case 0:
                 if (nesImage.ROMBanks.length === 1) {
-                    memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
+                    this.memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
                     ip = 0xc000;
                 }
                 else if (nesImage.ROMBanks.length === 2) {
-                    memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
-                    ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
+                    this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
+                    ip = this.memory.getByte(0xfffc) + 256 * this.memory.getByte(0xfffd);
                 }
+                this.vmemory = nesImage.VRAMBanks.length > 0 ? new CompoundMemory(nesImage.VRAMBanks[0], new RAM(0x2000)) : new RAM(0x4000);
                 break;
             case 1:
-                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VROMBanks);
-                memory = mmc1.memory;
-                ip = memory.getByte(0xfffc) + 256 * memory.getByte(0xfffd);
+                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
+                this.memory = mmc1.memory;
+                this.vmemory = mmc1.vmemory;
+                ip = this.memory.getByte(0xfffc) + 256 * this.memory.getByte(0xfffd);
         }
-        if (!memory)
+        if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
-        this.cpu = new Mos6502(memory, ip, 0xfd);
+        this.ppu = new PPU(this.memory, this.vmemory);
+        this.cpu = new Mos6502(this.memory, ip, 0xfd);
     }
     NesEmulator.prototype.step = function () {
         this.cpu.step();
@@ -2299,8 +2303,105 @@ var NesEmulator = (function () {
     return NesEmulator;
 })();
 var PPU = (function () {
-    function PPU() {
+    function PPU(memory, vmemory) {
+        this.vmemory = vmemory;
+        /**
+         *
+            Address range	Size	Description
+            $0000-$0FFF	$1000	Pattern table 0
+            $1000-$1FFF	$1000	Pattern Table 1
+            $2000-$23FF	$0400	Nametable 0
+            $2400-$27FF	$0400	Nametable 1
+            $2800-$2BFF	$0400	Nametable 2
+            $2C00-$2FFF	$0400	Nametable 3
+            $3000-$3EFF	$0F00	Mirrors of $2000-$2EFF
+            $3F00-$3F1F	$0020	Palette RAM indexes
+            $3F20-$3FFF	$00E0	Mirrors of $3F00-$3F1F
+    
+         */
+        this.rgaddrNametable = [0x2000, 0x2400, 0x2800, 0x2c00];
+        this.rgcolorBackground = [0x00000, 0x0000ff, 0x00ff00, 0x000000, 0xff0000, 0x000000, 0x000000, 0x000000];
+        this.iaddrWrite = 0;
+        this.addrWrite = 0;
+        this.daddrWrite = 1;
+        this.addrSpritePatternTable = 0;
+        this.addrScreenPatternTable = 0;
+        this.spriteHeight = 8;
+        this.vblankEnable = false;
+        this.imageMask = false;
+        this.spriteMask = false;
+        this.screenEnable = false;
+        this.spritesEnable = false;
+        if (vmemory.size() !== 0x4000)
+            throw 'insufficient Vmemory size';
+        memory.shadowSetter(0x2000, 0x2007, this.setter.bind(this));
     }
+    PPU.prototype.setter = function (addr, value) {
+        value &= 0xff;
+        /*$0x2006 Used to set the address of PPU Memory to be accessed via
+          $2007. The first write to this register will set 8 lower
+          address bits. The second write will set 6 upper bits. The
+          address will increment either by 1 or by 32 after each
+          access to $2007 (see "PPU Memory").
+        */
+        switch (addr) {
+            case 0x2000:
+                this.inametable = value & 0x03;
+                this.daddrWrite = value & 0x04 ? 32 : 1;
+                this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
+                this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
+                this.spriteHeight = value & 0x20 ? 16 : 8;
+                this.vblankEnable = !!(value & 0x80);
+                break;
+            case 0x2001:
+                this.imageMask = !!(value & 0x01);
+                this.spriteMask = !!(value & 0x02);
+                this.screenEnable = !!(value & 0x04);
+                this.spritesEnable = !!(value & 0x08);
+                this.imageMask = !!(value & 0x01);
+                this.icolorBackground = (value >> 4) & 0x07;
+                break;
+            case 0x2006:
+                if (this.iaddrWrite === 0) {
+                    this.addrWrite = (value & 0x3f) << 8;
+                    this.iaddrWrite = 1;
+                }
+                else {
+                    this.addrWrite |= value & 0xff;
+                    this.iaddrWrite = 0;
+                }
+                break;
+            case 0x2007:
+                this.vmemory.setByte(this.addrWrite, value);
+                this.addrWrite += this.daddrWrite;
+                break;
+        }
+    };
+    PPU.prototype.render = function (canvas) {
+        var ctx = canvas.getContext('2d');
+        var imageData = ctx.getImageData(0, 0, 256, 240);
+        var buf = new ArrayBuffer(imageData.data.length);
+        var buf8 = new Uint8ClampedArray(buf);
+        var data = new Uint32Array(buf);
+        for (var nametableRow = 0; nametableRow < 30; nametableRow++) {
+            for (var nametableCol = 0; nametableCol < 32; nametableCol++) {
+                var addrPattern = this.rgaddrNametable[this.inametable] + nametableCol + 32 * nametableRow;
+                var ipattern = this.vmemory.getByte(addrPattern);
+                for (var y = 0; y < 8; y++) {
+                    var patternRow = this.vmemory.getByte(this.addrScreenPatternTable + ipattern * 16 + y);
+                    for (var x = 7; x >= 0; x--) {
+                        var dataAddr = ((nametableRow * 8 + y) * 256 + (nametableCol * 8) + 7 - x);
+                        if (patternRow & (1 << x))
+                            data[dataAddr] = 0xffffffff;
+                        else
+                            data[dataAddr] = 0xff000000;
+                    }
+                }
+            }
+        }
+        imageData.data.set(buf8);
+        ctx.putImageData(imageData, 0, 0);
+    };
     return PPU;
 })();
 ///<reference path="Memory.ts"/>

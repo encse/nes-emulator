@@ -24,7 +24,7 @@
 			st += ' ' + arguments[i];
 		};
 		st += '</div>';
-		$('#log').html($('#log').html() + st);
+		$('#log').append(st);
 	}
 	function log_error() {
 		var st = '<div class="error">';
@@ -85,6 +85,16 @@
 					i++;
 				}
 				log(res);
+				var canvas = document.createElement('canvas');
+				canvas.width = 240;
+				canvas.height = 200;
+				nesEmulator.ppu.render(canvas);
+
+				var img = document.createElement('img');
+				img.src = canvas.toDataURL();
+				$('#log').append(img);
+
+				
 			} catch (e) {
 				log_error(e);
 			}
@@ -134,8 +144,9 @@
 			'test/instr_test-v5/rom_singles/14-rti.nes',
 			'test/instr_test-v5/rom_singles/15-brk.nes',
 			'test/instr_test-v5/rom_singles/16-special.nes',
-			'test/instr_test-v5/official_only.nes',
-			'test/instr_test-v5/all_instrs.nes'];
+			//'test/instr_test-v5/official_only.nes',
+			//'test/instr_test-v5/all_instrs.nes'
+		];
 
 		var tests_misc = ['test/instr_misc/01-abs_x_wrap.nes',
 			'test/instr_misc/02-branch_wrap.nes',

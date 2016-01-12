@@ -4,6 +4,13 @@ class RAM implements Memory {
     constructor(size: number) {
         this.memory = new Uint8Array(size);
     }
+
+    public static fromBytes(memory: Uint8Array) {
+        var res = new RAM(0);
+        res.memory = memory;
+        return res;
+    }
+
     public size() {
         return this.memory.length;
     }
