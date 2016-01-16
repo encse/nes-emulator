@@ -4,35 +4,15 @@
 class MMC1 {
 
    /**
-    *  $8000-9FFF:  [...C PSMM]
-        C = CHR Mode (0=8k mode, 1=4k mode)
-        P = PRG Size (0=32k mode, 1=16k mode)
-        S = Slot select:
-            0 = $C000 swappable, $8000 fixed to page $00 (mode A)
-            1 = $8000 swappable, $C000 fixed to page $0F (mode B)
-            This bit is ignored when 'P' is clear (32k mode)
-        M = Mirroring control:
-            %00 = 1ScA
-            %01 = 1ScB
-            %10 = Vert
-            %11 = Horz
+    * 
+     
 
-
-      $A000-BFFF:  [...C CCCC]
-        CHR Reg 0
-
-      $C000-DFFF:  [...C CCCC]
-        CHR Reg 1
-
-      $E000-FFFF:  [...W PPPP]
-        W = WRAM Disable (0=enabled, 1=disabled)
-        P = PRG Reg
+      
 
     */
-    r0:number = 0;
-    r1: number = 0;
-    r2: number = 0;
-    r3: number = 0;
+  
+ 
+  
 
     iWrite: number = 0;
     rTemp: number = 0;
@@ -44,13 +24,55 @@ class MMC1 {
             return (flgs >> iFirst) & ((1 << (iLast-iFirst)) - 1);
     }
 
-    get C(): number { return this.getFlg(this.r0, 4) ; }
+    /**
+     * $8000-9FFF:  [...C PSMM]
+     */
+    r0: number = 0;
+  
+    /** CHR Mode (0=8k mode, 1=4k mode) */
+    get C(): number { return this.getFlg(this.r0, 4); }
+    /** PRG Size (0=32k mode, 1=16k mode) */
     get P(): number { return this.getFlg(this.r0, 3); }
+    /**
+     * Slot select:
+     *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
+     *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
+     *  This bit is ignored when 'P' is clear (32k mode)
+     */
     get S(): number { return this.getFlg(this.r0, 2); }
+    /**
+     *  Mirroring control:
+     *  %00 = 1ScA
+     *  %01 = 1ScB
+     *  %10 = Vert
+     *  %11 = Horz
+     */
     get M(): number { return this.getFlg(this.r0, 0, 1); }
+
+    /**
+     *  $A000-BFFF:  [...C CCCC]
+        CHR Reg 0
+     */
+    r1: number = 0;
     get CHR0(): number { return this.getFlg(this.r1, 0, 4); }
+
+    /**
+     *  $C000-DFFF:  [...C CCCC]
+     *  CHR Reg 1
+     */
+    r2: number = 0;
     get CHR1(): number { return this.getFlg(this.r2, 0, 4); }
+
+    /**
+     * $E000-FFFF:  [...W PPPP]
+     */
+    r3: number = 0;
     get PRG0(): number { return this.getFlg(this.r3, 0, 3); }
+    /**
+     * W = WRAM Disable (0=enabled, 1=disabled)
+     * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
+     * Later ones do.
+     */
     get W(): number { return this.getFlg(this.r3, 4); }
 
     memory: CompoundMemory;
@@ -58,14 +80,13 @@ class MMC1 {
     private nametable:CompoundMemory;
     private nametableA:RAM;
     private nametableB:RAM;
-    private palette:RAM;
 
     constructor(private PRGBanks: Memory[], private VROMBanks: Memory[]) {
         while (PRGBanks.length < 2)
             PRGBanks.push(new RAM(0x4000));
 
         while (VROMBanks.length < 2)
-            VROMBanks.push(new RAM(0x100));
+            VROMBanks.push(new RAM(0x1000));
 
         this.memory = new CompoundMemory(
             new RAM(0x8000),
@@ -73,18 +94,15 @@ class MMC1 {
             PRGBanks[1]
         );
 
-        this.nametableA = new RAM(0x100);
-        this.nametableB = new RAM(0x100);
-        this.palette = new RAM(0x20);
-        this.nametable = new CompoundMemory(this.nametableA, this.nametableA, this.nametableB, this.nametableB);
-       
-      
+        this.nametableA = new RAM(0x400);
+        this.nametableB = new RAM(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
         
         this.vmemory = new CompoundMemory(
             VROMBanks[0],
             VROMBanks[1],
-            new RepeatedMemory(2, this.nametable),
-            new RepeatedMemory(8, this.palette)
+            this.nametable,
+            new RAM(0x1000)
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
@@ -135,13 +153,21 @@ class MMC1 {
     }
 
     private update() {
+      
         /*
-          P = PRG Size (0=32k mode, 1=16k mode)
-          S = Slot select:
-            0 = $C000 swappable, $8000 fixed to page $00 (mode A)
-            1 = $8000 swappable, $C000 fixed to page $0F (mode B)
-            This bit is ignored when 'P' is clear (32k mode)*/
+            PRG Setup:
+            --------------------------
+            There is 1 PRG reg and 3 PRG modes.
 
+                           $8000   $A000   $C000   $E000
+                         +-------------------------------+
+            P=0:         |            <$E000>            |
+                         +-------------------------------+
+            P=1, S=0:    |     { 0 }     |     $E000     |
+                         +---------------+---------------+
+            P=1, S=1:    |     $E000     |     {$0F}     |
+                         +---------------+---------------+
+        */
         if (this.P === 1) {
             this.memory.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
             this.memory.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
@@ -153,6 +179,38 @@ class MMC1 {
         else {
             this.memory.rgmemory[1] = this.PRGBanks[this.PRG0];
             this.memory.rgmemory[2] = this.PRGBanks[0x0f];
+        }
+
+        /*
+            CHR Setup:
+            --------------------------
+            There are 2 CHR regs and 2 CHR modes.
+
+                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00 
+                      +---------------------------------------------------------------+
+            C=0:      |                            <$A000>                            |
+                      +---------------------------------------------------------------+
+            C=1:      |             $A000             |             $C000             |
+                      +-------------------------------+-------------------------------+
+        */
+        if (this.C === 0) {
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
+            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
+        } else {
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
+            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
+        }
+
+        if (this.M === 0) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
+        } else if (this.M === 1){
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+        } else if (this.M === 2) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
+        } else if (this.M === 3) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
         }
     }
 }
