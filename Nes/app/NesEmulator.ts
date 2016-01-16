@@ -10,6 +10,8 @@ class NesEmulator {
 
     public constructor(nesImage: NesImage) {
         var ip = 0;
+        if (nesImage.fPAL)
+            throw 'only NTSC images are supported';
         switch (nesImage.mapperType)
         {
             case 0:
