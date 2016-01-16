@@ -28,7 +28,17 @@ class NesEmulator {
                     ip = this.memory.getByte(0xfffc) + 256 * this.memory.getByte(0xfffd);
                 }
 
-                this.vmemory = nesImage.VRAMBanks.length > 0  ? new CompoundMemory(nesImage.VRAMBanks[0], new RAM(0x2000)) : new RAM(0x4000);
+                if (nesImage.VRAMBanks.length > 1 || nesImage.VRAMBanks[0].size() !== 0x2000)
+                    throw 'unknown VRAMBanks';
+
+                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
+                var nameTableA = new RAM(0x400);
+                var nameTableB = new RAM(0x400);
+                var nameTableC = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableA : nameTableB;
+                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableA;
+                var rest = new RAM(0x1000);
+
+                this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
                 break;
             case 1:
                 var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
