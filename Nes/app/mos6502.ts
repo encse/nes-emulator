@@ -1,6 +1,7 @@
 ﻿///<reference path="Memory.ts"/>
 
 class Mos6502 {
+    sleep: number = 0;
 
     private addrRA: number = -1;
 
@@ -8,6 +9,13 @@ class Mos6502 {
     rX: number = 0;
     rY: number = 0;
 
+    public ip: number;
+    public sp: number;
+
+    public addrReset = 0xfffc;
+    public addrIRQ = 0xfffe;
+    public addrNMI = 0xfffa;
+ 
     private flgCarry: number = 0;
     private flgZero: number = 0;
     private flgInterruptDisable: number = 1;
@@ -15,6 +23,18 @@ class Mos6502 {
     private flgBreakCommand: number = 0;
     private flgOverflow: number = 0;
     private flgNegative: number = 0;
+
+    private nmiRequested: boolean;
+
+    public Reset() {
+        this.ip = this.getWord(this.addrReset);
+        this.sp = 0xfd;
+    }
+
+    public RequestNMI() {
+        this.nmiRequested = true;
+    }
+
 
     public get rP(): number {
         return (this.flgNegative << 7) +
@@ -39,7 +59,7 @@ class Mos6502 {
         this.flgCarry = (byte >> 0) & 1;
     }
 
-    public constructor(public memory:Memory, public ip: number, public sp: number) {
+    public constructor(public memory:Memory) {
         
     }
 
@@ -379,7 +399,7 @@ class Mos6502 {
     private CLI(): void {
         this.flgInterruptDisable= 0;
     }
-    private CLO(): void {
+    private CLV(): void {
         this.flgOverflow= 0;
     }
 
@@ -966,7 +986,16 @@ class Mos6502 {
         this.flgBreakCommand = 1;
         this.PHP();
         this.flgInterruptDisable = 1;
-        this.ip = this.getWord(0xfffe);
+        this.ip = this.getWord(this.addrIRQ);
+    }
+
+    private NMI(): void {
+        this.nmiRequested = false;
+
+        this.pushWord(this.ip);
+        this.pushByte(this.rP);
+        this.flgInterruptDisable = 1;
+        this.ip = this.getWord(this.addrNMI);
     }
 
     /**
@@ -1069,11 +1098,23 @@ class Mos6502 {
     private getByteAbsolute(): number { return this.memory.getByte(this.getAddrAbsolute()); }
     private getWordAbsolute(): number { return this.getWord(this.getAddrAbsolute()); }
 
-    private getAddrAbsoluteX(): number { return (this.rX + this.getWordImmediate()) & 0xffff; }
-    private getByteAbsoluteX(): number { return this.memory.getByte(this.getAddrAbsoluteX()) }
+    private getAddrAbsoluteX(): number {
+        var addr = (this.rX + this.getWordImmediate()) & 0xffff;
+        if ((addr & 0xff) === 0xff)
+            this.pageCross = 1;
+
+        return addr;
+    }
+    private getByteAbsoluteX(): number { return this.memory.getByte(this.getAddrAbsoluteX()); }
     private getWordAbsoluteX(): number { return this.getWord(this.getAddrAbsoluteX()) }
 
-    private getAddrAbsoluteY(): number { return (this.rY + this.getWordImmediate()) & 0xffff; }
+    private getAddrAbsoluteY(): number {
+        var addr = (this.rY + this.getWordImmediate()) & 0xffff;
+        if ((addr & 0xff) === 0xff)
+            this.pageCross = 1;
+
+        return addr;
+    }
     private getByteAbsoluteY(): number { return this.memory.getByte(this.getAddrAbsoluteY()); }
     private getWordAbsoluteY(): number { return this.getWord(this.getAddrAbsoluteY()); }
 
@@ -1112,6 +1153,10 @@ class Mos6502 {
         
         var addrLo: number = this.getByteImmediate() & 0xff;
         var addrHi: number = (addrLo + 1) & 0xff;
+
+        if (addrLo === 0xff)
+            this.pageCross = 1;
+
         return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     }
     private getByteIndirectY(): number { return this.memory.getByte(this.getAddrIndirectY()); }
@@ -1136,7 +1181,28 @@ class Mos6502 {
         return this.popByte() + (this.popByte() << 8);
     }
 
+    private pageCross = 0;
+    private jumpSucceed = 0;
+    private jumpToNewPage = 0;
+
+    private setJmpFlags(sbyte) {
+        this.jumpSucceed = 1;
+        this.jumpToNewPage = ((this.ip + sbyte) & 0xff00) !== (this.ip & 0xff00) ? 1 : 0;
+    }
+
     public step() {
+
+        if (this.sleep > 0) {
+            this.sleep--;
+            return;
+        }
+
+        if (this.nmiRequested) {
+            this.NMI();
+            return;
+        }
+
+        this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
         var ipPrev = this.ip;
         switch (this.memory.getByte(this.ip)) {
             case 0x69: this.ADC(this.getByteImmediate()); this.ip += 2; break;
@@ -1175,7 +1241,7 @@ class Mos6502 {
             case 0x18: this.CLC(); this.ip += 1; break;
             case 0xd8: this.CLD(); this.ip += 1; break;
             case 0x58: this.CLI(); this.ip += 1; break;
-            case 0xb8: this.CLO(); this.ip += 1; break;
+            case 0xb8: this.CLV(); this.ip += 1; break;
 
             case 0xc9: this.CMP(this.getByteImmediate()); this.ip += 2; break;
             case 0xc5: this.CMP(this.getByteZeroPage()); this.ip += 2; break;
@@ -1426,6 +1492,8 @@ class Mos6502 {
                 throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
 
+        if (this.sleep > 0)
+            this.sleep --;
         
         this.ip &= 0xffff;
     }

@@ -8,8 +8,7 @@ class NesEmulator {
     public vmemory: Memory;
     public ppu: PPU;
 
-    public constructor(nesImage: NesImage) {
-        var ip = 0;
+    public constructor(nesImage: NesImage, ctx:CanvasRenderingContext2D) {
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType)
@@ -19,15 +18,12 @@ class NesEmulator {
                     this.memory = new CompoundMemory(
                             new RAM(0xc000),
                             nesImage.ROMBanks[0]);
-                    ip = 0xc000;
                 }
                 else if (nesImage.ROMBanks.length === 2) {
                     this.memory = new CompoundMemory(
                         new RAM(0x8000),
                         nesImage.ROMBanks[0],
                         nesImage.ROMBanks[1]);
-
-                    ip = this.memory.getByte(0xfffc) + 256 * this.memory.getByte(0xfffd);
                 }
 
                 if (nesImage.VRAMBanks.length > 1 || nesImage.VRAMBanks[0].size() !== 0x2000)
@@ -46,16 +42,29 @@ class NesEmulator {
                 var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
                 this.memory = mmc1.memory;
                 this.vmemory = mmc1.vmemory;
-                ip = this.memory.getByte(0xfffc) + 256 * this.memory.getByte(0xfffd);
+              
         }
 
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
-        this.ppu = new PPU(this.memory, this.vmemory);
-        this.cpu = new Mos6502(this.memory, ip, 0xfd);
+        this.cpu = new Mos6502(this.memory);
+        this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
+
+        this.cpu.Reset();
+
     }
+    public setCtx(ctx:CanvasRenderingContext2D) {
+        this.ppu.setCtx(ctx);
+    }
+    icycle = 0;
     public step() {
-        this.cpu.step();
+        this.ppu.step();
+        this.icycle++;
+        if (this.icycle === 3) {
+            this.cpu.step();
+            this.icycle = 0;
+        }
+
     }
 
 }

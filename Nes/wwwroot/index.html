@@ -57,49 +57,48 @@
 		done = done || function () { }
 
 		loadNesEmulator(url, function (nesEmulator) {
-			try {
-				var dtStart = new Date().getTime();
-				while (true) {
-					if (nesEmulator.cpu.getByte(0x6001) === 0xde &&
-							nesEmulator.cpu.getByte(0x6002) === 0xb0,
-						nesEmulator.cpu.getByte(0x6003) === 0x61
-					) {
-						if (nesEmulator.cpu.getByte(0x6000) !== 0x80) {
-							var resultCode = nesEmulator.cpu.getByte(0x6000);
-							if (resultCode !== 0)
-								log_error('res: ' + resultCode.toString(16));
-							break;
-						}
+
+			var canvas = document.createElement('canvas');
+			canvas.width = 256;
+			canvas.height = 240;
+			$(canvas).css('zoom', 2);
+			$('#log').append(canvas);
+
+			nesEmulator.setCtx(canvas.getContext('2d'));
+
+			var step = function() {
+				try {
+					for(var i=0; i < 66560; i++) {
+						//if (nesEmulator.cpu.getByte(0x6001) === 0xde &&
+						//	nesEmulator.cpu.getByte(0x6002) === 0xb0,
+						//	nesEmulator.cpu.getByte(0x6003) === 0x61
+						//) {
+						//	if (nesEmulator.cpu.getByte(0x6000) !== 0x80) {
+						//		var resultCode = nesEmulator.cpu.getByte(0x6000);
+						//		if (resultCode !== 0)
+						//			log_error('res: ' + resultCode.toString(16));
+						//		break;
+						//	}
+						//}
+						nesEmulator.step();
 					}
-					nesEmulator.step();
+					requestAnimationFrame(step);
+					//var res = "";
+					//var i = 0x6004;
+					//while (nesEmulator.cpu.getByte(i) !== 0) {
+					//	res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+					//	i++;
+					//}
+					//log(res);
 
-					//if ((new Date().getTime() - dtStart) / 1000 > 5) {
-					//	log_error('timeout');
-					//	break;
-					//};
+				} catch (e) {
+					log_error(e);
 				}
-				var res = "";
-				var i = 0x6004;
-				while (nesEmulator.cpu.getByte(i) !== 0) {
-					res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-					i++;
-				}
-				log(res);
-				var canvas = document.createElement('canvas');
-				canvas.width = 256;
-				canvas.height = 240;
-				nesEmulator.ppu.render(canvas);
-
-				var img = document.createElement('img');
-				img.src = canvas.toDataURL();
-				$('#log').append(img);
-
+			//	done();
 				
-			} catch (e) {
-				log_error(e);
 			}
-			done();
-		
+
+			requestAnimationFrame(step);
 		});
 	}
 
@@ -128,7 +127,9 @@
 
 	$('#btnTest').click(() => {
 		var tests_blargg = [
-			'test/instr_test-v5/rom_singles/01-basics.nes',
+			//'test/smb.nes'
+			//'test/palette/palette.nes',
+			//'test/instr_test-v5/rom_singles/01-basics.nes',
 			//'test/instr_test-v5/rom_singles/02-implied.nes',
 			//'test/instr_test-v5/rom_singles/03-immediate.nes',
 			//'test/instr_test-v5/rom_singles/04-zero_page.nes',

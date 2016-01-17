@@ -131,6 +131,9 @@
     <Content Include="wwwroot\test\inst_test-v4\source\common\testing.s" />
     <Content Include="wwwroot\test\inst_test-v4\source\common\text_out.s" />
     <Content Include="wwwroot\test\inst_test-v4\source\readme.txt" />
+    <Content Include="wwwroot\test\palette\palette.s" />
+    <Content Include="wwwroot\test\palette\palette_symbols.py" />
+    <Content Include="wwwroot\test\palette\palette_test.txt" />
     <Content Include="wwwroot\test\step_test\nestest.bin" />
     <Content Include="wwwroot\test\step_test\nestest.log" />
     <Content Include="wwwroot\test\inst_test-v4\source\common\ascii.chr" />
@@ -174,6 +177,12 @@
     <Content Include="wwwroot\test\instr_test-v5\source\common\bootloader.bin" />
     <Content Include="wwwroot\test\instr_test-v5\source\nes.cfg" />
     <Content Include="wwwroot\test\nesstress\nesstress.nes" />
+    <Content Include="wwwroot\test\palette.nes" />
+    <Content Include="wwwroot\test\palette\compile_palette.bat" />
+    <Content Include="wwwroot\test\palette\nrom.cfg" />
+    <Content Include="wwwroot\test\palette\palette.nes" />
+    <Content Include="wwwroot\test\palette\test.chr" />
+    <Content Include="wwwroot\test\smb.nes" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
