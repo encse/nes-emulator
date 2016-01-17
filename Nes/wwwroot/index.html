@@ -21,7 +21,7 @@
 		
 		var st = '<div>';
 		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i];
+			st += ' ' + arguments[i].replace('\n', '<br/>');
 		};
 		st += '</div>';
 		$('#log').append(st);
@@ -29,10 +29,10 @@
 	function log_error() {
 		var st = '<div class="error">';
 		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i];
+			st += ' ' + arguments[i].replace('\n', '<br/>');
 		};
 		st += "</div>";
-		$('#log').html($('#log').html() + st);
+		$('#log').append(st);
 	}
 
 	function loadNesEmulator(url, done) {
@@ -51,6 +51,29 @@
 		}
 		xhr.send();
 	}
+	function testFinished(nesEmulator) {
+		if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
+			nesEmulator.cpu.getByte(0x6001) === 0xde &&
+			nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
+			nesEmulator.cpu.getByte(0x6003) === 0x61
+		)
+		{
+			var resultCode = nesEmulator.cpu.getByte(0x6000);
+			if (resultCode !== 0)
+				log_error('res: ' + resultCode.toString(16));
+
+			var res = "";
+			var i = 0x6004;
+			while (nesEmulator.cpu.getByte(i) !== 0) {
+				res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+				i++;
+			}
+			log(res);
+			return true;
+		}
+
+		return false;
+	}
 
 	function runTest(url, done) {
 		log('<h2>', url, '</h2>');
@@ -68,28 +91,22 @@
 
 			var step = function() {
 				try {
-					for(var i=0; i < 66560; i++) {
-						//if (nesEmulator.cpu.getByte(0x6001) === 0xde &&
-						//	nesEmulator.cpu.getByte(0x6002) === 0xb0,
-						//	nesEmulator.cpu.getByte(0x6003) === 0x61
-						//) {
-						//	if (nesEmulator.cpu.getByte(0x6000) !== 0x80) {
-						//		var resultCode = nesEmulator.cpu.getByte(0x6000);
-						//		if (resultCode !== 0)
-						//			log_error('res: ' + resultCode.toString(16));
-						//		break;
-						//	}
-						//}
+					for (var i = 0; i < 89342 * 4 * 12; i++) {
+						
 						nesEmulator.step();
 					}
+
+					if (testFinished(nesEmulator)) {
+						for (var i = 0; i < 89342 * 4 * 12; i++) {
+
+							nesEmulator.step();
+						}
+						nesEmulator.ppu.getNameTable(0);
+						done();
+						return;
+					}
 					requestAnimationFrame(step);
-					//var res = "";
-					//var i = 0x6004;
-					//while (nesEmulator.cpu.getByte(i) !== 0) {
-					//	res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-					//	i++;
-					//}
-					//log(res);
+					
 
 				} catch (e) {
 					log_error(e);
@@ -127,6 +144,8 @@
 
 	$('#btnTest').click(() => {
 		var tests_blargg = [
+			//'test/instr_timing/rom_singles/1-instr_timing.nes',
+
 			//'test/smb.nes'
 			//'test/palette/palette.nes',
 			//'test/instr_test-v5/rom_singles/01-basics.nes',
@@ -143,17 +162,17 @@
 			//'test/instr_test-v5/rom_singles/12-jmp_jsr.nes',
 			//'test/instr_test-v5/rom_singles/13-rts.nes',
 			//'test/instr_test-v5/rom_singles/14-rti.nes',
-			//'test/instr_test-v5/rom_singles/15-brk.nes',
+			'test/instr_test-v5/rom_singles/15-brk.nes',
 			//'test/instr_test-v5/rom_singles/16-special.nes',
 			//'test/instr_test-v5/official_only.nes',
-			//'test/instr_test-v5/all_instrs.nes'
+			//'test/instr_test-v5/all_instrs.nes',
+			//'test/instr_misc/01-abs_x_wrap.nes',
+			//'test/instr_misc/02-branch_wrap.nes',
+			//'test/instr_misc/03-dummy_reads.nes',
+			//'test/instr_misc/04-dummy_reads_apu.nes',
+			//'test/instr_misc/instr_misc.nes'
 		];
 
-		var tests_misc = ['test/instr_misc/01-abs_x_wrap.nes',
-			'test/instr_misc/02-branch_wrap.nes',
-			'test/instr_misc/03-dummy_reads.nes',
-			'test/instr_misc/04-dummy_reads_apu.nes',
-			'test/instr_misc/instr_misc.nes'];
 
 		runAll(tests_blargg);
 	//	runTest(tests_inst[2]);

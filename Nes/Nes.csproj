@@ -60,6 +60,22 @@
     <Content Include="wwwroot\test\instr_test-v5\source\common\testing.s" />
     <Content Include="wwwroot\test\instr_test-v5\source\common\text_out.s" />
     <Content Include="wwwroot\test\instr_test-v5\source\readme.txt" />
+    <Content Include="wwwroot\test\instr_timing\readme.txt" />
+    <Content Include="wwwroot\test\instr_timing\source\1-instr_timing.s" />
+    <Content Include="wwwroot\test\instr_timing\source\2-branch_timing.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\build_rom.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\console.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\crc.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\delay.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\macros.inc" />
+    <Content Include="wwwroot\test\instr_timing\source\common\neshw.inc" />
+    <Content Include="wwwroot\test\instr_timing\source\common\ppu.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\print.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\shell.inc" />
+    <Content Include="wwwroot\test\instr_timing\source\common\shell.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\testing.s" />
+    <Content Include="wwwroot\test\instr_timing\source\common\text_out.s" />
+    <Content Include="wwwroot\test\instr_timing\source\readme.txt" />
     <Content Include="wwwroot\test\inst_test-v4\readme.txt" />
   </ItemGroup>
   <ItemGroup>
@@ -183,8 +199,15 @@
     <Content Include="wwwroot\test\palette\palette.nes" />
     <Content Include="wwwroot\test\palette\test.chr" />
     <Content Include="wwwroot\test\smb.nes" />
+    <Content Include="wwwroot\test\instr_timing\instr_timing.nes" />
+    <Content Include="wwwroot\test\instr_timing\rom_singles\1-instr_timing.nes" />
+    <Content Include="wwwroot\test\instr_timing\rom_singles\2-branch_timing.nes" />
+    <Content Include="wwwroot\test\instr_timing\source\common\ascii.chr" />
+    <Content Include="wwwroot\test\instr_timing\source\common\devcart.bin" />
+    <Content Include="wwwroot\test\instr_timing\source\nes.cfg" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="app\APU.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\MMC1.ts" />

@@ -7,6 +7,7 @@ class NesEmulator {
     public memory: CompoundMemory;
     public vmemory: Memory;
     public ppu: PPU;
+    public apu: APU;
 
     public constructor(nesImage: NesImage, ctx:CanvasRenderingContext2D) {
         if (nesImage.fPAL)
@@ -48,6 +49,7 @@ class NesEmulator {
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
         this.cpu = new Mos6502(this.memory);
+        this.apu = new APU(this.memory);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
 
         this.cpu.Reset();
@@ -58,13 +60,14 @@ class NesEmulator {
     }
     icycle = 0;
     public step() {
-        this.ppu.step();
-        this.icycle++;
-        if (this.icycle === 3) {
-            this.cpu.step();
-            this.icycle = 0;
-        }
 
+        if (this.icycle % 16 === 0)
+            this.cpu.step();
+
+        if(this.icycle % 5 === 0)
+            this.ppu.step();
+
+        this.icycle++;
     }
 
 }
