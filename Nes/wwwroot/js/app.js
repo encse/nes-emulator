@@ -2738,7 +2738,7 @@ var PPU = (function () {
            ||| ++-------------- nametable select
            +++----------------- fine Y scroll
         */
-        this.v = 0; // Current VRAM address (15 bits)
+        this._v = 0; // Current VRAM address (15 bits)
         this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
         this.x = 0; // Fine X scroll (3 bits)
         this.w = 0; // First or second write toggle (1 bit)
@@ -2748,6 +2748,14 @@ var PPU = (function () {
         this.nmi_occured = false;
         this.nmi_output = false;
         this.spriteHeight = 8;
+        this._imageGrayscale = false;
+        this._showBgInLeftmost8Pixels = false;
+        this._showSpritesInLeftmost8Pixels = false;
+        this._showBg = false;
+        this._showSprites = false;
+        this._emphasizeRed = false;
+        this._emphasizeGreen = false;
+        this._emphasizeBlue = false;
         this.imageGrayscale = false;
         this.showBgInLeftmost8Pixels = false;
         this.showSpritesInLeftmost8Pixels = false;
@@ -2775,6 +2783,16 @@ var PPU = (function () {
         memory.shadowSetter(0x2000, 0x2007, this.setter.bind(this));
         memory.shadowGetter(0x2000, 0x2007, this.getter.bind(this));
     }
+    Object.defineProperty(PPU.prototype, "v", {
+        get: function () {
+            return this._v;
+        },
+        set: function (value) {
+            this._v = value;
+        },
+        enumerable: true,
+        configurable: true
+    });
     PPU.prototype.setCtx = function (ctx) {
         this.ctx = ctx;
         this.imageData = this.ctx.getImageData(0, 0, 256, 240);
@@ -2837,14 +2855,14 @@ var PPU = (function () {
                 this.nmi_output = !!(value & 0x80);
                 break;
             case 0x2001:
-                this.imageGrayscale = !!(value & 0x01);
-                this.showBgInLeftmost8Pixels = !!(value & 0x02);
-                this.showSpritesInLeftmost8Pixels = !!(value & 0x04);
-                this.showBg = !!(value & 0x08);
-                this.showSprites = !!(value & 0x10);
-                this.emphasizeRed = !!(value & 0x20);
-                this.emphasizeGreen = !!(value & 0x40);
-                this.emphasizeBlue = !!(value & 0x80);
+                this._imageGrayscale = !!(value & 0x01);
+                this._showBgInLeftmost8Pixels = !!(value & 0x02);
+                this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+                this._showBg = !!(value & 0x08);
+                this._showSprites = !!(value & 0x10);
+                this._emphasizeRed = !!(value & 0x20);
+                this._emphasizeGreen = !!(value & 0x40);
+                this._emphasizeBlue = !!(value & 0x80);
                 break;
             case 0x2005:
                 if (this.w === 0) {
@@ -2872,10 +2890,11 @@ var PPU = (function () {
                 this.w = 1 - this.w;
                 break;
             case 0x2007:
-                console.log('x');
+                var vold = this.v;
                 this.vmemory.setByte(this.v & 0x3fff, value);
                 this.v += this.daddrWrite;
                 this.v &= 0x3fff;
+                console.log('x', this.showBg, vold, this.v, String.fromCharCode(value));
                 break;
         }
     };
@@ -2938,6 +2957,14 @@ var PPU = (function () {
             this.ctx.putImageData(this.imageData, 0, 0);
             this.dataAddr = 0;
             this.nmi_occured = true;
+            this.imageGrayscale = this._imageGrayscale;
+            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
+            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
+            this.showBg = this._showBg;
+            this.showSprites = this._showSprites;
+            this.emphasizeRed = this._emphasizeRed;
+            this.emphasizeGreen = this._emphasizeGreen;
+            this.emphasizeBlue = this._emphasizeBlue;
         }
         else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
@@ -2950,9 +2977,10 @@ var PPU = (function () {
             //beginning of screen
             console.log('ppu vblank end');
             this.nmi_occured = false;
-            this.v = this.t;
+            if (this.showBg)
+                this.v = this.t;
         }
-        if (this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+        if (this.showBg && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
             //
@@ -2996,8 +3024,10 @@ var PPU = (function () {
             if (this.sy === PPU.syPreRender + 1) {
                 this.sy = PPU.syFirstVisible;
             }
-            else
-                this.incrementY();
+            else {
+                if (this.sy < PPU.syPostRender)
+                    this.incrementY();
+            }
         }
     };
     PPU.syFirstVisible = 0;

@@ -29,7 +29,14 @@
         ||| ++-------------- nametable select
         +++----------------- fine Y scroll
      */
-    v: number = 0; // Current VRAM address (15 bits)
+    _v: number = 0; // Current VRAM address (15 bits)
+
+    get v() {
+        return this._v;
+    }
+    set v(value: number) {
+        this._v = value;
+    }
     t: number = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
     x: number = 0; // Fine X scroll (3 bits)
     w: number = 0; // First or second write toggle (1 bit)
@@ -43,6 +50,15 @@
 
 
     spriteHeight = 8;
+    _imageGrayscale = false;
+    _showBgInLeftmost8Pixels = false;
+    _showSpritesInLeftmost8Pixels = false;
+    _showBg = false;
+    _showSprites = false;
+    _emphasizeRed = false;
+    _emphasizeGreen = false;
+    _emphasizeBlue = false;
+
     imageGrayscale = false;
     showBgInLeftmost8Pixels = false;
     showSpritesInLeftmost8Pixels = false;
@@ -147,14 +163,14 @@
           
             break;
         case 0x2001:
-            this.imageGrayscale = !!(value & 0x01);
-            this.showBgInLeftmost8Pixels = !!(value & 0x02);
-            this.showSpritesInLeftmost8Pixels = !!(value & 0x04);
-            this.showBg = !!(value & 0x08);
-            this.showSprites = !!(value & 0x10);
-            this.emphasizeRed = !!(value & 0x20);
-            this.emphasizeGreen = !!(value & 0x40);
-            this.emphasizeBlue = !!(value & 0x80);
+            this._imageGrayscale = !!(value & 0x01);
+            this._showBgInLeftmost8Pixels = !!(value & 0x02);
+            this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+            this._showBg = !!(value & 0x08);
+            this._showSprites = !!(value & 0x10);
+            this._emphasizeRed = !!(value & 0x20);
+            this._emphasizeGreen = !!(value & 0x40);
+            this._emphasizeBlue = !!(value & 0x80);
             break;
         case 0x2005:
             if (this.w === 0) {
@@ -183,16 +199,18 @@
             this.w = 1 - this.w;
             break;
         case 0x2007:
-            console.log('x');
+            var vold = this.v;
+          
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
+            console.log('x', this.showBg, vold, this.v, String.fromCharCode(value));
             break;
         }
     }
 
     private incrementX() {
-
+       
         this.x++;
         if (this.x === 8) {
             this.x = 0;
@@ -211,6 +229,7 @@
     }
 
     private incrementY() {
+       
         this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
         this.v ^= 0x0400; // switch horizontal nametable
 
@@ -266,6 +285,17 @@
 
             this.dataAddr = 0;
             this.nmi_occured = true;
+
+            this.imageGrayscale = this._imageGrayscale;
+            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
+            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
+            this.showBg = this._showBg;
+            this.showSprites = this._showSprites;
+            this.emphasizeRed = this._emphasizeRed;
+            this.emphasizeGreen = this._emphasizeGreen;
+            this.emphasizeBlue = this._emphasizeBlue;
+
+
         } else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
             if (this.nmi_occured && this.nmi_output) {
@@ -276,10 +306,13 @@
             //beginning of screen
             console.log('ppu vblank end');
             this.nmi_occured = false;
-            this.v = this.t;
+
+            if (this.showBg)
+                this.v = this.t;
         }
 
-        if (this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+        
+        if (this.showBg && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
 
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
@@ -328,8 +361,10 @@
             this.sy++;
             if (this.sy === PPU.syPreRender + 1) {
                 this.sy = PPU.syFirstVisible;
-            } else
-                this.incrementY();
+            } else {
+                if(this.sy < PPU.syPostRender)
+                    this.incrementY();
+            }
         }
 
     }
