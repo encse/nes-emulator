@@ -32,7 +32,7 @@ class Mos6502 {
     }
 
     public RequestNMI() {
-        throw 'not tested';
+       // throw 'not tested';
         this.nmiRequested = true;
     }
 

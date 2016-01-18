@@ -88,16 +88,16 @@
 			$('#log').append(canvas);
 
 			nesEmulator.setCtx(canvas.getContext('2d'));
-
+			var timeStart = Date.now();
 			var step = function() {
 				try {
-					for (var i = 0; i < 89342 * 4 * 12; i++) {
+					for (var i = 0; i < 90000; i++) {
 						
 						nesEmulator.step();
 					}
 
 					if (testFinished(nesEmulator)) {
-						for (var i = 0; i < 89342 * 4 * 12; i++) {
+						for (var i = 0; i < 90000; i++) {
 
 							nesEmulator.step();
 						}
@@ -106,7 +106,7 @@
 						return;
 					}
 					requestAnimationFrame(step);
-					
+					window.fps = nesEmulator.ppu.iFrame / (Date.now() - timeStart) * 1000;
 
 				} catch (e) {
 					log_error(e);
@@ -147,25 +147,25 @@
 			//'test/instr_timing/rom_singles/1-instr_timing.nes',
 
 			//'test/smb.nes'
-			//'test/palette/palette.nes',
-			'test/instr_test-v5/rom_singles/01-basics.nes',
-			'test/instr_test-v5/rom_singles/02-implied.nes',
-			'test/instr_test-v5/rom_singles/03-immediate.nes',
-			'test/instr_test-v5/rom_singles/04-zero_page.nes',
-			'test/instr_test-v5/rom_singles/05-zp_xy.nes',
-			'test/instr_test-v5/rom_singles/06-absolute.nes',
-			'test/instr_test-v5/rom_singles/07-abs_xy.nes',
-			'test/instr_test-v5/rom_singles/08-ind_x.nes',
-			'test/instr_test-v5/rom_singles/09-ind_y.nes',
-			'test/instr_test-v5/rom_singles/10-branches.nes',
-			'test/instr_test-v5/rom_singles/11-stack.nes',
-			'test/instr_test-v5/rom_singles/12-jmp_jsr.nes',
-			'test/instr_test-v5/rom_singles/13-rts.nes',
-			'test/instr_test-v5/rom_singles/14-rti.nes',
-			'test/instr_test-v5/rom_singles/15-brk.nes',
-			'test/instr_test-v5/rom_singles/16-special.nes',
+			 //'test/palette/palette.nes',
+		    'test/instr_test-v5/rom_singles/01-basics.nes',
+			//'test/instr_test-v5/rom_singles/02-implied.nes',
+			//'test/instr_test-v5/rom_singles/03-immediate.nes',
+			//'test/instr_test-v5/rom_singles/04-zero_page.nes',
+			//'test/instr_test-v5/rom_singles/05-zp_xy.nes',
+			//'test/instr_test-v5/rom_singles/06-absolute.nes',
+			//'test/instr_test-v5/rom_singles/07-abs_xy.nes',
+			//'test/instr_test-v5/rom_singles/08-ind_x.nes',
+			//'test/instr_test-v5/rom_singles/09-ind_y.nes',
+			//'test/instr_test-v5/rom_singles/10-branches.nes',
+			//'test/instr_test-v5/rom_singles/11-stack.nes',
+			//'test/instr_test-v5/rom_singles/12-jmp_jsr.nes',
+			//'test/instr_test-v5/rom_singles/13-rts.nes',
+			//'test/instr_test-v5/rom_singles/14-rti.nes',
+			//'test/instr_test-v5/rom_singles/15-brk.nes',
+			//'test/instr_test-v5/rom_singles/16-special.nes',
 			//'test/instr_test-v5/official_only.nes',
-			//'test/instr_test-v5/all_instrs.nes',
+			'test/instr_test-v5/all_instrs.nes',
 			//'test/instr_misc/01-abs_x_wrap.nes',
 			//'test/instr_misc/02-branch_wrap.nes',
 			//'test/instr_misc/03-dummy_reads.nes',

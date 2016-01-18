@@ -100,13 +100,6 @@ var MMC1 = (function () {
     function MMC1(PRGBanks, VROMBanks) {
         this.PRGBanks = PRGBanks;
         this.VROMBanks = VROMBanks;
-        /**
-         *
-          
-     
-           
-     
-         */
         this.iWrite = 0;
         this.rTemp = 0;
         /**
@@ -138,22 +131,15 @@ var MMC1 = (function () {
         this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], this.nametable, new RAM(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
     }
-    MMC1.prototype.getFlg = function (flgs, iFirst, iLast) {
-        if (iLast === void 0) { iLast = null; }
-        if (iLast === null)
-            return (flgs >> iFirst) & 1;
-        else
-            return (flgs >> iFirst) & ((1 << (iLast - iFirst)) - 1);
-    };
     Object.defineProperty(MMC1.prototype, "C", {
         /** CHR Mode (0=8k mode, 1=4k mode) */
-        get: function () { return this.getFlg(this.r0, 4); },
+        get: function () { return (this.r0 >> 4) & 1; },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(MMC1.prototype, "P", {
         /** PRG Size (0=32k mode, 1=16k mode) */
-        get: function () { return this.getFlg(this.r0, 3); },
+        get: function () { return (this.r0 >> 3) & 1; },
         enumerable: true,
         configurable: true
     });
@@ -164,7 +150,7 @@ var MMC1 = (function () {
          *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
          *  This bit is ignored when 'P' is clear (32k mode)
          */
-        get: function () { return this.getFlg(this.r0, 2); },
+        get: function () { return (this.r0 >> 2) & 1; },
         enumerable: true,
         configurable: true
     });
@@ -176,22 +162,22 @@ var MMC1 = (function () {
          *  %10 = Vert
          *  %11 = Horz
          */
-        get: function () { return this.getFlg(this.r0, 0, 1); },
+        get: function () { return this.r0 & 3; },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(MMC1.prototype, "CHR0", {
-        get: function () { return this.getFlg(this.r1, 0, 4); },
+        get: function () { return this.r1 & 31; },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(MMC1.prototype, "CHR1", {
-        get: function () { return this.getFlg(this.r2, 0, 4); },
+        get: function () { return this.r1 & 31; },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(MMC1.prototype, "PRG0", {
-        get: function () { return this.getFlg(this.r3, 0, 3); },
+        get: function () { return this.r3 & 15; },
         enumerable: true,
         configurable: true
     });
@@ -201,7 +187,7 @@ var MMC1 = (function () {
          * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
          * Later ones do.
          */
-        get: function () { return this.getFlg(this.r3, 4); },
+        get: function () { return (this.r3 >> 4) & 1; },
         enumerable: true,
         configurable: true
     });
@@ -249,6 +235,7 @@ var MMC1 = (function () {
         }
     };
     MMC1.prototype.update = function () {
+        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
         /*
             PRG Setup:
             --------------------------
@@ -288,10 +275,12 @@ var MMC1 = (function () {
                       +-------------------------------+-------------------------------+
         */
         if (this.C === 0) {
+            console.log('chr:', this.CHR0);
             this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
             this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
         }
         else {
+            console.log('chr mode 2:', this.CHR0);
             this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
             this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
         }
@@ -340,7 +329,7 @@ var Mos6502 = (function () {
         this.sp = 0xfd;
     };
     Mos6502.prototype.RequestNMI = function () {
-        throw 'not tested';
+        // throw 'not tested';
         this.nmiRequested = true;
     };
     Object.defineProperty(Mos6502.prototype, "rP", {
@@ -2767,6 +2756,7 @@ var PPU = (function () {
         this.sy = PPU.syFirstVisible;
         this.sx = PPU.sxMin;
         this.dataAddr = 0;
+        this.iFrame = 0;
         this.icycle = 0;
         this.colors = [
             0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
@@ -2803,7 +2793,8 @@ var PPU = (function () {
     PPU.prototype.getter = function (addr) {
         switch (addr) {
             case 0x2002:
-                /*
+                {
+                    /*
                     7  bit  0
                     ---- ----
                     VSO. ....
@@ -2833,11 +2824,19 @@ var PPU = (function () {
                     Some Vs. System PPUs return a constant value in D4-D0 that the game checks.
                     Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
                   */
-                this.w = 0;
-                var res = this.nmi_occured ? (1 << 7) : 0;
-                //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
-                this.nmi_occured = false;
-                return res;
+                    this.w = 0;
+                    var res = this.nmi_occured ? (1 << 7) : 0;
+                    //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
+                    this.nmi_occured = false;
+                    return res;
+                }
+            case 0x2007:
+                {
+                    var res = this.vmemory.getByte(this.v & 0x3fff);
+                    this.v += this.daddrWrite;
+                    this.v &= 0x3fff;
+                    return res;
+                }
             default:
                 throw 'unimplemented read from addr ' + addr;
                 return 0;
@@ -2855,14 +2854,17 @@ var PPU = (function () {
                 this.nmi_output = !!(value & 0x80);
                 break;
             case 0x2001:
-                this._imageGrayscale = !!(value & 0x01);
-                this._showBgInLeftmost8Pixels = !!(value & 0x02);
-                this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
-                this._showBg = !!(value & 0x08);
-                this._showSprites = !!(value & 0x10);
-                this._emphasizeRed = !!(value & 0x20);
-                this._emphasizeGreen = !!(value & 0x40);
-                this._emphasizeBlue = !!(value & 0x80);
+                var x = this.showBg;
+                this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
+                this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels = !!(value & 0x02);
+                this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+                this.showBg = this._showBg = !!(value & 0x08);
+                this.showSprites = this._showSprites = !!(value & 0x10);
+                this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
+                this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
+                this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
+                if (x != this.showBg)
+                    console.log('show:', x, '->', this.showBg);
                 break;
             case 0x2005:
                 if (this.w === 0) {
@@ -2886,6 +2888,7 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
+                    console.log(this.v.toString(16));
                 }
                 this.w = 1 - this.w;
                 break;
@@ -2894,7 +2897,8 @@ var PPU = (function () {
                 this.vmemory.setByte(this.v & 0x3fff, value);
                 this.v += this.daddrWrite;
                 this.v &= 0x3fff;
-                console.log('x', this.showBg, vold, this.v, String.fromCharCode(value));
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+                    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
                 break;
         }
     };
@@ -2943,7 +2947,7 @@ var PPU = (function () {
         var st = '';
         for (var y = 0; y < 30; y++) {
             for (var x = 0; x < 32; x++) {
-                st += String.fromCharCode(this.vmemory.getByte(0x2000 + x + y * 32));
+                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
             }
             st += '\n';
         }
@@ -2951,10 +2955,11 @@ var PPU = (function () {
     };
     PPU.prototype.step = function () {
         if (this.sx === 0 && this.sy === PPU.syPostRender) {
-            console.log('ppu vblank start', this.icycle);
+            //console.log('ppu vblank start', this.icycle);
             this.sx = PPU.sxMin;
             this.imageData.data.set(this.buf8);
             this.ctx.putImageData(this.imageData, 0, 0);
+            this.iFrame++;
             this.dataAddr = 0;
             this.nmi_occured = true;
             this.imageGrayscale = this._imageGrayscale;
@@ -2975,45 +2980,47 @@ var PPU = (function () {
         }
         else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
             //beginning of screen
-            console.log('ppu vblank end');
+            //console.log('ppu vblank end bg:',this.showBg );
             this.nmi_occured = false;
-            if (this.showBg)
+            if (this.showBg || this.showSprites)
                 this.v = this.t;
         }
-        if (this.showBg && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
-            // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-            // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-            //
-            // The address to be fetched during rendering can be deduced from v in the following way:
-            //   tile address      = 0x2000 | (v & 0x0FFF)
-            //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-            //
-            // The low 12 bits of the attribute address are composed in the following way:
-            //   NN 1111 YYY XXX
-            //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-            //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-            //   || ++++---------- attribute offset (960 bytes)
-            //   ++--------------- nametable select
-            var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-            var attribute = this.vmemory.getByte(addrAttribute);
-            var addrTile = 0x2000 | (this.v & 0x0fff);
-            var itile = this.vmemory.getByte(addrTile);
-            var tileCol = 7 - (this.x);
-            var tileRow = this.v >> 12;
-            var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
-            var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
-            var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
-            var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
-            /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
-                (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                They can still be shown using the background palette hack, explained below.*/
-            if ((ipalette & 3) === 0)
-                ipalette = 0;
-            var addrPalette = 0x3f00 + ipalette;
-            var icolor = this.vmemory.getByte(addrPalette);
-            var color = this.colors[icolor];
-            this.data[this.dataAddr] = color;
-            this.dataAddr++;
+        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+            if (this.showBg) {
+                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
+                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
+                //
+                // The address to be fetched during rendering can be deduced from v in the following way:
+                //   tile address      = 0x2000 | (v & 0x0FFF)
+                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+                //
+                // The low 12 bits of the attribute address are composed in the following way:
+                //   NN 1111 YYY XXX
+                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
+                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
+                //   || ++++---------- attribute offset (960 bytes)
+                //   ++--------------- nametable select
+                var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+                var attribute = this.vmemory.getByte(addrAttribute);
+                var addrTile = 0x2000 | (this.v & 0x0fff);
+                var itile = this.vmemory.getByte(addrTile);
+                var tileCol = 7 - (this.x);
+                var tileRow = this.v >> 12;
+                var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
+                var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
+                var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
+                var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                var addrPalette = 0x3f00 + ipalette;
+                var icolor = this.vmemory.getByte(addrPalette);
+                var color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+                this.dataAddr++;
+            }
             this.incrementX();
         }
         this.sx++;
@@ -3025,8 +3032,9 @@ var PPU = (function () {
                 this.sy = PPU.syFirstVisible;
             }
             else {
-                if (this.sy < PPU.syPostRender)
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
                     this.incrementY();
+                }
             }
         }
     };

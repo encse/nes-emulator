@@ -3,26 +3,8 @@
 ///<reference path="CompoundMemory.ts"/>
 class MMC1 {
 
-   /**
-    * 
-     
-
-      
-
-    */
-  
- 
-  
-
     iWrite: number = 0;
     rTemp: number = 0;
-
-    private getFlg(flgs, iFirst, iLast = null): number {
-        if (iLast === null)
-            return (flgs >> iFirst) & 1;
-        else 
-            return (flgs >> iFirst) & ((1 << (iLast-iFirst)) - 1);
-    }
 
     /**
      * $8000-9FFF:  [...C PSMM]
@@ -30,16 +12,16 @@ class MMC1 {
     r0: number = 0;
   
     /** CHR Mode (0=8k mode, 1=4k mode) */
-    get C(): number { return this.getFlg(this.r0, 4); }
+    get C(): number { return (this.r0 >> 4) & 1; }
     /** PRG Size (0=32k mode, 1=16k mode) */
-    get P(): number { return this.getFlg(this.r0, 3); }
+    get P(): number { return (this.r0 >> 3) & 1; }
     /**
      * Slot select:
      *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
      *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
      *  This bit is ignored when 'P' is clear (32k mode)
      */
-    get S(): number { return this.getFlg(this.r0, 2); }
+    get S(): number { return (this.r0 >> 2) & 1; }
     /**
      *  Mirroring control:
      *  %00 = 1ScA
@@ -47,33 +29,33 @@ class MMC1 {
      *  %10 = Vert
      *  %11 = Horz
      */
-    get M(): number { return this.getFlg(this.r0, 0, 1); }
+    get M(): number { return this.r0 & 3; }
 
     /**
      *  $A000-BFFF:  [...C CCCC]
         CHR Reg 0
      */
     r1: number = 0;
-    get CHR0(): number { return this.getFlg(this.r1, 0, 4); }
+    get CHR0(): number { return this.r1 & 31 ; }
 
     /**
      *  $C000-DFFF:  [...C CCCC]
      *  CHR Reg 1
      */
     r2: number = 0;
-    get CHR1(): number { return this.getFlg(this.r2, 0, 4); }
+    get CHR1(): number { return this.r1 & 31; }
 
     /**
      * $E000-FFFF:  [...W PPPP]
      */
     r3: number = 0;
-    get PRG0(): number { return this.getFlg(this.r3, 0, 3); }
+    get PRG0(): number { return this.r3 & 15; }
     /**
      * W = WRAM Disable (0=enabled, 1=disabled)
      * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
      * Later ones do.
      */
-    get W(): number { return this.getFlg(this.r3, 4); }
+    get W(): number { return (this.r3 >> 4) & 1; }
 
     memory: CompoundMemory;
     vmemory: CompoundMemory;
@@ -153,7 +135,8 @@ class MMC1 {
     }
 
     private update() {
-      
+
+        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
         /*
             PRG Setup:
             --------------------------
@@ -194,9 +177,11 @@ class MMC1 {
                       +-------------------------------+-------------------------------+
         */
         if (this.C === 0) {
+            console.log('chr:', this.CHR0);
             this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
             this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
         } else {
+            console.log('chr mode 2:', this.CHR0);
             this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
             this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
         }

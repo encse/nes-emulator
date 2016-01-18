@@ -84,7 +84,7 @@
     private data: Uint32Array;
     private dataAddr = 0;
 
-  
+    public iFrame = 0;
 
     constructor(memory: CompoundMemory, public vmemory: Memory, private cpu:Mos6502) {
         if (vmemory.size() !== 0x4000)
@@ -105,7 +105,8 @@
     private getter(addr: number) {
         switch (addr) {
         case 0x2002:
-            /*
+        {
+                /*
                 7  bit  0
                 ---- ----
                 VSO. ....
@@ -137,10 +138,19 @@
               */
             this.w = 0;
 
-            var res = this.nmi_occured ? (1<<7) : 0;
+            let res = this.nmi_occured ? (1 << 7) : 0;
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.nmi_occured = false;
             return res;
+        }
+        case 0x2007:
+        {
+            let res = this.vmemory.getByte(this.v & 0x3fff);
+            this.v += this.daddrWrite;
+            this.v &= 0x3fff;
+
+            return res;
+        }
         default:
             throw 'unimplemented read from addr ' + addr;
             return 0;
@@ -163,14 +173,18 @@
           
             break;
         case 0x2001:
-            this._imageGrayscale = !!(value & 0x01);
-            this._showBgInLeftmost8Pixels = !!(value & 0x02);
-            this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
-            this._showBg = !!(value & 0x08);
-            this._showSprites = !!(value & 0x10);
-            this._emphasizeRed = !!(value & 0x20);
-            this._emphasizeGreen = !!(value & 0x40);
-            this._emphasizeBlue = !!(value & 0x80);
+            var x = this.showBg;
+            this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
+            this.showBgInLeftmost8Pixels =this._showBgInLeftmost8Pixels = !!(value & 0x02);
+            this.showSpritesInLeftmost8Pixels =this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+            this.showBg = this._showBg = !!(value & 0x08);
+            this.showSprites =this._showSprites = !!(value & 0x10);
+            this.emphasizeRed =this._emphasizeRed = !!(value & 0x20);
+            this.emphasizeGreen =this._emphasizeGreen = !!(value & 0x40);
+            this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
+            if (x != this.showBg)
+                console.log('show:', x, '->', this.showBg);
+
             break;
         case 0x2005:
             if (this.w === 0) {
@@ -195,6 +209,7 @@
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
+                console.log(this.v.toString(16));
             }
             this.w = 1 - this.w;
             break;
@@ -204,7 +219,8 @@
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
-            console.log('x', this.showBg, vold, this.v, String.fromCharCode(value));
+            if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+                console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
             break;
         }
     }
@@ -264,7 +280,7 @@
         var st = '';
         for (var y = 0; y < 30; y++){
             for (var x = 0; x < 32; x++) {
-                st += String.fromCharCode(this.vmemory.getByte(0x2000 + x + y * 32));
+                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i*0x400) + x + y * 32));
             }
             st += '\n';
 
@@ -278,11 +294,12 @@
 
 
         if (this.sx === 0 && this.sy === PPU.syPostRender) {
-            console.log('ppu vblank start', this.icycle);
+            //console.log('ppu vblank start', this.icycle);
             this.sx = PPU.sxMin;
             (<any>this.imageData.data).set(this.buf8);
             this.ctx.putImageData(this.imageData, 0, 0);
-
+            this.iFrame++;
+             
             this.dataAddr = 0;
             this.nmi_occured = true;
 
@@ -302,55 +319,59 @@
                 this.nmi_output = false;
                 this.cpu.RequestNMI();
             }
+
+          
         } else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
             //beginning of screen
-            console.log('ppu vblank end');
+            //console.log('ppu vblank end bg:',this.showBg );
             this.nmi_occured = false;
 
-            if (this.showBg)
+            if (this.showBg || this.showSprites)
                 this.v = this.t;
         }
 
         
-        if (this.showBg && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
 
-            // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-            // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-            //
-            // The address to be fetched during rendering can be deduced from v in the following way:
-            //   tile address      = 0x2000 | (v & 0x0FFF)
-            //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-            //
-            // The low 12 bits of the attribute address are composed in the following way:
-            //   NN 1111 YYY XXX
-            //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-            //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-            //   || ++++---------- attribute offset (960 bytes)
-            //   ++--------------- nametable select
+            if (this.showBg) {
+                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
+                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
+                //
+                // The address to be fetched during rendering can be deduced from v in the following way:
+                //   tile address      = 0x2000 | (v & 0x0FFF)
+                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+                //
+                // The low 12 bits of the attribute address are composed in the following way:
+                //   NN 1111 YYY XXX
+                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
+                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
+                //   || ++++---------- attribute offset (960 bytes)
+                //   ++--------------- nametable select
 
-            let addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-            var attribute = this.vmemory.getByte(addrAttribute);
+                let addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+                var attribute = this.vmemory.getByte(addrAttribute);
 
-            let addrTile = 0x2000 | (this.v & 0x0fff);
-            let itile = this.vmemory.getByte(addrTile);
-            var tileCol = 7 - (this.x);
-            var tileRow = this.v >> 12;
+                let addrTile = 0x2000 | (this.v & 0x0fff);
+                let itile = this.vmemory.getByte(addrTile);
+                var tileCol = 7 - (this.x);
+                var tileRow = this.v >> 12;
 
-            let ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
-            let ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
-            let ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
-            let ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+                let ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
+                let ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
+                let ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
+                let ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
 
-            /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
-                (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                They can still be shown using the background palette hack, explained below.*/
-            if ((ipalette & 3) === 0)
-                ipalette = 0;
-            let addrPalette = 0x3f00 + ipalette;
-            let icolor = this.vmemory.getByte(addrPalette);
-            let color = this.colors[icolor];
-            this.data[this.dataAddr] = color;
-            this.dataAddr++;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                let addrPalette = 0x3f00 + ipalette;
+                let icolor = this.vmemory.getByte(addrPalette);
+                let color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+                this.dataAddr++;
+            }
             this.incrementX();
         }
 
@@ -362,8 +383,9 @@
             if (this.sy === PPU.syPreRender + 1) {
                 this.sy = PPU.syFirstVisible;
             } else {
-                if(this.sy < PPU.syPostRender)
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
                     this.incrementY();
+                }
             }
         }
 
