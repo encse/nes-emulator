@@ -51,7 +51,8 @@ var APU = (function () {
      * is non-zero, it is decremented.
      *
      */
-    function APU(memory) {
+    function APU(memory, cpu) {
+        this.cpu = cpu;
         this.mode = 0;
         this.irqDisabled = 0;
         this.idividerStep = 0;
@@ -82,7 +83,7 @@ var APU = (function () {
         // triangle length counter > 0
         // square 2 length counter > 0
         // square 1 length counter > 0
-        console.log('get ', addr.toString(16));
+        //console.log('get ', addr.toString(16));
         return 0;
     };
     APU.prototype.setter = function (addr, value) {
@@ -148,11 +149,15 @@ var APU = (function () {
                 this.idividerStep = this.isequencerStep = 0;
                 this.mode = (value >> 7) & 1;
                 this.irqDisabled = (value >> 6) & 1;
+                if (this.irqDisabled === 0) {
+                    console.log('APU', this.irqDisabled ? 'irq disabled' : 'irq enabled');
+                    this.cpu.RequestIRQ();
+                }
                 if (this.mode !== 0)
                     throw 'not supported';
                 break;
         }
-        console.log('set ', addr.toString(16), value);
+        // console.log('set ', addr.toString(16), value);
     };
     APU.prototype.step = function () {
         //The divider generates an output clock rate of just under 240 Hz, and appears to
@@ -164,8 +169,11 @@ var APU = (function () {
             this.isequencerStep++;
             if (this.mode === 0) {
                 if (this.isequencerStep === 2) {
-                    if (!this.lc0Halt && this.lc0 > 0)
+                    if (!this.lc0Halt && this.lc0 > 0) {
                         this.lc0--;
+                        if (this.lc0 && this.irqDisabled === 0)
+                            this.cpu.RequestIRQ();
+                    }
                     this.isequencerStep = 0;
                 }
             }
@@ -476,7 +484,7 @@ var Mos6502 = (function () {
         this.addrNMI = 0xfffa;
         this.flgCarry = 0;
         this.flgZero = 0;
-        this.flgInterruptDisable = 1;
+        this.flgInterruptDisable = 0;
         this.flgDecimalMode = 0;
         this.flgBreakCommand = 0;
         this.flgOverflow = 0;
@@ -490,8 +498,12 @@ var Mos6502 = (function () {
         this.sp = 0xfd;
     };
     Mos6502.prototype.RequestNMI = function () {
-        // throw 'not tested';
+        console.log('RequestNMI');
         this.nmiRequested = true;
+    };
+    Mos6502.prototype.RequestIRQ = function () {
+        console.log('RequestIRQ');
+        this.irqRequested = true;
     };
     Object.defineProperty(Mos6502.prototype, "rP", {
         get: function () {
@@ -841,6 +853,7 @@ var Mos6502 = (function () {
         this.flgDecimalMode = 0;
     };
     Mos6502.prototype.CLI = function () {
+        console.log('cli');
         this.flgInterruptDisable = 0;
     };
     Mos6502.prototype.CLV = function () {
@@ -1384,6 +1397,7 @@ var Mos6502 = (function () {
 
    */
     Mos6502.prototype.BRK = function () {
+        console.log('process BRK');
         this.pushWord(this.ip + 2);
         this.flgBreakCommand = 1;
         this.PHP();
@@ -1391,16 +1405,26 @@ var Mos6502 = (function () {
         this.ip = this.getWord(this.addrIRQ);
     };
     Mos6502.prototype.NMI = function () {
+        console.log('process NMI');
         this.nmiRequested = false;
         this.pushWord(this.ip);
         this.pushByte(this.rP);
         this.flgInterruptDisable = 1;
         this.ip = this.getWord(this.addrNMI);
     };
+    Mos6502.prototype.IRQ = function () {
+        console.log('process irq');
+        this.irqRequested = false;
+        this.pushWord(this.ip);
+        this.pushByte(this.rP);
+        this.flgInterruptDisable = 1;
+        this.ip = this.getWord(this.addrIRQ);
+    };
     /**
      * RTI - Return from Interrupt
 
-        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed by the program counter.
+        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed
+        by the program counter.
 
         Processor Status after use:
 
@@ -1414,6 +1438,7 @@ var Mos6502 = (function () {
 
      */
     Mos6502.prototype.RTI = function () {
+        console.log('rti');
         this.PLP();
         this.ip = this.popWord();
     };
@@ -1582,6 +1607,10 @@ var Mos6502 = (function () {
         }
         if (this.nmiRequested) {
             this.NMI();
+            return;
+        }
+        if (this.irqRequested && this.flgInterruptDisable === 0) {
+            this.IRQ();
             return;
         }
         this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
@@ -2893,7 +2922,7 @@ var NesEmulator = (function () {
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
         this.cpu = new Mos6502(this.memory);
-        this.apu = new APU(this.memory);
+        this.apu = new APU(this.memory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
         this.cpu.Reset();
     }

@@ -18,13 +18,14 @@ class Mos6502 {
  
     private flgCarry: number = 0;
     private flgZero: number = 0;
-    private flgInterruptDisable: number = 1;
+    private flgInterruptDisable: number = 0;
     private flgDecimalMode: number = 0;
     private flgBreakCommand: number = 0;
     private flgOverflow: number = 0;
     private flgNegative: number = 0;
 
     private nmiRequested: boolean;
+    private irqRequested: boolean;
 
     public Reset() {
         this.ip = this.getWord(this.addrReset);
@@ -32,8 +33,13 @@ class Mos6502 {
     }
 
     public RequestNMI() {
-       // throw 'not tested';
+        console.log('RequestNMI');
         this.nmiRequested = true;
+    }
+
+    public RequestIRQ() {
+        console.log('RequestIRQ');
+        this.irqRequested = true;
     }
 
 
@@ -414,6 +420,7 @@ class Mos6502 {
         this.flgDecimalMode = 0;
     }
     private CLI(): void {
+        console.log('cli');
         this.flgInterruptDisable= 0;
     }
     private CLV(): void {
@@ -999,6 +1006,7 @@ class Mos6502 {
 
    */
     private BRK(): void {
+        console.log('process BRK');
         this.pushWord(this.ip + 2);
         this.flgBreakCommand = 1;
         this.PHP();
@@ -1007,6 +1015,7 @@ class Mos6502 {
     }
 
     private NMI(): void {
+        console.log('process NMI');
         this.nmiRequested = false;
 
         this.pushWord(this.ip);
@@ -1015,10 +1024,21 @@ class Mos6502 {
         this.ip = this.getWord(this.addrNMI);
     }
 
+    private IRQ(): void {
+        console.log('process irq');
+        this.irqRequested = false;
+
+        this.pushWord(this.ip);
+        this.pushByte(this.rP);
+        this.flgInterruptDisable = 1;
+        this.ip = this.getWord(this.addrIRQ);
+    }
+
     /**
      * RTI - Return from Interrupt
 
-        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed by the program counter.
+        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed 
+        by the program counter.
 
         Processor Status after use:
 
@@ -1032,6 +1052,7 @@ class Mos6502 {
 
      */
     private RTI(): void {
+        console.log('rti');
         this.PLP();
         this.ip = this.popWord();
     }
@@ -1248,7 +1269,10 @@ class Mos6502 {
             this.NMI();
             return;
         }
-
+        if (this.irqRequested && this.flgInterruptDisable === 0) {
+            this.IRQ();
+            return;
+        }
         this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
         var ipPrev = this.ip;
         switch (this.memory.getByte(this.ip)) {

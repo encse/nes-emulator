@@ -27,6 +27,28 @@
     </Content>
     <Content Include="wwwroot\test\color_test\color_test.s" />
     <Content Include="wwwroot\test\color_test\color_test.txt" />
+    <Content Include="wwwroot\test\cpu_interrupts\readme.txt" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\1-cli_latency.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\2-nmi_and_brk.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\3-nmi_and_irq.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\4-irq_and_dma.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\5-branch_delays_irq.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\build_rom.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\console.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\crc.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\delay.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\macros.inc" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\neshw.inc" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\ppu.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\print.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\shell.inc" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\shell.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\shell_misc.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\sync_apu.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\sync_vbl.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\testing.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\text_out.s" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\readme.txt" />
     <Content Include="wwwroot\test\instr_misc\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\source\01-basics.s" />
@@ -211,6 +233,15 @@
     <Content Include="wwwroot\test\color_test\compile_color_test.bat" />
     <Content Include="wwwroot\test\color_test\nrom.cfg" />
     <Content Include="wwwroot\test\color_test\test.chr" />
+    <Content Include="wwwroot\test\cpu_interrupts\cpu_interrupts.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\rom_singles\1-cli_latency.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\rom_singles\2-nmi_and_brk.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\rom_singles\3-nmi_and_irq.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\rom_singles\4-irq_and_dma.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\rom_singles\5-branch_delays_irq.nes" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\ascii.chr" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\common\devcart.bin" />
+    <Content Include="wwwroot\test\cpu_interrupts\source\nes.cfg" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />

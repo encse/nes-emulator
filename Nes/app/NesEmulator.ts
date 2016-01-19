@@ -49,7 +49,7 @@ class NesEmulator {
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
         this.cpu = new Mos6502(this.memory);
-        this.apu = new APU(this.memory);
+        this.apu = new APU(this.memory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
 
         this.cpu.Reset();

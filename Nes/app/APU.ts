@@ -67,7 +67,7 @@
     * is non-zero, it is decremented.
     * 
     */
-    constructor(memory: CompoundMemory) {
+    constructor(memory: CompoundMemory, private cpu: Mos6502) {
 
         memory.shadowSetter(0x4000, 0x4017, this.setter.bind(this));
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
@@ -92,7 +92,7 @@
             // square 2 length counter > 0
             // square 1 length counter > 0
 
-        console.log('get ', addr.toString(16));
+        //console.log('get ', addr.toString(16));
         return 0;
     }
 
@@ -176,11 +176,15 @@
                 this.mode = (value >> 7) & 1;
                 this.irqDisabled = (value >> 6) & 1;
 
+                if (this.irqDisabled === 0) {
+                    console.log('APU', this.irqDisabled ? 'irq disabled' : 'irq enabled');
+                    this.cpu.RequestIRQ();
+                }
                 if (this.mode !== 0)
                     throw 'not supported';
                 break;
         }
-        console.log('set ', addr.toString(16), value);
+       // console.log('set ', addr.toString(16), value);
     }
 
     public step() {
@@ -195,8 +199,12 @@
             this.isequencerStep++;
             if (this.mode === 0) {
                 if (this.isequencerStep === 2) {
-                    if(!this.lc0Halt && this.lc0 > 0)
+                    if (!this.lc0Halt && this.lc0 > 0) {
                         this.lc0--;
+                        if (this.lc0 && this.irqDisabled === 0)
+                            this.cpu.RequestIRQ();
+
+                    }
                     this.isequencerStep = 0;
                 }
             }
