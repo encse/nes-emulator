@@ -2421,33 +2421,33 @@ var Mos6502 = (function () {
                 this.sleep = 4;
                 break;
             case 0x1c:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0x3c:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0x5c:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0x7c:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0xdc:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0xfc:
-                this.ip += 3;
                 this.getAddrAbsoluteX();
+                this.ip += 3;
                 this.sleep = 4 + this.pageCross;
                 break;
             case 0xeb:
@@ -2768,12 +2768,12 @@ var Mos6502 = (function () {
             case 0x9b:
                 this.XAS(this.getByteAbsoluteY());
                 this.ip += 3;
-                this.sleep = 5 + this.pageCross;
+                this.sleep = 5;
                 break;
             case 0x9f:
                 this.AXA(this.getByteAbsoluteY());
                 this.ip += 3;
-                this.sleep = 5 + this.pageCross;
+                this.sleep = 5;
                 break;
             case 0xbb:
                 this.LAR(this.getByteAbsoluteY());

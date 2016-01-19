@@ -1460,12 +1460,12 @@ class Mos6502 {
             case 0xe2: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
             case 0x89: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
             case 0x0c: /* *NOP*/ this.ip += 3; this.sleep = 4; break;
-            case 0x1c: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
-            case 0x3c: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
-            case 0x5c: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
-            case 0x7c: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
-            case 0xdc: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
-            case 0xfc: /* *NOP*/ this.ip += 3; this.getAddrAbsoluteX(); this.sleep = 4 + this.pageCross; break;
+            case 0x1c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
+            case 0x3c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
+            case 0x5c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
+            case 0x7c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
+            case 0xdc: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
+            case 0xfc: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
             case 0xeb: this.SBC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
             case 0xc3: this.DCP(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
             case 0xc7: this.DCP(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
@@ -1538,8 +1538,8 @@ class Mos6502 {
             case 0x9e: this.SXA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 5; break;
             case 0x8b: this.XAA(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
             case 0x93: this.AXA(this.getByteIndirectY()); this.ip += 2; this.sleep = 6; break;
-            case 0x9b: this.XAS(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5 + this.pageCross; break;
-            case 0x9f: this.AXA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5 + this.pageCross; break;
+            case 0x9b: this.XAS(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5; break;
+            case 0x9f: this.AXA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5; break;
             case 0xbb: this.LAR(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
 
             default:
