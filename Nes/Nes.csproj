@@ -25,6 +25,8 @@
     <Content Include="web.config">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="wwwroot\test\color_test\color_test.s" />
+    <Content Include="wwwroot\test\color_test\color_test.txt" />
     <Content Include="wwwroot\test\instr_misc\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\source\01-basics.s" />
@@ -205,6 +207,10 @@
     <Content Include="wwwroot\test\instr_timing\source\common\ascii.chr" />
     <Content Include="wwwroot\test\instr_timing\source\common\devcart.bin" />
     <Content Include="wwwroot\test\instr_timing\source\nes.cfg" />
+    <Content Include="wwwroot\test\color_test\color_test.nes" />
+    <Content Include="wwwroot\test\color_test\compile_color_test.bat" />
+    <Content Include="wwwroot\test\color_test\nrom.cfg" />
+    <Content Include="wwwroot\test\color_test\test.chr" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />

@@ -45,7 +45,7 @@
     addrScreenPatternTable: number = 0;
 
    
-    nmi_occured = false;
+    flgVblank = false;
     nmi_output = false;
 
 
@@ -138,9 +138,9 @@
               */
             this.w = 0;
 
-            let res = this.nmi_occured ? (1 << 7) : 0;
+            let res = this.flgVblank ? (1 << 7) : 0;
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
-            this.nmi_occured = false;
+            this.flgVblank = false;
             return res;
         }
         case 0x2007:
@@ -182,8 +182,8 @@
             this.emphasizeRed =this._emphasizeRed = !!(value & 0x20);
             this.emphasizeGreen =this._emphasizeGreen = !!(value & 0x40);
             this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
-            if (x != this.showBg)
-                console.log('show:', x, '->', this.showBg);
+            //if (x != this.showBg)
+            //    console.log('show:', x, '->', this.showBg);
 
             break;
         case 0x2005:
@@ -209,7 +209,7 @@
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-                console.log(this.v.toString(16));
+               // console.log(this.v.toString(16));
             }
             this.w = 1 - this.w;
             break;
@@ -219,8 +219,8 @@
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
-            if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
-                console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
+            //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+            //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
             break;
         }
     }
@@ -301,7 +301,7 @@
             this.iFrame++;
              
             this.dataAddr = 0;
-            this.nmi_occured = true;
+            this.flgVblank = true;
 
             this.imageGrayscale = this._imageGrayscale;
             this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
@@ -315,7 +315,7 @@
 
         } else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
-            if (this.nmi_occured && this.nmi_output) {
+            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
                 this.nmi_output = false;
                 this.cpu.RequestNMI();
             }
@@ -324,7 +324,7 @@
         } else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
             //beginning of screen
             //console.log('ppu vblank end bg:',this.showBg );
-            this.nmi_occured = false;
+            this.flgVblank = false;
 
             if (this.showBg || this.showSprites)
                 this.v = this.t;

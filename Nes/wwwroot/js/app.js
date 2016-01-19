@@ -1,14 +1,175 @@
 var APU = (function () {
+    /**
+     *
+     * --------------
+     * Length Counter
+     * --------------
+     *
+     * A length counter allows automatic duration control. Counting can be halted and
+     * the counter can be disabled by clearing the appropriate bit in the status
+     * register, which immediately sets the counter to 0 and keeps it there.
+     *
+     * The halt flag is in the channel's first register. For the square and noise
+     * channels, it is bit 5, and for the triangle, bit 7:
+     *
+     *     --h- ----       halt (noise and square channels)
+     *     h--- ----       halt (triangle channel)
+     *
+     * Note that the bit position for the halt flag is also mapped to another flag in
+     * the Length Counter (noise and square) or Linear Counter (triangle).
+     *
+     * Unless disabled, a write the channel's fourth register immediately reloads the
+     * counter with the value from a lookup table, based on the index formed by the
+     * upper 5 bits:
+     *
+     *     iiii i---       length index
+     *
+     *     bits  bit 3
+     *     7-4   0   1
+     *         -------
+     *     0   $0A $FE
+     *     1   $14 $02
+     *     2   $28 $04
+     *     3   $50 $06
+     *     4   $A0 $08
+     *     5   $3C $0A
+     *     6   $0E $0C
+     *     7   $1A $0E
+     *     8   $0C $10
+     *     9   $18 $12
+     *     A   $30 $14
+     *     B   $60 $16
+     *     C   $C0 $18
+     *     D   $48 $1A
+     *     E   $10 $1C
+     *     F   $20 $1E
+     *
+     * See the clarifications section for a possible explanation for the values left
+     * column of the table.
+     *
+     * When clocked by the frame sequencer, if the halt flag is clear and the counter
+     * is non-zero, it is decremented.
+     *
+     */
     function APU(memory) {
+        this.mode = 0;
+        this.irqDisabled = 0;
+        this.idividerStep = 0;
+        this.isequencerStep = 0;
+        this.lc0 = 0;
+        this.lc0Halt = 0;
+        this.haltNoiseAndSquare = 0;
+        this.haltTriangle = 0;
+        this.lcTable = [
+            [0x0A, 0x14, 0x28, 0x50, 0xA0, 0x3C, 0x0E, 0x1A, 0x0C, 0x18, 0x30, 0x60, 0xC0, 0x48, 0x10, 0x20],
+            [0xFE, 0x02, 0x04, 0x06, 0x08, 0x0A, 0x0C, 0x0E, 0x10, 0x12, 0x14, 0x16, 0x18, 0x1A, 0x1C, 0x1E]
+        ];
         memory.shadowSetter(0x4000, 0x4017, this.setter.bind(this));
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
     APU.prototype.getter = function (addr) {
-        //   console.log('get ', addr.toString(16));
+        switch (addr) {
+            case 0x4015:
+                return this.lc0 > 0 ? 1 : 0;
+        }
+        // When $4015 is read, the status of the channels' length counters and bytes
+        // remaining in the current DMC sample, and interrupt flags are returned.
+        // Afterwards the Frame Sequencer's frame interrupt flag is cleared.
+        // if-d nt21
+        // IRQ from DMC
+        // frame interrupt
+        // DMC sample bytes remaining > 0
+        // triangle length counter > 0
+        // square 2 length counter > 0
+        // square 1 length counter > 0
+        console.log('get ', addr.toString(16));
         return 0;
     };
     APU.prototype.setter = function (addr, value) {
-        //  console.log('set ', addr.toString(16), value);
+        switch (addr) {
+            case 0x4000:
+                //$4000 / 4 ddle nnnn   duty, loop env/ disable length, env disable, vol / env period
+                // The halt flag is in the channel's first register. For the square and noise
+                // channels, it is bit 5, and for the triangle, bit 7:
+                // --h - ----       halt(noise and square channels)
+                // h-- - ----       halt(triangle channel)
+                this.lc0Halt = (value >> 5) & 1;
+                break;
+            // $4001 eppp nsss   enable sweep, period, negative, shift
+            // $4002 pppp pppp   period low
+            case 0x4003:
+                // llll lppp   length index, period high
+                //Unless disabled, a write the channel's fourth register immediately reloads the
+                //counter with the value from a lookup table, based on the index formed by the
+                //upper 5 bits:
+                //iiii i-- - length index
+                if (!this.lc0Halt) {
+                    this.lc0 = this.lcTable[value >> 4][(value >> 3) & 1];
+                }
+                break;
+            case 0x4015:
+                // ---------------
+                //     Status Register
+                // ---------------
+                //     The status register at $4015 allows control and query of the channels' length
+                // counters, and query of the DMC and frame interrupts.It is the only register
+                // which can also be read.
+                // When $4015 is written to, the channels' length counter enable flags are set, 
+                // the DMC is possibly started or stopped, and the DMC's IRQ occurred flag is
+                // cleared.
+                // ---d nt21   DMC, noise, triangle, square 2, square 1
+                // If d is set and the DMC's DMA reader has no more sample bytes to fetch, the DMC
+                // sample is restarted.If d is clear then the DMA reader's sample bytes remaining
+                // is set to 0.
+                this.lc0Halt = 1 - (value & 1);
+                break;
+            case 0x4017:
+                // On a write to $4017, the divider and sequencer are reset, then the sequencer is
+                // configured. Two sequences are available, and frame IRQ generation can be
+                // disabled.
+                //  mi-- ----       mode, IRQ disable
+                // If the mode flag is clear, the 4-step sequence is selected, otherwise the
+                // 5-step sequence is selected and the sequencer is immediately clocked once.
+                //     f = set interrupt flag
+                //     l = clock length counters and sweep units
+                //     e = clock envelopes and triangle's linear counter
+                // mode 0: 4-step  effective rate (approx)
+                // ---------------------------------------
+                //     - - - f      60 Hz
+                //     - l - l     120 Hz
+                //     e e e e     240 Hz
+                // mode 1: 5-step  effective rate (approx)
+                // ---------------------------------------
+                //     - - - - -   (interrupt flag never set)
+                //     l - l - -    96 Hz
+                //     e e e e -   192 Hz
+                // At any time if the interrupt flag is set and the IRQ disable is clear, the
+                // CPU's IRQ line is asserted.
+                this.idividerStep = this.isequencerStep = 0;
+                this.mode = (value >> 7) & 1;
+                this.irqDisabled = (value >> 6) & 1;
+                if (this.mode !== 0)
+                    throw 'not supported';
+                break;
+        }
+        console.log('set ', addr.toString(16), value);
+    };
+    APU.prototype.step = function () {
+        //The divider generates an output clock rate of just under 240 Hz, and appears to
+        //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is
+        //clocked by the divider's output.
+        this.idividerStep++;
+        if (this.idividerStep === 89490) {
+            this.idividerStep = 0;
+            this.isequencerStep++;
+            if (this.mode === 0) {
+                if (this.isequencerStep === 2) {
+                    if (!this.lc0Halt && this.lc0 > 0)
+                        this.lc0--;
+                    this.isequencerStep = 0;
+                }
+            }
+        }
     };
     return APU;
 })();
@@ -1289,6 +1450,18 @@ var Mos6502 = (function () {
     Mos6502.prototype.SXA = function (addr) {
         //not implemented
     };
+    Mos6502.prototype.XAA = function (byte) {
+        //not implemented
+    };
+    Mos6502.prototype.AXA = function (byte) {
+        //not implemented
+    };
+    Mos6502.prototype.XAS = function (byte) {
+        //not implemented
+    };
+    Mos6502.prototype.LAR = function (byte) {
+        //not implemented
+    };
     Mos6502.prototype.getByte = function (addr) {
         if (addr === this.addrRA)
             return this.rA;
@@ -1306,7 +1479,11 @@ var Mos6502 = (function () {
     };
     Mos6502.prototype.getSByteRelative = function () { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; };
     Mos6502.prototype.getByteImmediate = function () { return this.memory.getByte(this.ip + 1); };
-    Mos6502.prototype.getWordImmediate = function () { return this.getWord(this.ip + 1); };
+    Mos6502.prototype.getWordImmediate = function () {
+        //if ((this.ip & 0xff) === 0xff)
+        //    this.pageCross = 1;
+        return this.getWord(this.ip + 1);
+    };
     Mos6502.prototype.getAddrZeroPage = function () { return this.getByteImmediate(); };
     Mos6502.prototype.getByteZeroPage = function () { return this.memory.getByte(this.getAddrZeroPage()); };
     Mos6502.prototype.getWordZeroPage = function () { return this.getWord(this.getAddrZeroPage()); };
@@ -1320,16 +1497,25 @@ var Mos6502 = (function () {
     Mos6502.prototype.getByteAbsolute = function () { return this.memory.getByte(this.getAddrAbsolute()); };
     Mos6502.prototype.getWordAbsolute = function () { return this.getWord(this.getAddrAbsolute()); };
     Mos6502.prototype.getAddrAbsoluteX = function () {
-        var addr = (this.rX + this.getWordImmediate()) & 0xffff;
-        if ((addr & 0xff) === 0xff)
+        // For example, in the instruction LDA 1234, X, where the value in the X register is added 
+        // to address 1234 to get the effective address to load the accumulator from, the operand's low' +
+        // ' byte is fetched before the high byte, so the processor can start adding the X register's 
+        // value before it has the high byte.If there is no carry operation, the entire indexed operation 
+        // takes only four clocks, which is one microsecond at 4MHz. (I don't think there are any 65c02's 
+        //  being made today that won't do at least 4MHz.) If there is a carry requiring the high byte to be ' +
+        // 'incremented, it takes one additional clock.
+        var w = this.getWordImmediate();
+        var addr = (this.rX + w) & 0xffff;
+        if (this.rX + (w & 0xff) > 0xff)
             this.pageCross = 1;
         return addr;
     };
     Mos6502.prototype.getByteAbsoluteX = function () { return this.memory.getByte(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getWordAbsoluteX = function () { return this.getWord(this.getAddrAbsoluteX()); };
     Mos6502.prototype.getAddrAbsoluteY = function () {
-        var addr = (this.rY + this.getWordImmediate()) & 0xffff;
-        if ((addr & 0xff) === 0xff)
+        var w = this.getWordImmediate();
+        var addr = (this.rY + w) & 0xffff;
+        if (this.rY + (w & 0xff) > 0xff)
             this.pageCross = 1;
         return addr;
     };
@@ -1363,7 +1549,7 @@ var Mos6502 = (function () {
         //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
         var addrLo = this.getByteImmediate() & 0xff;
         var addrHi = (addrLo + 1) & 0xff;
-        if (addrLo === 0xff)
+        if (addrLo + this.rY > 0xff)
             this.pageCross = 1;
         return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
     };
@@ -1386,7 +1572,8 @@ var Mos6502 = (function () {
     };
     Mos6502.prototype.setJmpFlags = function (sbyte) {
         this.jumpSucceed = 1;
-        this.jumpToNewPage = ((this.ip + sbyte) & 0xff00) !== (this.ip & 0xff00) ? 2 : 0;
+        var addrDstLow = (this.ip & 0xff) + sbyte + 2; // +2 because we increment the IP with 2 anyway
+        this.jumpToNewPage = addrDstLow < 0 || addrDstLow > 0xff ? 1 : 0;
     };
     Mos6502.prototype.step = function () {
         if (this.sleep > 0) {
@@ -2301,7 +2488,7 @@ var Mos6502 = (function () {
             case 0xdf:
                 this.DCP(this.getAddrAbsoluteX());
                 this.ip += 3;
-                this.sleep = 2;
+                this.sleep = 7;
                 break;
             case 0xe3:
                 this.ISC(this.getAddrIndirectX());
@@ -2568,6 +2755,31 @@ var Mos6502 = (function () {
                 this.ip += 3;
                 this.sleep = 5;
                 break;
+            case 0x8b:
+                this.XAA(this.getByteImmediate());
+                this.ip += 2;
+                this.sleep = 2;
+                break;
+            case 0x93:
+                this.AXA(this.getByteIndirectY());
+                this.ip += 2;
+                this.sleep = 6;
+                break;
+            case 0x9b:
+                this.XAS(this.getByteAbsoluteY());
+                this.ip += 3;
+                this.sleep = 5 + this.pageCross;
+                break;
+            case 0x9f:
+                this.AXA(this.getByteAbsoluteY());
+                this.ip += 3;
+                this.sleep = 5 + this.pageCross;
+                break;
+            case 0xbb:
+                this.LAR(this.getByteAbsoluteY());
+                this.ip += 3;
+                this.sleep = 4 + this.pageCross;
+                break;
             default:
                 throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
@@ -2689,10 +2901,11 @@ var NesEmulator = (function () {
         this.ppu.setCtx(ctx);
     };
     NesEmulator.prototype.step = function () {
-        if (this.icycle % 16 === 0)
-            this.cpu.step();
-        if (this.icycle % 5 === 0)
+        if (this.icycle % 4 === 0)
             this.ppu.step();
+        if (this.icycle % 12 === 0)
+            this.cpu.step();
+        this.apu.step();
         this.icycle++;
     };
     return NesEmulator;
@@ -2734,7 +2947,7 @@ var PPU = (function () {
         this.daddrWrite = 0;
         this.addrSpritePatternTable = 0;
         this.addrScreenPatternTable = 0;
-        this.nmi_occured = false;
+        this.flgVblank = false;
         this.nmi_output = false;
         this.spriteHeight = 8;
         this._imageGrayscale = false;
@@ -2825,9 +3038,9 @@ var PPU = (function () {
                     Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
                   */
                     this.w = 0;
-                    var res = this.nmi_occured ? (1 << 7) : 0;
+                    var res = this.flgVblank ? (1 << 7) : 0;
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
-                    this.nmi_occured = false;
+                    this.flgVblank = false;
                     return res;
                 }
             case 0x2007:
@@ -2863,8 +3076,8 @@ var PPU = (function () {
                 this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
                 this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
                 this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
-                if (x != this.showBg)
-                    console.log('show:', x, '->', this.showBg);
+                //if (x != this.showBg)
+                //    console.log('show:', x, '->', this.showBg);
                 break;
             case 0x2005:
                 if (this.w === 0) {
@@ -2888,7 +3101,6 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
-                    console.log(this.v.toString(16));
                 }
                 this.w = 1 - this.w;
                 break;
@@ -2897,8 +3109,8 @@ var PPU = (function () {
                 this.vmemory.setByte(this.v & 0x3fff, value);
                 this.v += this.daddrWrite;
                 this.v &= 0x3fff;
-                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
-                    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
+                //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+                //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
                 break;
         }
     };
@@ -2961,7 +3173,7 @@ var PPU = (function () {
             this.ctx.putImageData(this.imageData, 0, 0);
             this.iFrame++;
             this.dataAddr = 0;
-            this.nmi_occured = true;
+            this.flgVblank = true;
             this.imageGrayscale = this._imageGrayscale;
             this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
             this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
@@ -2973,7 +3185,7 @@ var PPU = (function () {
         }
         else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
-            if (this.nmi_occured && this.nmi_output) {
+            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
                 this.nmi_output = false;
                 this.cpu.RequestNMI();
             }
@@ -2981,7 +3193,7 @@ var PPU = (function () {
         else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
             //beginning of screen
             //console.log('ppu vblank end bg:',this.showBg );
-            this.nmi_occured = false;
+            this.flgVblank = false;
             if (this.showBg || this.showSprites)
                 this.v = this.t;
         }

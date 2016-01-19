@@ -1074,6 +1074,19 @@ class Mos6502 {
     private SXA(addr: number): void {
        //not implemented
     }
+    private XAA(byte: number): void {
+        //not implemented
+    }
+
+    private AXA(byte: number): void {
+        //not implemented
+    }
+    private XAS(byte: number): void {
+        //not implemented
+    }
+    private LAR(byte: number): void {
+        //not implemented
+    }
 
 
     private getByte(addr: number) {
@@ -1097,7 +1110,12 @@ class Mos6502 {
     private getSByteRelative(): number { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; }
 
     private getByteImmediate(): number { return this.memory.getByte(this.ip + 1); }
-    private getWordImmediate(): number { return this.getWord(this.ip + 1); }
+    private getWordImmediate(): number {
+        //if ((this.ip & 0xff) === 0xff)
+        //    this.pageCross = 1;
+
+         return this.getWord(this.ip + 1);
+    }
 
     private getAddrZeroPage(): number { return this.getByteImmediate(); }
     private getByteZeroPage(): number { return this.memory.getByte(this.getAddrZeroPage()); }
@@ -1116,8 +1134,16 @@ class Mos6502 {
     private getWordAbsolute(): number { return this.getWord(this.getAddrAbsolute()); }
 
     private getAddrAbsoluteX(): number {
-        var addr = (this.rX + this.getWordImmediate()) & 0xffff;
-        if ((addr & 0xff) === 0xff)
+        // For example, in the instruction LDA 1234, X, where the value in the X register is added 
+        // to address 1234 to get the effective address to load the accumulator from, the operand's low' +
+        // ' byte is fetched before the high byte, so the processor can start adding the X register's 
+        // value before it has the high byte.If there is no carry operation, the entire indexed operation 
+        // takes only four clocks, which is one microsecond at 4MHz. (I don't think there are any 65c02's 
+        //  being made today that won't do at least 4MHz.) If there is a carry requiring the high byte to be ' +
+        // 'incremented, it takes one additional clock.
+        var w = this.getWordImmediate();
+        var addr = (this.rX + w) & 0xffff;
+        if (this.rX + (w & 0xff) > 0xff)
             this.pageCross = 1;
 
         return addr;
@@ -1126,8 +1152,10 @@ class Mos6502 {
     private getWordAbsoluteX(): number { return this.getWord(this.getAddrAbsoluteX()) }
 
     private getAddrAbsoluteY(): number {
-        var addr = (this.rY + this.getWordImmediate()) & 0xffff;
-        if ((addr & 0xff) === 0xff)
+
+        var w = this.getWordImmediate();
+        var addr = (this.rY + w) & 0xffff;
+        if (this.rY + (w & 0xff) > 0xff)
             this.pageCross = 1;
 
         return addr;
@@ -1171,7 +1199,7 @@ class Mos6502 {
         var addrLo: number = this.getByteImmediate() & 0xff;
         var addrHi: number = (addrLo + 1) & 0xff;
 
-        if (addrLo === 0xff)
+        if (addrLo + this.rY > 0xff)
             this.pageCross = 1;
 
         return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
@@ -1204,7 +1232,9 @@ class Mos6502 {
 
     private setJmpFlags(sbyte) {
         this.jumpSucceed = 1;
-        this.jumpToNewPage = ((this.ip + sbyte) & 0xff00) !== (this.ip & 0xff00) ? 2 : 0;
+
+        var addrDstLow = (this.ip & 0xff) + sbyte + 2; // +2 because we increment the IP with 2 anyway
+        this.jumpToNewPage = addrDstLow < 0 || addrDstLow > 0xff ? 1 : 0;
     }
 
     public step() {
@@ -1443,7 +1473,7 @@ class Mos6502 {
             case 0xd3: this.DCP(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
             case 0xd7: this.DCP(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
             case 0xdb: this.DCP(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0xdf: this.DCP(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 2; break;
+            case 0xdf: this.DCP(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
 
             case 0xe3: this.ISC(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
             case 0xe7: this.ISC(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
@@ -1506,6 +1536,11 @@ class Mos6502 {
 
             case 0x9c: this.SYA(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 5; break;
             case 0x9e: this.SXA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 5; break;
+            case 0x8b: this.XAA(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
+            case 0x93: this.AXA(this.getByteIndirectY()); this.ip += 2; this.sleep = 6; break;
+            case 0x9b: this.XAS(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5 + this.pageCross; break;
+            case 0x9f: this.AXA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5 + this.pageCross; break;
+            case 0xbb: this.LAR(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
 
             default:
                 throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
