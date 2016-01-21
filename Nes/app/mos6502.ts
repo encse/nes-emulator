@@ -450,11 +450,11 @@ class Mos6502 {
         this.flgDecimalMode = 0;
     }
     private CLI(): void {
-        console.log('cli');
+        console.log('$' + this.ip.toString(16),'CLI');
         this.flgInterruptDisable= 0;
     }
     private SEI(): void {
-        console.log('sei');
+        console.log('$' + this.ip.toString(16), 'SEI');
         this.flgInterruptDisable = 1;
     }
     private CLV(): void {
@@ -939,7 +939,8 @@ class Mos6502 {
     /*JSR - Jump to Subroutine
         The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
      */
-    private JSR(addr:number): void {
+    private JSR(addr: number): void {
+        console.log('$' + this.ip.toString(16), 'JSR');
         this.pushWord(this.ip + 3 - 1);
         this.ip = addr;
     }
@@ -949,6 +950,7 @@ class Mos6502 {
         The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
      */
     private RTS(): void {
+        console.log('$'+this.ip.toString(16), 'RTS');
         this.ip = this.popWord() + 1;
     }
 

@@ -179,7 +179,9 @@ var APU = (function () {
             }
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
-        this.cpu.irqLine = !this.mode && !this.irqDisabled && this.isequencerStep === 3 ? 0 : 1;
+        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3)
+            this.cpu.irqLine = 0;
+        //console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
     };
     return APU;
 })();
@@ -877,11 +879,11 @@ var Mos6502 = (function () {
         this.flgDecimalMode = 0;
     };
     Mos6502.prototype.CLI = function () {
-        console.log('cli');
+        console.log('$' + this.ip.toString(16), 'CLI');
         this.flgInterruptDisable = 0;
     };
     Mos6502.prototype.SEI = function () {
-        console.log('sei');
+        console.log('$' + this.ip.toString(16), 'SEI');
         this.flgInterruptDisable = 1;
     };
     Mos6502.prototype.CLV = function () {
@@ -1335,6 +1337,7 @@ var Mos6502 = (function () {
         The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
      */
     Mos6502.prototype.JSR = function (addr) {
+        console.log('$' + this.ip.toString(16), 'JSR');
         this.pushWord(this.ip + 3 - 1);
         this.ip = addr;
     };
@@ -1343,6 +1346,7 @@ var Mos6502 = (function () {
         The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
      */
     Mos6502.prototype.RTS = function () {
+        console.log('$' + this.ip.toString(16), 'RTS');
         this.ip = this.popWord() + 1;
     };
     /**

@@ -217,6 +217,8 @@
 
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
-        this.cpu.irqLine = !this.mode && !this.irqDisabled && this.isequencerStep === 3 ? 0 : 1;
+        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3)
+            this.cpu.irqLine = 0;
+        //console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
     }
 }
