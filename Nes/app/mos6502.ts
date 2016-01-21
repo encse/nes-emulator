@@ -1,7 +1,8 @@
 ﻿///<reference path="Memory.ts"/>
 
 class Mos6502 {
-    sleep: number = 0;
+    t: number = 0;
+    tLim: number = 0;
 
     private addrRA: number = -1;
 
@@ -422,6 +423,10 @@ class Mos6502 {
     private CLI(): void {
         console.log('cli');
         this.flgInterruptDisable= 0;
+    }
+    private SEI(): void {
+        console.log('sei');
+        this.flgInterruptDisable = 1;
     }
     private CLV(): void {
         this.flgOverflow= 0;
@@ -1260,321 +1265,362 @@ class Mos6502 {
 
     public step() {
 
-        if (this.sleep > 0) {
-            this.sleep--;
-            return;
-        }
+        if (this.t === this.tLim)
+            this.t = 0;
 
-        if (this.nmiRequested) {
-            this.NMI();
-            return;
+        if (this.t === 0) {
+            if (this.nmiRequested) {
+                this.NMI();
+                return;
+            }
+            if (this.irqRequested && this.flgInterruptDisable === 0) {
+                this.IRQ();
+                return;
+            }
         }
-        if (this.irqRequested && this.flgInterruptDisable === 0) {
-            this.IRQ();
-            return;
-        }
+     
+        this.processInstruction();
+        this.t++;
+    }
+
+    currentOpcode : number;
+    processInstruction() {
         this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
         var ipPrev = this.ip;
-        switch (this.memory.getByte(this.ip)) {
-            case 0x69: this.ADC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x65: this.ADC(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x75: this.ADC(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x6d: this.ADC(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0x7d: this.ADC(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x79: this.ADC(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x61: this.ADC(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x71: this.ADC(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
 
-            case 0x29: this.AND(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x25: this.AND(this.getByteZeroPage()); this.ip += 2;  this.sleep = 3; break;
-            case 0x35: this.AND(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x2D: this.AND(this.getByteAbsolute()); this.ip += 3;  this.sleep = 4; break;
-            case 0x3D: this.AND(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x39: this.AND(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x21: this.AND(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x31: this.AND(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
+        if (this.t === 0)
+            this.currentOpcode = this.memory.getByte(this.ip);
 
-            case 0x0a: this.ASL(this.addrRA);             this.ip += 1; this.sleep = 2; break;
-            case 0x06: this.ASL(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0x16: this.ASL(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x0e: this.ASL(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x1e: this.ASL(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+        switch (this.currentOpcode) {
+            case 0x69: if(this.t === 0) {this.ADC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break; 
+            case 0x65: if(this.t === 0) {this.ADC(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x75: if(this.t === 0) {this.ADC(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x6d: if(this.t === 0) {this.ADC(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x7d: if(this.t === 0) {this.ADC(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x79: if(this.t === 0) {this.ADC(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x61: if(this.t === 0) {this.ADC(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x71: if(this.t === 0) {this.ADC(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0x90: this.BCC(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0xb0: this.BCS(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0xf0: this.BEQ(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0x30: this.BMI(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0xd0: this.BNE(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0x10: this.BPL(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0x50: this.BVC(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
-            case 0x70: this.BVS(this.getSByteRelative()); this.ip += 2; this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage; break;
+            case 0x29: if(this.t === 0) {this.AND(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x25: if(this.t === 0) {this.AND(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x35: if(this.t === 0) {this.AND(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x2D: if(this.t === 0) {this.AND(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x3D: if(this.t === 0) {this.AND(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x39: if(this.t === 0) {this.AND(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x21: if(this.t === 0) {this.AND(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x31: if(this.t === 0) {this.AND(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0x24: this.BIT(this.getByteZeroPage()); this.ip += 2; this.sleep = 3; break;
-            case 0x2c: this.BIT(this.getByteAbsolute()); this.ip += 3; this.sleep = 4; break;
+            case 0x0a: if(this.t === 0) {this.ASL(this.addrRA); this.ip += 1; this.tLim = 2;} break;
+            case 0x06: if(this.t === 0) {this.ASL(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0x16: if(this.t === 0) {this.ASL(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x0e: if(this.t === 0) {this.ASL(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x1e: if(this.t === 0) {this.ASL(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x18: this.CLC(); this.ip += 1; this.sleep = 2; break;
-            case 0xd8: this.CLD(); this.ip += 1; this.sleep = 2; break;
-            case 0x58: this.CLI(); this.ip += 1; this.sleep = 2; break;
-            case 0xb8: this.CLV(); this.ip += 1; this.sleep = 2; break;
+            case 0x90: if(this.t === 0) {this.BCC(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0xb0: if(this.t === 0) {this.BCS(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0xf0: if(this.t === 0) {this.BEQ(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0x30: if(this.t === 0) {this.BMI(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0xd0: if(this.t === 0) {this.BNE(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0x10: if(this.t === 0) {this.BPL(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0x50: if(this.t === 0) {this.BVC(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
+            case 0x70: if(this.t === 0) {this.BVS(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
 
-            case 0xc9: this.CMP(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xc5: this.CMP(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xd5: this.CMP(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0xcd: this.CMP(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xdd: this.CMP(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xd9: this.CMP(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xc1: this.CMP(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0xd1: this.CMP(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
+            case 0x24: if(this.t === 0) {this.BIT(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x2c: if(this.t === 0) {this.BIT(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
 
-            case 0xe0: this.CPX(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xe4: this.CPX(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xec: this.CPX(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            
-            case 0xc0: this.CPY(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xc4: this.CPY(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xcc: this.CPY(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
+            case 0x18: if(this.t === 0) {this.CLC(); this.ip += 1; this.tLim = 2;} break;
+            case 0xd8: if(this.t === 0) {this.CLD(); this.ip += 1; this.tLim = 2;} break;
+            case 0x58: if (this.t === 0) { this.CLI(); this.ip += 1; this.tLim = 2; } break;
+                //switch (this.t) {
+                //    case 0:
+                //        this.ip += 1;
+                //        this.tLim = 2;
+                //        break;
+                //    case 1:
+                //        this.CLI();
+                //        break;
+                //}
+                //break;
+            case 0xb8: if(this.t === 0) {this.CLV(); this.ip += 1; this.tLim = 2;} break;
 
-            case 0xc6: this.DEC(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0xd6: this.DEC(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0xce: this.DEC(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0xde: this.DEC(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0xc9: if(this.t === 0) {this.CMP(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xc5: if(this.t === 0) {this.CMP(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xd5: if(this.t === 0) {this.CMP(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0xcd: if(this.t === 0) {this.CMP(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xdd: if(this.t === 0) {this.CMP(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xd9: if(this.t === 0) {this.CMP(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xc1: if(this.t === 0) {this.CMP(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xd1: if(this.t === 0) {this.CMP(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0xca: this.DEX(); this.ip += 1; this.sleep = 2; break;
-            case 0x88: this.DEY(); this.ip += 1; this.sleep = 2; break;
+            case 0xe0: if(this.t === 0) {this.CPX(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xe4: if(this.t === 0) {this.CPX(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xec: if(this.t === 0) {this.CPX(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
 
-            case 0xe6: this.INC(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0xf6: this.INC(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0xee: this.INC(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0xfe: this.INC(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
-            case 0xe8: this.INX(); this.ip += 1; this.sleep = 2; break;
-            case 0xc8: this.INY(); this.ip += 1; this.sleep = 2; break;
+            case 0xc0: if(this.t === 0) {this.CPY(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xc4: if(this.t === 0) {this.CPY(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xcc: if(this.t === 0) {this.CPY(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
 
-            case 0x49: this.EOR(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x45: this.EOR(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x55: this.EOR(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x4D: this.EOR(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0x5D: this.EOR(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x59: this.EOR(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x41: this.EOR(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x51: this.EOR(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
+            case 0xc6: if(this.t === 0) {this.DEC(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0xd6: if(this.t === 0) {this.DEC(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xce: if(this.t === 0) {this.DEC(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0xde: if(this.t === 0) {this.DEC(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-          
-            case 0x4c: /*JMP*/ this.ip = this.getAddrAbsolute(); this.sleep = 3; break;
-            case 0x6c: /*JMP*/ this.ip = this.getWordIndirect(); this.sleep = 5; break;
+            case 0xca: if(this.t === 0) {this.DEX(); this.ip += 1; this.tLim = 2;} break;
+            case 0x88: if(this.t === 0) {this.DEY(); this.ip += 1; this.tLim = 2;} break;
 
-            case 0xa9: this.LDA(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xa5: this.LDA(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xb5: this.LDA(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0xad: this.LDA(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xbd: this.LDA(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xb9: this.LDA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xa1: this.LDA(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0xb1: this.LDA(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
-         
-            case 0xa2: this.LDX(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xa6: this.LDX(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xb6: this.LDX(this.getByteZeroPageY()); this.ip += 2; this.sleep = 4; break;
-            case 0xae: this.LDX(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xbe: this.LDX(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-         
-            case 0xa0: this.LDY(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xa4: this.LDY(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xb4: this.LDY(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0xac: this.LDY(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xbc: this.LDY(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
+            case 0xe6: if(this.t === 0) {this.INC(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0xf6: if(this.t === 0) {this.INC(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xee: if(this.t === 0) {this.INC(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0xfe: if(this.t === 0) {this.INC(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
+            case 0xe8: if(this.t === 0) {this.INX(); this.ip += 1; this.tLim = 2;} break;
+            case 0xc8: if(this.t === 0) {this.INY(); this.ip += 1; this.tLim = 2;} break;
 
-            case 0x4a: this.LSR(this.addrRA);             this.ip += 1; this.sleep = 2; break;
-            case 0x46: this.LSR(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0x56: this.LSR(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x4e: this.LSR(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x5e: this.LSR(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x49: if(this.t === 0) {this.EOR(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x45: if(this.t === 0) {this.EOR(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x55: if(this.t === 0) {this.EOR(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x4D: if(this.t === 0) {this.EOR(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x5D: if(this.t === 0) {this.EOR(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x59: if(this.t === 0) {this.EOR(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x41: if(this.t === 0) {this.EOR(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x51: if(this.t === 0) {this.EOR(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0xea: /*NOP*/ this.ip += 1; this.sleep = 2; break;
-        
-      
-            case 0x09: this.ORA(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x05: this.ORA(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x15: this.ORA(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x0d: this.ORA(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0x1d: this.ORA(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x19: this.ORA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0x01: this.ORA(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x11: this.ORA(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
-           
-        
-            case 0x48: this.PHA(); this.ip += 1; this.sleep = 3; break;
-            case 0x08: this.PHP(); this.ip += 1; this.sleep = 3; break;
-            case 0x68: this.PLA(); this.ip += 1; this.sleep = 4; break;
-            case 0x28: this.PLP(); this.ip += 1; this.sleep = 4; break;
 
-            case 0x2a: this.ROL(this.addrRA);             this.ip += 1; this.sleep = 2; break;
-            case 0x26: this.ROL(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0x36: this.ROL(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x2e: this.ROL(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x3e: this.ROL(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x4c: if(this.t === 0) {/*JMP*/ this.ip = this.getAddrAbsolute(); this.tLim = 3;} break;
+            case 0x6c: if(this.t === 0) {/*JMP*/ this.ip = this.getWordIndirect(); this.tLim = 5;} break;
 
-            case 0x6a: this.ROR(this.addrRA);             this.ip += 1; this.sleep = 2; break;
-            case 0x66: this.ROR(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0x76: this.ROR(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x6e: this.ROR(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x7e: this.ROR(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
-            
-            case 0x00: this.BRK(); this.sleep = 7; break;
-            case 0x40: this.RTI(); this.sleep = 6; break;
+            case 0xa9: if(this.t === 0) {this.LDA(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xa5: if(this.t === 0) {this.LDA(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xb5: if(this.t === 0) {this.LDA(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0xad: if(this.t === 0) {this.LDA(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xbd: if(this.t === 0) {this.LDA(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xb9: if(this.t === 0) {this.LDA(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xa1: if(this.t === 0) {this.LDA(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xb1: if(this.t === 0) {this.LDA(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0xe9: this.SBC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xe5: this.SBC(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xf5: this.SBC(this.getByteZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0xed: this.SBC(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xfd: this.SBC(this.getByteAbsoluteX()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xf9: this.SBC(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xe1: this.SBC(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0xf1: this.SBC(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
+            case 0xa2: if(this.t === 0) {this.LDX(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xa6: if(this.t === 0) {this.LDX(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xb6: if(this.t === 0) {this.LDX(this.getByteZeroPageY()); this.ip += 2; this.tLim = 4;} break;
+            case 0xae: if(this.t === 0) {this.LDX(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xbe: if(this.t === 0) {this.LDX(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
 
-            case 0x38: /*SEC*/ this.flgCarry = 1;            this.ip += 1; this.sleep = 2; break;
-            case 0xf8: /*SED*/ this.flgDecimalMode = 1;      this.ip += 1; this.sleep = 2; break;
-            case 0x78: /*SEI*/ this.flgInterruptDisable = 1; this.ip += 1; this.sleep = 2; break;
+            case 0xa0: if(this.t === 0) {this.LDY(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xa4: if(this.t === 0) {this.LDY(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xb4: if(this.t === 0) {this.LDY(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0xac: if(this.t === 0) {this.LDY(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xbc: if(this.t === 0) {this.LDY(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
 
-            case 0x85: this.STA(this.getAddrZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x95: this.STA(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x8d: this.STA(this.getAddrAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0x9d: this.STA(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 5; break;
-            case 0x99: this.STA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 5; break;
-            case 0x81: this.STA(this.getAddrIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x91: this.STA(this.getAddrIndirectY()); this.ip += 2; this.sleep = 6; break;
+            case 0x4a: if(this.t === 0) {this.LSR(this.addrRA); this.ip += 1; this.tLim = 2;} break;
+            case 0x46: if(this.t === 0) {this.LSR(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0x56: if(this.t === 0) {this.LSR(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x4e: if(this.t === 0) {this.LSR(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x5e: if(this.t === 0) {this.LSR(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x86: this.STX(this.getAddrZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x96: this.STX(this.getAddrZeroPageY()); this.ip += 2; this.sleep = 4; break;
-            case 0x8e: this.STX(this.getAddrAbsolute());  this.ip += 3; this.sleep = 4; break;
+            case 0xea: if(this.t === 0) {/*NOP*/ this.ip += 1; this.tLim = 2;} break;
 
-            case 0x84: this.STY(this.getAddrZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x94: this.STY(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 4; break;
-            case 0x8c: this.STY(this.getAddrAbsolute());  this.ip += 3; this.sleep = 4; break;
 
-            case 0xaa: this.TAX(); this.ip += 1; this.sleep = 2; break;
-            case 0xa8: this.TAY(); this.ip += 1; this.sleep = 2; break;
-            case 0xba: this.TSX(); this.ip += 1; this.sleep = 2; break;
-            case 0x8a: this.TXA(); this.ip += 1; this.sleep = 2; break;
-            case 0x9a: this.TXS(); this.ip += 1; this.sleep = 2; break;
-            case 0x98: this.TYA(); this.ip += 1; this.sleep = 2; break;
+            case 0x09: if(this.t === 0) {this.ORA(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x05: if(this.t === 0) {this.ORA(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x15: if(this.t === 0) {this.ORA(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x0d: if(this.t === 0) {this.ORA(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x1d: if(this.t === 0) {this.ORA(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x19: if(this.t === 0) {this.ORA(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x01: if(this.t === 0) {this.ORA(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x11: if(this.t === 0) {this.ORA(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0x20: this.JSR(this.getAddrAbsolute()); this.sleep = 6; break;
-            case 0x60: this.RTS();                       this.sleep = 6; break;
+
+            case 0x48: if(this.t === 0) {this.PHA(); this.ip += 1; this.tLim = 3;} break;
+            case 0x08: if(this.t === 0) {this.PHP(); this.ip += 1; this.tLim = 3;} break;
+            case 0x68: if(this.t === 0) {this.PLA(); this.ip += 1; this.tLim = 4;} break;
+            case 0x28: if (this.t === 0) { this.PLP(); this.ip += 1; this.tLim = 4; } break;
+                //switch (this.t) {
+                //    case 0:
+
+                //        this.ip += 1;
+                //        this.tLim = 4;
+                //        break;
+                //    case 3:
+                //        this.PLP();
+
+                //        break;
+                //}
+                //break;
+
+            case 0x2a: if(this.t === 0) {this.ROL(this.addrRA); this.ip += 1; this.tLim = 2;} break;
+            case 0x26: if(this.t === 0) {this.ROL(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0x36: if(this.t === 0) {this.ROL(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x2e: if(this.t === 0) {this.ROL(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x3e: if(this.t === 0) {this.ROL(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
+
+            case 0x6a: if(this.t === 0) {this.ROR(this.addrRA); this.ip += 1; this.tLim = 2;} break;
+            case 0x66: if(this.t === 0) {this.ROR(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0x76: if(this.t === 0) {this.ROR(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x6e: if(this.t === 0) {this.ROR(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x7e: if(this.t === 0) {this.ROR(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
+
+            case 0x00: if(this.t === 0) {this.BRK(); this.tLim = 7;} break;
+            case 0x40: if(this.t === 0) {this.RTI(); this.tLim = 6;} break;
+
+            case 0xe9: if(this.t === 0) {this.SBC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xe5: if(this.t === 0) {this.SBC(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xf5: if(this.t === 0) {this.SBC(this.getByteZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0xed: if(this.t === 0) {this.SBC(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xfd: if(this.t === 0) {this.SBC(this.getByteAbsoluteX()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xf9: if(this.t === 0) {this.SBC(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xe1: if(this.t === 0) {this.SBC(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xf1: if(this.t === 0) {this.SBC(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
+
+            case 0x38: if(this.t === 0) {/*SEC*/ this.flgCarry = 1; this.ip += 1; this.tLim = 2;} break;
+            case 0xf8: if(this.t === 0) {/*SED*/ this.flgDecimalMode = 1; this.ip += 1; this.tLim = 2;} break;
+            case 0x78: if (this.t === 0) {/*SED*/ this.SEI(); this.ip += 1; this.tLim = 2; } break;
+                //switch (this.t) {
+                //    case 0:
+                //        this.ip += 1;
+                //        this.tLim = 2;
+                //        break;
+                //    case 1:
+                //        this.SEI();
+                //        break;
+                //}
+                //break;
+              
+
+            case 0x85: if(this.t === 0) {this.STA(this.getAddrZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x95: if(this.t === 0) {this.STA(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x8d: if(this.t === 0) {this.STA(this.getAddrAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x9d: if(this.t === 0) {this.STA(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 5;} break;
+            case 0x99: if(this.t === 0) {this.STA(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 5;} break;
+            case 0x81: if(this.t === 0) {this.STA(this.getAddrIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x91: if(this.t === 0) {this.STA(this.getAddrIndirectY()); this.ip += 2; this.tLim = 6;} break;
+
+            case 0x86: if(this.t === 0) {this.STX(this.getAddrZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x96: if(this.t === 0) {this.STX(this.getAddrZeroPageY()); this.ip += 2; this.tLim = 4;} break;
+            case 0x8e: if(this.t === 0) {this.STX(this.getAddrAbsolute()); this.ip += 3; this.tLim = 4;} break;
+
+            case 0x84: if(this.t === 0) {this.STY(this.getAddrZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x94: if(this.t === 0) {this.STY(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 4;} break;
+            case 0x8c: if(this.t === 0) {this.STY(this.getAddrAbsolute()); this.ip += 3; this.tLim = 4;} break;
+
+            case 0xaa: if(this.t === 0) {this.TAX(); this.ip += 1; this.tLim = 2;} break;
+            case 0xa8: if(this.t === 0) {this.TAY(); this.ip += 1; this.tLim = 2;} break;
+            case 0xba: if(this.t === 0) {this.TSX(); this.ip += 1; this.tLim = 2;} break;
+            case 0x8a: if(this.t === 0) {this.TXA(); this.ip += 1; this.tLim = 2;} break;
+            case 0x9a: if(this.t === 0) {this.TXS(); this.ip += 1; this.tLim = 2;} break;
+            case 0x98: if(this.t === 0) {this.TYA(); this.ip += 1; this.tLim = 2;} break;
+
+            case 0x20: if(this.t === 0) {this.JSR(this.getAddrAbsolute()); this.tLim = 6;} break;
+            case 0x60: if(this.t === 0) {this.RTS(); this.tLim = 6;} break;
 
             //unofficial opcodes below
 
-            case 0x1a: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0x3a: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0x5a: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0x7a: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0xda: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0xfa: /* *NOP*/ this.ip += 1; this.sleep = 2; break;
-            case 0x04: /* *NOP*/ this.ip += 2; this.sleep = 3; break;
-            case 0x14: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0x34: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0x44: /* *NOP*/ this.ip += 2; this.sleep = 3; break;
-            case 0x54: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0x64: /* *NOP*/ this.ip += 2; this.sleep = 3; break;
-            case 0x74: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0xd4: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0xf4: /* *NOP*/ this.ip += 2; this.sleep = 4; break;
-            case 0x80: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
-            case 0x82: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
-            case 0xc2: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
-            case 0xe2: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
-            case 0x89: /* *NOP*/ this.ip += 2; this.sleep = 2; break;
-            case 0x0c: /* *NOP*/ this.ip += 3; this.sleep = 4; break;
-            case 0x1c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0x3c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0x5c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0x7c: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0xdc: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0xfc: /* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3;  this.sleep = 4 + this.pageCross; break;
-            case 0xeb: this.SBC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xc3: this.DCP(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0xc7: this.DCP(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0xcf: this.DCP(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0xd3: this.DCP(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0xd7: this.DCP(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0xdb: this.DCP(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0xdf: this.DCP(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x1a: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0x3a: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0x5a: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0x7a: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0xda: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0xfa: if(this.t === 0) {/* *NOP*/ this.ip += 1; this.tLim = 2;} break;
+            case 0x04: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 3;} break;
+            case 0x14: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0x34: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0x44: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 3;} break;
+            case 0x54: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0x64: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 3;} break;
+            case 0x74: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0xd4: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0xf4: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 4;} break;
+            case 0x80: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 2;} break;
+            case 0x82: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 2;} break;
+            case 0xc2: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 2;} break;
+            case 0xe2: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 2;} break;
+            case 0x89: if(this.t === 0) {/* *NOP*/ this.ip += 2; this.tLim = 2;} break;
+            case 0x0c: if(this.t === 0) {/* *NOP*/ this.ip += 3; this.tLim = 4;} break;
+            case 0x1c: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x3c: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x5c: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0x7c: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xdc: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xfc: if(this.t === 0) {/* *NOP*/ this.getAddrAbsoluteX(); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xeb: if(this.t === 0) {this.SBC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xc3: if(this.t === 0) {this.DCP(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0xc7: if(this.t === 0) {this.DCP(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0xcf: if(this.t === 0) {this.DCP(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0xd3: if(this.t === 0) {this.DCP(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0xd7: if(this.t === 0) {this.DCP(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xdb: if(this.t === 0) {this.DCP(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0xdf: if(this.t === 0) {this.DCP(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0xe3: this.ISC(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0xe7: this.ISC(this.getAddrZeroPage());  this.ip += 2; this.sleep = 5; break;
-            case 0xef: this.ISC(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0xf3: this.ISC(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0xf7: this.ISC(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0xfb: this.ISC(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0xff: this.ISC(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0xe3: if(this.t === 0) {this.ISC(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0xe7: if(this.t === 0) {this.ISC(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
+            case 0xef: if(this.t === 0) {this.ISC(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0xf3: if(this.t === 0) {this.ISC(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0xf7: if(this.t === 0) {this.ISC(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xfb: if(this.t === 0) {this.ISC(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0xff: if(this.t === 0) {this.ISC(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0xab: this.LAX(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xa7: this.LAX(this.getByteZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0xb7: this.LAX(this.getByteZeroPageY()); this.ip += 2; this.sleep = 4; break;
-            case 0xaf: this.LAX(this.getByteAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0xbf: this.LAX(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
-            case 0xa3: this.LAX(this.getByteIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0xb3: this.LAX(this.getByteIndirectY()); this.ip += 2; this.sleep = 5 + this.pageCross; break;
+            case 0xab: if(this.t === 0) {this.LAX(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xa7: if(this.t === 0) {this.LAX(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0xb7: if(this.t === 0) {this.LAX(this.getByteZeroPageY()); this.ip += 2; this.tLim = 4;} break;
+            case 0xaf: if(this.t === 0) {this.LAX(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0xbf: if(this.t === 0) {this.LAX(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
+            case 0xa3: if(this.t === 0) {this.LAX(this.getByteIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0xb3: if(this.t === 0) {this.LAX(this.getByteIndirectY()); this.ip += 2; this.tLim = 5 + this.pageCross;} break;
 
-            case 0x83: this.SAX(this.getAddrIndirectX()); this.ip += 2; this.sleep = 6; break;
-            case 0x87: this.SAX(this.getAddrZeroPage());  this.ip += 2; this.sleep = 3; break;
-            case 0x8f: this.SAX(this.getAddrAbsolute());  this.ip += 3; this.sleep = 4; break;
-            case 0x97: this.SAX(this.getAddrZeroPageY()); this.ip += 2; this.sleep = 4; break;
+            case 0x83: if(this.t === 0) {this.SAX(this.getAddrIndirectX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x87: if(this.t === 0) {this.SAX(this.getAddrZeroPage()); this.ip += 2; this.tLim = 3;} break;
+            case 0x8f: if(this.t === 0) {this.SAX(this.getAddrAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x97: if(this.t === 0) {this.SAX(this.getAddrZeroPageY()); this.ip += 2; this.tLim = 4;} break;
 
-            case 0x03: this.SLO(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0x07: this.SLO(this.getByteImmediate()); this.ip += 2; this.sleep = 5; break;
-            case 0x0f: this.SLO(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x13: this.SLO(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0x17: this.SLO(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x1b: this.SLO(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0x1f: this.SLO(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x03: if(this.t === 0) {this.SLO(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0x07: if(this.t === 0) {this.SLO(this.getByteImmediate()); this.ip += 2; this.tLim = 5;} break;
+            case 0x0f: if(this.t === 0) {this.SLO(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x13: if(this.t === 0) {this.SLO(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0x17: if(this.t === 0) {this.SLO(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x1b: if(this.t === 0) {this.SLO(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0x1f: if(this.t === 0) {this.SLO(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x23: this.RLA(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0x27: this.RLA(this.getByteImmediate()); this.ip += 2; this.sleep = 5; break;
-            case 0x2f: this.RLA(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x33: this.RLA(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0x37: this.RLA(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x3b: this.RLA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0x3f: this.RLA(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x23: if(this.t === 0) {this.RLA(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0x27: if(this.t === 0) {this.RLA(this.getByteImmediate()); this.ip += 2; this.tLim = 5;} break;
+            case 0x2f: if(this.t === 0) {this.RLA(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x33: if(this.t === 0) {this.RLA(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0x37: if(this.t === 0) {this.RLA(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x3b: if(this.t === 0) {this.RLA(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0x3f: if(this.t === 0) {this.RLA(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x63: this.RRA(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0x67: this.RRA(this.getByteImmediate()); this.ip += 2; this.sleep = 5; break;
-            case 0x6f: this.RRA(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x73: this.RRA(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0x77: this.RRA(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x7b: this.RRA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0x7f: this.RRA(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x63: if(this.t === 0) {this.RRA(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0x67: if(this.t === 0) {this.RRA(this.getByteImmediate()); this.ip += 2; this.tLim = 5;} break;
+            case 0x6f: if(this.t === 0) {this.RRA(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x73: if(this.t === 0) {this.RRA(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0x77: if(this.t === 0) {this.RRA(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x7b: if(this.t === 0) {this.RRA(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0x7f: if(this.t === 0) {this.RRA(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x43: this.SRE(this.getAddrIndirectX()); this.ip += 2; this.sleep = 8; break;
-            case 0x47: this.SRE(this.getByteImmediate()); this.ip += 2; this.sleep = 5; break;
-            case 0x4f: this.SRE(this.getAddrAbsolute());  this.ip += 3; this.sleep = 6; break;
-            case 0x53: this.SRE(this.getAddrIndirectY()); this.ip += 2; this.sleep = 8; break;
-            case 0x57: this.SRE(this.getAddrZeroPageX()); this.ip += 2; this.sleep = 6; break;
-            case 0x5b: this.SRE(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 7; break;
-            case 0x5f: this.SRE(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 7; break;
+            case 0x43: if(this.t === 0) {this.SRE(this.getAddrIndirectX()); this.ip += 2; this.tLim = 8;} break;
+            case 0x47: if(this.t === 0) {this.SRE(this.getByteImmediate()); this.ip += 2; this.tLim = 5;} break;
+            case 0x4f: if(this.t === 0) {this.SRE(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
+            case 0x53: if(this.t === 0) {this.SRE(this.getAddrIndirectY()); this.ip += 2; this.tLim = 8;} break;
+            case 0x57: if(this.t === 0) {this.SRE(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
+            case 0x5b: if(this.t === 0) {this.SRE(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 7;} break;
+            case 0x5f: if(this.t === 0) {this.SRE(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x0b: this.ANC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x2b: this.ANC(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x4b: this.ALR(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x6b: this.ARR(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0xcb: this.AXS(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
+            case 0x0b: if(this.t === 0) {this.ANC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x2b: if(this.t === 0) {this.ANC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x4b: if(this.t === 0) {this.ALR(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x6b: if(this.t === 0) {this.ARR(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0xcb: if(this.t === 0) {this.AXS(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
 
-            case 0x9c: this.SYA(this.getAddrAbsoluteX()); this.ip += 3; this.sleep = 5; break;
-            case 0x9e: this.SXA(this.getAddrAbsoluteY()); this.ip += 3; this.sleep = 5; break;
-            case 0x8b: this.XAA(this.getByteImmediate()); this.ip += 2; this.sleep = 2; break;
-            case 0x93: this.AXA(this.getByteIndirectY()); this.ip += 2; this.sleep = 6; break;
-            case 0x9b: this.XAS(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5; break;
-            case 0x9f: this.AXA(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 5; break;
-            case 0xbb: this.LAR(this.getByteAbsoluteY()); this.ip += 3; this.sleep = 4 + this.pageCross; break;
+            case 0x9c: if(this.t === 0) {this.SYA(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 5;} break;
+            case 0x9e: if(this.t === 0) {this.SXA(this.getAddrAbsoluteY()); this.ip += 3; this.tLim = 5;} break;
+            case 0x8b: if(this.t === 0) {this.XAA(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
+            case 0x93: if(this.t === 0) {this.AXA(this.getByteIndirectY()); this.ip += 2; this.tLim = 6;} break;
+            case 0x9b: if(this.t === 0) {this.XAS(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 5;} break;
+            case 0x9f: if(this.t === 0) {this.AXA(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 5;} break;
+            case 0xbb: if(this.t === 0) {this.LAR(this.getByteAbsoluteY()); this.ip += 3; this.tLim = 4 + this.pageCross;} break;
 
             default:
                 throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
-        if (this.sleep === 0) {
-             throw 'sleep not set';
+        if (this.tLim === 0) {
+            throw 'sleep not set';
         }
-        this.sleep --;
-        
         this.ip &= 0xffff;
     }
-
 }

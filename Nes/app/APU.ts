@@ -174,14 +174,17 @@
                 // CPU's IRQ line is asserted.
                 this.idividerStep = this.isequencerStep = 0;
                 this.mode = (value >> 7) & 1;
+                if (this.mode !== 0) {
+                    console.log('mode 1 not supported');
+                    return;
+                }
                 this.irqDisabled = (value >> 6) & 1;
 
                 if (this.irqDisabled === 0) {
                     console.log('APU', this.irqDisabled ? 'irq disabled' : 'irq enabled');
                     this.cpu.RequestIRQ();
                 }
-                if (this.mode !== 0)
-                    throw 'not supported';
+               
                 break;
         }
        // console.log('set ', addr.toString(16), value);
@@ -201,13 +204,26 @@
                 if (this.isequencerStep === 2) {
                     if (!this.lc0Halt && this.lc0 > 0) {
                         this.lc0--;
-                        if (this.lc0 && this.irqDisabled === 0)
+                        if (!this.lc0 && this.irqDisabled === 0)
                             this.cpu.RequestIRQ();
 
                     }
                     this.isequencerStep = 0;
                 }
             }
+            //else if (this.mode === 1) {
+            //    if (this.isequencerStep === 0 || this.isequencerStep === 2) {
+            //        if (!this.lc0Halt && this.lc0 > 0) {
+            //            this.lc0--;
+            //            if (!this.lc0 && this.irqDisabled === 0)
+            //                this.cpu.RequestIRQ();
+
+            //        }
+            //    }
+            //    else if (this.isequencerStep === 5) {
+            //        this.isequencerStep = 0;
+            //    }
+            //}
         }
 
     }

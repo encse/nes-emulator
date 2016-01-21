@@ -148,13 +148,15 @@ var APU = (function () {
                 // CPU's IRQ line is asserted.
                 this.idividerStep = this.isequencerStep = 0;
                 this.mode = (value >> 7) & 1;
+                if (this.mode !== 0) {
+                    console.log('mode 1 not supported');
+                    return;
+                }
                 this.irqDisabled = (value >> 6) & 1;
                 if (this.irqDisabled === 0) {
                     console.log('APU', this.irqDisabled ? 'irq disabled' : 'irq enabled');
                     this.cpu.RequestIRQ();
                 }
-                if (this.mode !== 0)
-                    throw 'not supported';
                 break;
         }
         // console.log('set ', addr.toString(16), value);
@@ -171,7 +173,7 @@ var APU = (function () {
                 if (this.isequencerStep === 2) {
                     if (!this.lc0Halt && this.lc0 > 0) {
                         this.lc0--;
-                        if (this.lc0 && this.irqDisabled === 0)
+                        if (!this.lc0 && this.irqDisabled === 0)
                             this.cpu.RequestIRQ();
                     }
                     this.isequencerStep = 0;
@@ -180,6 +182,28 @@ var APU = (function () {
         }
     };
     return APU;
+})();
+///<reference path="Memory.ts"/>
+var RepeatedMemory = (function () {
+    function RepeatedMemory(count, memory) {
+        this.count = count;
+        this.memory = memory;
+        this.sizeI = this.memory.size() * this.count;
+    }
+    RepeatedMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    RepeatedMemory.prototype.getByte = function (addr) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.getByte(addr % this.sizeI);
+    };
+    RepeatedMemory.prototype.setByte = function (addr, value) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.setByte(addr % this.sizeI, value);
+    };
+    return RepeatedMemory;
 })();
 ///<reference path="Memory.ts"/>
 var CompoundMemory = (function () {
@@ -470,11 +494,374 @@ var MMC1 = (function () {
     };
     return MMC1;
 })();
+var PPU = (function () {
+    function PPU(memory, vmemory, cpu) {
+        this.vmemory = vmemory;
+        this.cpu = cpu;
+        /**
+         *
+            Address range	Size	Description
+            $0000-$0FFF	$1000	Pattern table 0
+            $1000-$1FFF	$1000	Pattern Table 1
+            $2000-$23FF	$0400	Nametable 0
+            $2400-$27FF	$0400	Nametable 1
+            $2800-$2BFF	$0400	Nametable 2
+            $2C00-$2FFF	$0400	Nametable 3
+            $3000-$3EFF	$0F00	Mirrors of $2000-$2EFF
+            $3F00-$3F1F	$0020	Palette RAM indexes
+            $3F20-$3FFF	$00E0	Mirrors of $3F00-$3F1F
+    
+         */
+        /**
+        *The PPU uses the current VRAM address for both reading and writing PPU memory thru $2007, and for
+        * fetching nametable data to draw the background. As it's drawing the background, it updates the
+        * address to point to the nametable data currently being drawn. Bits 10-11 hold the base address of
+        * the nametable minus $2000. Bits 12-14 are the Y offset of a scanline within a tile.
+           The 15 bit registers t and v are composed this way during rendering:
+           yyy NN YYYYY XXXXX
+           ||| || ||||| +++++-- coarse X scroll
+           ||| || +++++-------- coarse Y scroll
+           ||| ++-------------- nametable select
+           +++----------------- fine Y scroll
+        */
+        this._v = 0; // Current VRAM address (15 bits)
+        this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
+        this.x = 0; // Fine X scroll (3 bits)
+        this.w = 0; // First or second write toggle (1 bit)
+        this.daddrWrite = 0;
+        this.addrSpritePatternTable = 0;
+        this.addrScreenPatternTable = 0;
+        this.flgVblank = false;
+        this.nmi_output = false;
+        this.spriteHeight = 8;
+        this._imageGrayscale = false;
+        this._showBgInLeftmost8Pixels = false;
+        this._showSpritesInLeftmost8Pixels = false;
+        this._showBg = false;
+        this._showSprites = false;
+        this._emphasizeRed = false;
+        this._emphasizeGreen = false;
+        this._emphasizeBlue = false;
+        this.imageGrayscale = false;
+        this.showBgInLeftmost8Pixels = false;
+        this.showSpritesInLeftmost8Pixels = false;
+        this.showBg = false;
+        this.showSprites = false;
+        this.emphasizeRed = false;
+        this.emphasizeGreen = false;
+        this.emphasizeBlue = false;
+        this.sy = PPU.syFirstVisible;
+        this.sx = PPU.sxMin;
+        this.dataAddr = 0;
+        this.iFrame = 0;
+        this.icycle = 0;
+        this.colors = [
+            0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
+            0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
+            0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
+            0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
+            0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
+            0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
+            0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
+            0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
+        ];
+        if (vmemory.size() !== 0x4000)
+            throw 'insufficient Vmemory size';
+        memory.shadowSetter(0x2000, 0x2007, this.setter.bind(this));
+        memory.shadowGetter(0x2000, 0x2007, this.getter.bind(this));
+    }
+    Object.defineProperty(PPU.prototype, "v", {
+        get: function () {
+            return this._v;
+        },
+        set: function (value) {
+            this._v = value;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    PPU.prototype.setCtx = function (ctx) {
+        this.ctx = ctx;
+        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
+        this.buf = new ArrayBuffer(this.imageData.data.length);
+        this.buf8 = new Uint8ClampedArray(this.buf);
+        this.data = new Uint32Array(this.buf);
+    };
+    PPU.prototype.getter = function (addr) {
+        switch (addr) {
+            case 0x2002:
+                {
+                    /*
+                    7  bit  0
+                    ---- ----
+                    VSO. ....
+                    |||| ||||
+                    |||+-++++- Least significant bits previously written into a PPU register
+                    |||        (due to register not being updated for this address)
+                    ||+------- Sprite overflow. The intent was for this flag to be set
+                    ||         whenever more than eight sprites appear on a scanline, but a
+                    ||         hardware bug causes the actual behavior to be more complicated
+                    ||         and generate false positives as well as false negatives; see
+                    ||         PPU sprite evaluation. This flag is set during sprite
+                    ||         evaluation and cleared at dot 1 (the second dot) of the
+                    ||         pre-render line.
+                    |+-------- Sprite 0 Hit.  Set when a nonzero pixel of sprite 0 overlaps
+                    |          a nonzero background pixel; cleared at dot 1 of the pre-render
+                    |          line.  Used for raster timing.
+                    +--------- Vertical blank has started (0: not in vblank; 1: in vblank).
+                               Set at dot 1 of line 241 (the line *after* the post-render
+                               line); cleared after reading $2002 and at dot 1 of the
+                               pre-render line.
+                    Notes
+                    Reading the status register will clear D7 mentioned above and also the address latch used by PPUSCROLL and PPUADDR. It does not clear the sprite 0 hit or overflow bit.
+                    Once the sprite 0 hit flag is set, it will not be cleared until the end of the next vertical blank. If attempting to use this flag for raster timing, it is important to ensure that the sprite 0 hit check happens outside of vertical blank, otherwise the CPU will "leak" through and the check will fail. The easiest way to do this is to place an earlier check for D6 = 0, which will wait for the pre-render scanline to begin.
+                    If using sprite 0 hit to make a bottom scroll bar below a vertically scrolling or freely scrolling playfield, be careful to ensure that the tile in the playfield behind sprite 0 is opaque.
+                    Sprite 0 hit is not detected at x=255, nor is it detected at x=0 through 7 if the background or sprites are hidden in this area.
+                    See: PPU rendering for more information on the timing of setting and clearing the flags.
+                    Some Vs. System PPUs return a constant value in D4-D0 that the game checks.
+                    Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
+                  */
+                    this.w = 0;
+                    var res = this.flgVblank ? (1 << 7) : 0;
+                    //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
+                    this.flgVblank = false;
+                    return res;
+                }
+            case 0x2007:
+                {
+                    var res = this.vmemory.getByte(this.v & 0x3fff);
+                    this.v += this.daddrWrite;
+                    this.v &= 0x3fff;
+                    return res;
+                }
+            default:
+                throw 'unimplemented read from addr ' + addr;
+                return 0;
+        }
+    };
+    PPU.prototype.setter = function (addr, value) {
+        value &= 0xff;
+        switch (addr) {
+            case 0x2000:
+                this.t = (this.v & 0x73ff) | ((value & 3) << 10);
+                this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
+                this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
+                this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
+                this.spriteHeight = value & 0x20 ? 16 : 8;
+                this.nmi_output = !!(value & 0x80);
+                break;
+            case 0x2001:
+                var x = this.showBg;
+                this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
+                this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels = !!(value & 0x02);
+                this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+                this.showBg = this._showBg = !!(value & 0x08);
+                this.showSprites = this._showSprites = !!(value & 0x10);
+                this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
+                this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
+                this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
+                //if (x != this.showBg)
+                //    console.log('show:', x, '->', this.showBg);
+                break;
+            case 0x2005:
+                if (this.w === 0) {
+                    this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
+                    this.x = value & 7;
+                }
+                else {
+                    this.t = (this.t & 0x7c1f) | (((value >> 3) & 0x1f) << 5);
+                    this.t = (this.t & 0x0fff) | (value & 7) << 10;
+                }
+                this.w = 1 - this.w;
+                break;
+            // Used to set the address of PPU Memory to be accessed via 0x2007
+            // The first write to this register will set 8 lower address bits.
+            // The second write will set 6 upper bits.The address will increment
+            // either by 1 or by 32 after each access to $2007.
+            case 0x2006:
+                if (this.w === 0) {
+                    this.t = (this.t & 0x00ff) | ((value & 0x3f) << 8);
+                }
+                else {
+                    this.t = (this.t & 0xff00) + (value & 0xff);
+                    this.v = this.t;
+                }
+                this.w = 1 - this.w;
+                break;
+            case 0x2007:
+                var vold = this.v;
+                this.vmemory.setByte(this.v & 0x3fff, value);
+                this.v += this.daddrWrite;
+                this.v &= 0x3fff;
+                //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+                //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
+                break;
+        }
+    };
+    PPU.prototype.incrementX = function () {
+        this.x++;
+        if (this.x === 8) {
+            this.x = 0;
+            // Coarse X increment
+            // The coarse X component of v needs to be incremented when the next tile is reached.
+            // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
+            // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
+            if ((this.v & 0x001F) === 31) {
+                this.v &= ~0x001F; // coarse X = 0
+                this.v ^= 0x0400; // switch horizontal nametable
+            }
+            else {
+                this.v += 1; // increment coarse X
+            }
+        }
+    };
+    PPU.prototype.incrementY = function () {
+        this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
+        this.v ^= 0x0400; // switch horizontal nametable
+        // If rendering is enabled, fine Y is incremented at dot 256 of each scanline, overflowing to coarse Y, 
+        // and finally adjusted to wrap among the nametables vertically.
+        // Bits 12- 14 are fine Y.Bits 5- 9 are coarse Y.Bit 11 selects the vertical nametable.
+        if ((this.v & 0x7000) !== 0x7000)
+            this.v += 0x1000; // increment fine Y
+        else {
+            this.v &= ~0x7000; // fine Y = 0
+            var y = (this.v & 0x03E0) >> 5; // let y = coarse Y
+            if (y === 29) {
+                y = 0; // coarse Y = 0
+                this.v ^= 0x0800; // switch vertical nametable
+            }
+            else if (y === 31) {
+                y = 0; // coarse Y = 0, nametable not switched
+            }
+            else {
+                y += 1; // increment coarse Y
+            }
+            this.v = (this.v & ~0x03E0) | (y << 5); // put coarse Y back into v
+        }
+    };
+    PPU.prototype.getNameTable = function (i) {
+        var st = '';
+        for (var y = 0; y < 30; y++) {
+            for (var x = 0; x < 32; x++) {
+                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
+            }
+            st += '\n';
+        }
+        console.log(st);
+    };
+    PPU.prototype.step = function () {
+        if (this.sx === 0 && this.sy === PPU.syPostRender) {
+            //console.log('ppu vblank start', this.icycle);
+            this.sx = PPU.sxMin;
+            this.imageData.data.set(this.buf8);
+            this.ctx.putImageData(this.imageData, 0, 0);
+            this.iFrame++;
+            this.dataAddr = 0;
+            this.flgVblank = true;
+            this.imageGrayscale = this._imageGrayscale;
+            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
+            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
+            this.showBg = this._showBg;
+            this.showSprites = this._showSprites;
+            this.emphasizeRed = this._emphasizeRed;
+            this.emphasizeGreen = this._emphasizeGreen;
+            this.emphasizeBlue = this._emphasizeBlue;
+        }
+        else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
+            //vblank
+            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
+                this.nmi_output = false;
+                this.cpu.RequestNMI();
+            }
+        }
+        else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
+            //beginning of screen
+            //console.log('ppu vblank end bg:',this.showBg );
+            this.flgVblank = false;
+            if (this.showBg || this.showSprites)
+                this.v = this.t;
+        }
+        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+            if (this.showBg) {
+                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
+                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
+                //
+                // The address to be fetched during rendering can be deduced from v in the following way:
+                //   tile address      = 0x2000 | (v & 0x0FFF)
+                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+                //
+                // The low 12 bits of the attribute address are composed in the following way:
+                //   NN 1111 YYY XXX
+                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
+                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
+                //   || ++++---------- attribute offset (960 bytes)
+                //   ++--------------- nametable select
+                var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+                var attribute = this.vmemory.getByte(addrAttribute);
+                var addrTile = 0x2000 | (this.v & 0x0fff);
+                var itile = this.vmemory.getByte(addrTile);
+                var tileCol = 7 - (this.x);
+                var tileRow = this.v >> 12;
+                var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
+                var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
+                var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
+                var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                var addrPalette = 0x3f00 + ipalette;
+                var icolor = this.vmemory.getByte(addrPalette);
+                var color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+                this.dataAddr++;
+            }
+            this.incrementX();
+        }
+        this.sx++;
+        if (this.sx === PPU.sxMax + 1) {
+            //end of scanline
+            this.sx = 0;
+            this.sy++;
+            if (this.sy === PPU.syPreRender + 1) {
+                this.sy = PPU.syFirstVisible;
+            }
+            else {
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
+                    this.incrementY();
+                }
+            }
+        }
+    };
+    PPU.syFirstVisible = 0;
+    PPU.syPostRender = 240;
+    PPU.syPreRender = 261;
+    PPU.sxMin = 0;
+    PPU.sxMax = 340;
+    return PPU;
+})();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(memory) {
+        this.memory = memory;
+    }
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    return ROM;
+})();
 ///<reference path="Memory.ts"/>
 var Mos6502 = (function () {
     function Mos6502(memory) {
         this.memory = memory;
-        this.sleep = 0;
+        this.t = 0;
+        this.tLim = 0;
         this.addrRA = -1;
         this.rA = 0;
         this.rX = 0;
@@ -855,6 +1242,10 @@ var Mos6502 = (function () {
     Mos6502.prototype.CLI = function () {
         console.log('cli');
         this.flgInterruptDisable = 0;
+    };
+    Mos6502.prototype.SEI = function () {
+        console.log('sei');
+        this.flgInterruptDisable = 1;
     };
     Mos6502.prototype.CLV = function () {
         this.flgOverflow = 0;
@@ -1601,1221 +1992,1744 @@ var Mos6502 = (function () {
         this.jumpToNewPage = addrDstLow < 0 || addrDstLow > 0xff ? 1 : 0;
     };
     Mos6502.prototype.step = function () {
-        if (this.sleep > 0) {
-            this.sleep--;
-            return;
+        if (this.t === this.tLim)
+            this.t = 0;
+        if (this.t === 0) {
+            if (this.nmiRequested) {
+                this.NMI();
+                return;
+            }
+            if (this.irqRequested && this.flgInterruptDisable === 0) {
+                this.IRQ();
+                return;
+            }
         }
-        if (this.nmiRequested) {
-            this.NMI();
-            return;
-        }
-        if (this.irqRequested && this.flgInterruptDisable === 0) {
-            this.IRQ();
-            return;
-        }
+        this.processInstruction();
+        this.t++;
+    };
+    Mos6502.prototype.processInstruction = function () {
         this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
         var ipPrev = this.ip;
-        switch (this.memory.getByte(this.ip)) {
+        if (this.t === 0)
+            this.currentOpcode = this.memory.getByte(this.ip);
+        switch (this.currentOpcode) {
             case 0x69:
-                this.ADC(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ADC(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x65:
-                this.ADC(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ADC(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x75:
-                this.ADC(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ADC(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x6d:
-                this.ADC(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ADC(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x7d:
-                this.ADC(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.ADC(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x79:
-                this.ADC(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.ADC(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x61:
-                this.ADC(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ADC(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x71:
-                this.ADC(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.ADC(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x29:
-                this.AND(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.AND(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x25:
-                this.AND(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.AND(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x35:
-                this.AND(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.AND(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x2D:
-                this.AND(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.AND(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x3D:
-                this.AND(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.AND(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x39:
-                this.AND(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.AND(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x21:
-                this.AND(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.AND(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x31:
-                this.AND(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.AND(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x0a:
-                this.ASL(this.addrRA);
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ASL(this.addrRA);
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x06:
-                this.ASL(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.ASL(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x16:
-                this.ASL(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ASL(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x0e:
-                this.ASL(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ASL(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x1e:
-                this.ASL(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.ASL(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x90:
-                this.BCC(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BCC(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0xb0:
-                this.BCS(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BCS(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0xf0:
-                this.BEQ(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BEQ(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0x30:
-                this.BMI(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BMI(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0xd0:
-                this.BNE(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BNE(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0x10:
-                this.BPL(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BPL(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0x50:
-                this.BVC(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BVC(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0x70:
-                this.BVS(this.getSByteRelative());
-                this.ip += 2;
-                this.sleep = 2 + this.jumpSucceed + this.jumpToNewPage;
+                if (this.t === 0) {
+                    this.BVS(this.getSByteRelative());
+                    this.ip += 2;
+                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
+                }
                 break;
             case 0x24:
-                this.BIT(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.BIT(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x2c:
-                this.BIT(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.BIT(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x18:
-                this.CLC();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CLC();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xd8:
-                this.CLD();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CLD();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x58:
-                this.CLI();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CLI();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
+            //switch (this.t) {
+            //    case 0:
+            //        this.ip += 1;
+            //        this.tLim = 2;
+            //        break;
+            //    case 1:
+            //        this.CLI();
+            //        break;
+            //}
+            //break;
             case 0xb8:
-                this.CLV();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CLV();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc9:
-                this.CMP(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CMP(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc5:
-                this.CMP(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.CMP(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xd5:
-                this.CMP(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.CMP(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xcd:
-                this.CMP(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.CMP(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xdd:
-                this.CMP(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.CMP(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xd9:
-                this.CMP(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.CMP(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xc1:
-                this.CMP(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.CMP(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xd1:
-                this.CMP(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.CMP(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0xe0:
-                this.CPX(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CPX(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xe4:
-                this.CPX(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.CPX(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xec:
-                this.CPX(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.CPX(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xc0:
-                this.CPY(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.CPY(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc4:
-                this.CPY(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.CPY(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xcc:
-                this.CPY(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.CPY(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xc6:
-                this.DEC(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.DEC(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0xd6:
-                this.DEC(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.DEC(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xce:
-                this.DEC(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.DEC(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0xde:
-                this.DEC(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.DEC(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xca:
-                this.DEX();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.DEX();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x88:
-                this.DEY();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.DEY();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xe6:
-                this.INC(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.INC(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0xf6:
-                this.INC(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.INC(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xee:
-                this.INC(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.INC(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0xfe:
-                this.INC(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.INC(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xe8:
-                this.INX();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.INX();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc8:
-                this.INY();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.INY();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x49:
-                this.EOR(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.EOR(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x45:
-                this.EOR(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.EOR(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x55:
-                this.EOR(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.EOR(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x4D:
-                this.EOR(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.EOR(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x5D:
-                this.EOR(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.EOR(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x59:
-                this.EOR(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.EOR(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x41:
-                this.EOR(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.EOR(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x51:
-                this.EOR(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.EOR(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x4c:
-                this.ip = this.getAddrAbsolute();
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ip = this.getAddrAbsolute();
+                    this.tLim = 3;
+                }
                 break;
             case 0x6c:
-                this.ip = this.getWordIndirect();
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.ip = this.getWordIndirect();
+                    this.tLim = 5;
+                }
                 break;
             case 0xa9:
-                this.LDA(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.LDA(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xa5:
-                this.LDA(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.LDA(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xb5:
-                this.LDA(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDA(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xad:
-                this.LDA(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDA(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xbd:
-                this.LDA(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LDA(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xb9:
-                this.LDA(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LDA(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xa1:
-                this.LDA(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.LDA(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xb1:
-                this.LDA(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.LDA(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0xa2:
-                this.LDX(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.LDX(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xa6:
-                this.LDX(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.LDX(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xb6:
-                this.LDX(this.getByteZeroPageY());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDX(this.getByteZeroPageY());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xae:
-                this.LDX(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDX(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xbe:
-                this.LDX(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LDX(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xa0:
-                this.LDY(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.LDY(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xa4:
-                this.LDY(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.LDY(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xb4:
-                this.LDY(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDY(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xac:
-                this.LDY(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LDY(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xbc:
-                this.LDY(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LDY(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x4a:
-                this.LSR(this.addrRA);
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.LSR(this.addrRA);
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x46:
-                this.LSR(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.LSR(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x56:
-                this.LSR(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.LSR(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x4e:
-                this.LSR(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.LSR(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x5e:
-                this.LSR(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.LSR(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xea:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x09:
-                this.ORA(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ORA(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x05:
-                this.ORA(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ORA(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x15:
-                this.ORA(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ORA(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x0d:
-                this.ORA(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ORA(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x1d:
-                this.ORA(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.ORA(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x19:
-                this.ORA(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.ORA(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x01:
-                this.ORA(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ORA(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x11:
-                this.ORA(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.ORA(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x48:
-                this.PHA();
-                this.ip += 1;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.PHA();
+                    this.ip += 1;
+                    this.tLim = 3;
+                }
                 break;
             case 0x08:
-                this.PHP();
-                this.ip += 1;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.PHP();
+                    this.ip += 1;
+                    this.tLim = 3;
+                }
                 break;
             case 0x68:
-                this.PLA();
-                this.ip += 1;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.PLA();
+                    this.ip += 1;
+                    this.tLim = 4;
+                }
                 break;
             case 0x28:
-                this.PLP();
-                this.ip += 1;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.PLP();
+                    this.ip += 1;
+                    this.tLim = 4;
+                }
                 break;
+            //switch (this.t) {
+            //    case 0:
+            //        this.ip += 1;
+            //        this.tLim = 4;
+            //        break;
+            //    case 3:
+            //        this.PLP();
+            //        break;
+            //}
+            //break;
             case 0x2a:
-                this.ROL(this.addrRA);
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ROL(this.addrRA);
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x26:
-                this.ROL(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.ROL(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x36:
-                this.ROL(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ROL(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x2e:
-                this.ROL(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ROL(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x3e:
-                this.ROL(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.ROL(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x6a:
-                this.ROR(this.addrRA);
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ROR(this.addrRA);
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x66:
-                this.ROR(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.ROR(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x76:
-                this.ROR(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ROR(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x6e:
-                this.ROR(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ROR(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x7e:
-                this.ROR(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.ROR(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x00:
-                this.BRK();
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.BRK();
+                    this.tLim = 7;
+                }
                 break;
             case 0x40:
-                this.RTI();
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RTI();
+                    this.tLim = 6;
+                }
                 break;
             case 0xe9:
-                this.SBC(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.SBC(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xe5:
-                this.SBC(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.SBC(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xf5:
-                this.SBC(this.getByteZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.SBC(this.getByteZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xed:
-                this.SBC(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.SBC(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xfd:
-                this.SBC(this.getByteAbsoluteX());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.SBC(this.getByteAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xf9:
-                this.SBC(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.SBC(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xe1:
-                this.SBC(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SBC(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xf1:
-                this.SBC(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.SBC(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x38:
-                this.flgCarry = 1;
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.flgCarry = 1;
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xf8:
-                this.flgDecimalMode = 1;
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.flgDecimalMode = 1;
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x78:
-                this.flgInterruptDisable = 1;
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.SEI();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
+            //switch (this.t) {
+            //    case 0:
+            //        this.ip += 1;
+            //        this.tLim = 2;
+            //        break;
+            //    case 1:
+            //        this.SEI();
+            //        break;
+            //}
+            //break;
             case 0x85:
-                this.STA(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.STA(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x95:
-                this.STA(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STA(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x8d:
-                this.STA(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STA(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x9d:
-                this.STA(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.STA(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0x99:
-                this.STA(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.STA(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0x81:
-                this.STA(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.STA(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x91:
-                this.STA(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.STA(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x86:
-                this.STX(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.STX(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x96:
-                this.STX(this.getAddrZeroPageY());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STX(this.getAddrZeroPageY());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x8e:
-                this.STX(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STX(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x84:
-                this.STY(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.STY(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x94:
-                this.STY(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STY(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x8c:
-                this.STY(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.STY(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xaa:
-                this.TAX();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TAX();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xa8:
-                this.TAY();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TAY();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xba:
-                this.TSX();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TSX();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x8a:
-                this.TXA();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TXA();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x9a:
-                this.TXS();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TXS();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x98:
-                this.TYA();
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.TYA();
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x20:
-                this.JSR(this.getAddrAbsolute());
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.JSR(this.getAddrAbsolute());
+                    this.tLim = 6;
+                }
                 break;
             case 0x60:
-                this.RTS();
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RTS();
+                    this.tLim = 6;
+                }
                 break;
             //unofficial opcodes below
             case 0x1a:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x3a:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x5a:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x7a:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xda:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0xfa:
-                this.ip += 1;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 1;
+                    this.tLim = 2;
+                }
                 break;
             case 0x04:
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x14:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x34:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x44:
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x54:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x64:
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x74:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xd4:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xf4:
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x80:
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x82:
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc2:
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xe2:
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x89:
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x0c:
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x1c:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x3c:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x5c:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0x7c:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xdc:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xfc:
-                this.getAddrAbsoluteX();
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.getAddrAbsoluteX();
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xeb:
-                this.SBC(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.SBC(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xc3:
-                this.DCP(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0xc7:
-                this.DCP(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0xcf:
-                this.DCP(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0xd3:
-                this.DCP(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0xd7:
-                this.DCP(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xdb:
-                this.DCP(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xdf:
-                this.DCP(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.DCP(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xe3:
-                this.ISC(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0xe7:
-                this.ISC(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0xef:
-                this.ISC(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0xf3:
-                this.ISC(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0xf7:
-                this.ISC(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xfb:
-                this.ISC(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xff:
-                this.ISC(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.ISC(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0xab:
-                this.LAX(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.LAX(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xa7:
-                this.LAX(this.getByteZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.LAX(this.getByteZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0xb7:
-                this.LAX(this.getByteZeroPageY());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LAX(this.getByteZeroPageY());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0xaf:
-                this.LAX(this.getByteAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.LAX(this.getByteAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0xbf:
-                this.LAX(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LAX(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             case 0xa3:
-                this.LAX(this.getByteIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.LAX(this.getByteIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0xb3:
-                this.LAX(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 5 + this.pageCross;
+                if (this.t === 0) {
+                    this.LAX(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 5 + this.pageCross;
+                }
                 break;
             case 0x83:
-                this.SAX(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SAX(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x87:
-                this.SAX(this.getAddrZeroPage());
-                this.ip += 2;
-                this.sleep = 3;
+                if (this.t === 0) {
+                    this.SAX(this.getAddrZeroPage());
+                    this.ip += 2;
+                    this.tLim = 3;
+                }
                 break;
             case 0x8f:
-                this.SAX(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.SAX(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 4;
+                }
                 break;
             case 0x97:
-                this.SAX(this.getAddrZeroPageY());
-                this.ip += 2;
-                this.sleep = 4;
+                if (this.t === 0) {
+                    this.SAX(this.getAddrZeroPageY());
+                    this.ip += 2;
+                    this.tLim = 4;
+                }
                 break;
             case 0x03:
-                this.SLO(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x07:
-                this.SLO(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.SLO(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x0f:
-                this.SLO(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x13:
-                this.SLO(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x17:
-                this.SLO(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x1b:
-                this.SLO(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x1f:
-                this.SLO(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.SLO(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x23:
-                this.RLA(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x27:
-                this.RLA(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.RLA(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x2f:
-                this.RLA(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x33:
-                this.RLA(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x37:
-                this.RLA(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x3b:
-                this.RLA(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x3f:
-                this.RLA(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.RLA(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x63:
-                this.RRA(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x67:
-                this.RRA(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.RRA(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x6f:
-                this.RRA(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x73:
-                this.RRA(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x77:
-                this.RRA(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x7b:
-                this.RRA(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x7f:
-                this.RRA(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.RRA(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x43:
-                this.SRE(this.getAddrIndirectX());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrIndirectX());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x47:
-                this.SRE(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.SRE(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 5;
+                }
                 break;
             case 0x4f:
-                this.SRE(this.getAddrAbsolute());
-                this.ip += 3;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrAbsolute());
+                    this.ip += 3;
+                    this.tLim = 6;
+                }
                 break;
             case 0x53:
-                this.SRE(this.getAddrIndirectY());
-                this.ip += 2;
-                this.sleep = 8;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrIndirectY());
+                    this.ip += 2;
+                    this.tLim = 8;
+                }
                 break;
             case 0x57:
-                this.SRE(this.getAddrZeroPageX());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrZeroPageX());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x5b:
-                this.SRE(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x5f:
-                this.SRE(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 7;
+                if (this.t === 0) {
+                    this.SRE(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 7;
+                }
                 break;
             case 0x0b:
-                this.ANC(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ANC(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x2b:
-                this.ANC(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ANC(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x4b:
-                this.ALR(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ALR(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x6b:
-                this.ARR(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.ARR(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0xcb:
-                this.AXS(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.AXS(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x9c:
-                this.SYA(this.getAddrAbsoluteX());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.SYA(this.getAddrAbsoluteX());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0x9e:
-                this.SXA(this.getAddrAbsoluteY());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.SXA(this.getAddrAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0x8b:
-                this.XAA(this.getByteImmediate());
-                this.ip += 2;
-                this.sleep = 2;
+                if (this.t === 0) {
+                    this.XAA(this.getByteImmediate());
+                    this.ip += 2;
+                    this.tLim = 2;
+                }
                 break;
             case 0x93:
-                this.AXA(this.getByteIndirectY());
-                this.ip += 2;
-                this.sleep = 6;
+                if (this.t === 0) {
+                    this.AXA(this.getByteIndirectY());
+                    this.ip += 2;
+                    this.tLim = 6;
+                }
                 break;
             case 0x9b:
-                this.XAS(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.XAS(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0x9f:
-                this.AXA(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 5;
+                if (this.t === 0) {
+                    this.AXA(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 5;
+                }
                 break;
             case 0xbb:
-                this.LAR(this.getByteAbsoluteY());
-                this.ip += 3;
-                this.sleep = 4 + this.pageCross;
+                if (this.t === 0) {
+                    this.LAR(this.getByteAbsoluteY());
+                    this.ip += 3;
+                    this.tLim = 4 + this.pageCross;
+                }
                 break;
             default:
                 throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
         }
-        if (this.sleep === 0) {
+        if (this.tLim === 0) {
             throw 'sleep not set';
         }
-        this.sleep--;
         this.ip &= 0xffff;
     };
     return Mos6502;
@@ -2938,390 +3852,6 @@ var NesEmulator = (function () {
         this.icycle++;
     };
     return NesEmulator;
-})();
-var PPU = (function () {
-    function PPU(memory, vmemory, cpu) {
-        this.vmemory = vmemory;
-        this.cpu = cpu;
-        /**
-         *
-            Address range	Size	Description
-            $0000-$0FFF	$1000	Pattern table 0
-            $1000-$1FFF	$1000	Pattern Table 1
-            $2000-$23FF	$0400	Nametable 0
-            $2400-$27FF	$0400	Nametable 1
-            $2800-$2BFF	$0400	Nametable 2
-            $2C00-$2FFF	$0400	Nametable 3
-            $3000-$3EFF	$0F00	Mirrors of $2000-$2EFF
-            $3F00-$3F1F	$0020	Palette RAM indexes
-            $3F20-$3FFF	$00E0	Mirrors of $3F00-$3F1F
-    
-         */
-        /**
-        *The PPU uses the current VRAM address for both reading and writing PPU memory thru $2007, and for
-        * fetching nametable data to draw the background. As it's drawing the background, it updates the
-        * address to point to the nametable data currently being drawn. Bits 10-11 hold the base address of
-        * the nametable minus $2000. Bits 12-14 are the Y offset of a scanline within a tile.
-           The 15 bit registers t and v are composed this way during rendering:
-           yyy NN YYYYY XXXXX
-           ||| || ||||| +++++-- coarse X scroll
-           ||| || +++++-------- coarse Y scroll
-           ||| ++-------------- nametable select
-           +++----------------- fine Y scroll
-        */
-        this._v = 0; // Current VRAM address (15 bits)
-        this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
-        this.x = 0; // Fine X scroll (3 bits)
-        this.w = 0; // First or second write toggle (1 bit)
-        this.daddrWrite = 0;
-        this.addrSpritePatternTable = 0;
-        this.addrScreenPatternTable = 0;
-        this.flgVblank = false;
-        this.nmi_output = false;
-        this.spriteHeight = 8;
-        this._imageGrayscale = false;
-        this._showBgInLeftmost8Pixels = false;
-        this._showSpritesInLeftmost8Pixels = false;
-        this._showBg = false;
-        this._showSprites = false;
-        this._emphasizeRed = false;
-        this._emphasizeGreen = false;
-        this._emphasizeBlue = false;
-        this.imageGrayscale = false;
-        this.showBgInLeftmost8Pixels = false;
-        this.showSpritesInLeftmost8Pixels = false;
-        this.showBg = false;
-        this.showSprites = false;
-        this.emphasizeRed = false;
-        this.emphasizeGreen = false;
-        this.emphasizeBlue = false;
-        this.sy = PPU.syFirstVisible;
-        this.sx = PPU.sxMin;
-        this.dataAddr = 0;
-        this.iFrame = 0;
-        this.icycle = 0;
-        this.colors = [
-            0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
-            0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
-            0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
-            0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
-            0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
-            0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
-            0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
-            0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
-        ];
-        if (vmemory.size() !== 0x4000)
-            throw 'insufficient Vmemory size';
-        memory.shadowSetter(0x2000, 0x2007, this.setter.bind(this));
-        memory.shadowGetter(0x2000, 0x2007, this.getter.bind(this));
-    }
-    Object.defineProperty(PPU.prototype, "v", {
-        get: function () {
-            return this._v;
-        },
-        set: function (value) {
-            this._v = value;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    PPU.prototype.setCtx = function (ctx) {
-        this.ctx = ctx;
-        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
-        this.buf = new ArrayBuffer(this.imageData.data.length);
-        this.buf8 = new Uint8ClampedArray(this.buf);
-        this.data = new Uint32Array(this.buf);
-    };
-    PPU.prototype.getter = function (addr) {
-        switch (addr) {
-            case 0x2002:
-                {
-                    /*
-                    7  bit  0
-                    ---- ----
-                    VSO. ....
-                    |||| ||||
-                    |||+-++++- Least significant bits previously written into a PPU register
-                    |||        (due to register not being updated for this address)
-                    ||+------- Sprite overflow. The intent was for this flag to be set
-                    ||         whenever more than eight sprites appear on a scanline, but a
-                    ||         hardware bug causes the actual behavior to be more complicated
-                    ||         and generate false positives as well as false negatives; see
-                    ||         PPU sprite evaluation. This flag is set during sprite
-                    ||         evaluation and cleared at dot 1 (the second dot) of the
-                    ||         pre-render line.
-                    |+-------- Sprite 0 Hit.  Set when a nonzero pixel of sprite 0 overlaps
-                    |          a nonzero background pixel; cleared at dot 1 of the pre-render
-                    |          line.  Used for raster timing.
-                    +--------- Vertical blank has started (0: not in vblank; 1: in vblank).
-                               Set at dot 1 of line 241 (the line *after* the post-render
-                               line); cleared after reading $2002 and at dot 1 of the
-                               pre-render line.
-                    Notes
-                    Reading the status register will clear D7 mentioned above and also the address latch used by PPUSCROLL and PPUADDR. It does not clear the sprite 0 hit or overflow bit.
-                    Once the sprite 0 hit flag is set, it will not be cleared until the end of the next vertical blank. If attempting to use this flag for raster timing, it is important to ensure that the sprite 0 hit check happens outside of vertical blank, otherwise the CPU will "leak" through and the check will fail. The easiest way to do this is to place an earlier check for D6 = 0, which will wait for the pre-render scanline to begin.
-                    If using sprite 0 hit to make a bottom scroll bar below a vertically scrolling or freely scrolling playfield, be careful to ensure that the tile in the playfield behind sprite 0 is opaque.
-                    Sprite 0 hit is not detected at x=255, nor is it detected at x=0 through 7 if the background or sprites are hidden in this area.
-                    See: PPU rendering for more information on the timing of setting and clearing the flags.
-                    Some Vs. System PPUs return a constant value in D4-D0 that the game checks.
-                    Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
-                  */
-                    this.w = 0;
-                    var res = this.flgVblank ? (1 << 7) : 0;
-                    //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
-                    this.flgVblank = false;
-                    return res;
-                }
-            case 0x2007:
-                {
-                    var res = this.vmemory.getByte(this.v & 0x3fff);
-                    this.v += this.daddrWrite;
-                    this.v &= 0x3fff;
-                    return res;
-                }
-            default:
-                throw 'unimplemented read from addr ' + addr;
-                return 0;
-        }
-    };
-    PPU.prototype.setter = function (addr, value) {
-        value &= 0xff;
-        switch (addr) {
-            case 0x2000:
-                this.t = (this.v & 0x73ff) | ((value & 3) << 10);
-                this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
-                this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
-                this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
-                this.spriteHeight = value & 0x20 ? 16 : 8;
-                this.nmi_output = !!(value & 0x80);
-                break;
-            case 0x2001:
-                var x = this.showBg;
-                this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
-                this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels = !!(value & 0x02);
-                this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
-                this.showBg = this._showBg = !!(value & 0x08);
-                this.showSprites = this._showSprites = !!(value & 0x10);
-                this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
-                this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
-                this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
-                //if (x != this.showBg)
-                //    console.log('show:', x, '->', this.showBg);
-                break;
-            case 0x2005:
-                if (this.w === 0) {
-                    this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
-                    this.x = value & 7;
-                }
-                else {
-                    this.t = (this.t & 0x7c1f) | (((value >> 3) & 0x1f) << 5);
-                    this.t = (this.t & 0x0fff) | (value & 7) << 10;
-                }
-                this.w = 1 - this.w;
-                break;
-            // Used to set the address of PPU Memory to be accessed via 0x2007
-            // The first write to this register will set 8 lower address bits.
-            // The second write will set 6 upper bits.The address will increment
-            // either by 1 or by 32 after each access to $2007.
-            case 0x2006:
-                if (this.w === 0) {
-                    this.t = (this.t & 0x00ff) | ((value & 0x3f) << 8);
-                }
-                else {
-                    this.t = (this.t & 0xff00) + (value & 0xff);
-                    this.v = this.t;
-                }
-                this.w = 1 - this.w;
-                break;
-            case 0x2007:
-                var vold = this.v;
-                this.vmemory.setByte(this.v & 0x3fff, value);
-                this.v += this.daddrWrite;
-                this.v &= 0x3fff;
-                //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
-                //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
-                break;
-        }
-    };
-    PPU.prototype.incrementX = function () {
-        this.x++;
-        if (this.x === 8) {
-            this.x = 0;
-            // Coarse X increment
-            // The coarse X component of v needs to be incremented when the next tile is reached.
-            // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
-            // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
-            if ((this.v & 0x001F) === 31) {
-                this.v &= ~0x001F; // coarse X = 0
-                this.v ^= 0x0400; // switch horizontal nametable
-            }
-            else {
-                this.v += 1; // increment coarse X
-            }
-        }
-    };
-    PPU.prototype.incrementY = function () {
-        this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
-        this.v ^= 0x0400; // switch horizontal nametable
-        // If rendering is enabled, fine Y is incremented at dot 256 of each scanline, overflowing to coarse Y, 
-        // and finally adjusted to wrap among the nametables vertically.
-        // Bits 12- 14 are fine Y.Bits 5- 9 are coarse Y.Bit 11 selects the vertical nametable.
-        if ((this.v & 0x7000) !== 0x7000)
-            this.v += 0x1000; // increment fine Y
-        else {
-            this.v &= ~0x7000; // fine Y = 0
-            var y = (this.v & 0x03E0) >> 5; // let y = coarse Y
-            if (y === 29) {
-                y = 0; // coarse Y = 0
-                this.v ^= 0x0800; // switch vertical nametable
-            }
-            else if (y === 31) {
-                y = 0; // coarse Y = 0, nametable not switched
-            }
-            else {
-                y += 1; // increment coarse Y
-            }
-            this.v = (this.v & ~0x03E0) | (y << 5); // put coarse Y back into v
-        }
-    };
-    PPU.prototype.getNameTable = function (i) {
-        var st = '';
-        for (var y = 0; y < 30; y++) {
-            for (var x = 0; x < 32; x++) {
-                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
-            }
-            st += '\n';
-        }
-        console.log(st);
-    };
-    PPU.prototype.step = function () {
-        if (this.sx === 0 && this.sy === PPU.syPostRender) {
-            //console.log('ppu vblank start', this.icycle);
-            this.sx = PPU.sxMin;
-            this.imageData.data.set(this.buf8);
-            this.ctx.putImageData(this.imageData, 0, 0);
-            this.iFrame++;
-            this.dataAddr = 0;
-            this.flgVblank = true;
-            this.imageGrayscale = this._imageGrayscale;
-            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
-            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
-            this.showBg = this._showBg;
-            this.showSprites = this._showSprites;
-            this.emphasizeRed = this._emphasizeRed;
-            this.emphasizeGreen = this._emphasizeGreen;
-            this.emphasizeBlue = this._emphasizeBlue;
-        }
-        else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
-            //vblank
-            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
-                this.nmi_output = false;
-                this.cpu.RequestNMI();
-            }
-        }
-        else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
-            //beginning of screen
-            //console.log('ppu vblank end bg:',this.showBg );
-            this.flgVblank = false;
-            if (this.showBg || this.showSprites)
-                this.v = this.t;
-        }
-        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
-            if (this.showBg) {
-                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-                //
-                // The address to be fetched during rendering can be deduced from v in the following way:
-                //   tile address      = 0x2000 | (v & 0x0FFF)
-                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-                //
-                // The low 12 bits of the attribute address are composed in the following way:
-                //   NN 1111 YYY XXX
-                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-                //   || ++++---------- attribute offset (960 bytes)
-                //   ++--------------- nametable select
-                var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-                var attribute = this.vmemory.getByte(addrAttribute);
-                var addrTile = 0x2000 | (this.v & 0x0fff);
-                var itile = this.vmemory.getByte(addrTile);
-                var tileCol = 7 - (this.x);
-                var tileRow = this.v >> 12;
-                var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
-                var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
-                var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
-                var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
-                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
-                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                    They can still be shown using the background palette hack, explained below.*/
-                if ((ipalette & 3) === 0)
-                    ipalette = 0;
-                var addrPalette = 0x3f00 + ipalette;
-                var icolor = this.vmemory.getByte(addrPalette);
-                var color = this.colors[icolor];
-                this.data[this.dataAddr] = color;
-                this.dataAddr++;
-            }
-            this.incrementX();
-        }
-        this.sx++;
-        if (this.sx === PPU.sxMax + 1) {
-            //end of scanline
-            this.sx = 0;
-            this.sy++;
-            if (this.sy === PPU.syPreRender + 1) {
-                this.sy = PPU.syFirstVisible;
-            }
-            else {
-                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
-                    this.incrementY();
-                }
-            }
-        }
-    };
-    PPU.syFirstVisible = 0;
-    PPU.syPostRender = 240;
-    PPU.syPreRender = 261;
-    PPU.sxMin = 0;
-    PPU.sxMax = 340;
-    return PPU;
-})();
-///<reference path="Memory.ts"/>
-var RepeatedMemory = (function () {
-    function RepeatedMemory(count, memory) {
-        this.count = count;
-        this.memory = memory;
-        this.sizeI = this.memory.size() * this.count;
-    }
-    RepeatedMemory.prototype.size = function () {
-        return this.sizeI;
-    };
-    RepeatedMemory.prototype.getByte = function (addr) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.getByte(addr % this.sizeI);
-    };
-    RepeatedMemory.prototype.setByte = function (addr, value) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.setByte(addr % this.sizeI, value);
-    };
-    return RepeatedMemory;
-})();
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(memory) {
-        this.memory = memory;
-    }
-    ROM.prototype.size = function () {
-        return this.memory.length;
-    };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    ROM.prototype.setByte = function (addr, value) {
-    };
-    return ROM;
 })();
 ///<reference path="NesEmulator.ts"/>
 var StepTest = (function () {
