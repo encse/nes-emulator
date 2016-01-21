@@ -77,6 +77,11 @@
     private getter(addr: number) {
         switch(addr) {
             case 0x4015:
+                if(this.cpu.irqLine ===0) {
+                    console.log('APU irqline == 1');
+                    this.cpu.irqLine = 1;
+                }
+
                 return this.lc0 > 0 ? 1 : 0;
         }
          // When $4015 is read, the status of the channels' length counters and bytes
@@ -174,16 +179,13 @@
                 // CPU's IRQ line is asserted.
                 this.idividerStep = this.isequencerStep = 0;
                 this.mode = (value >> 7) & 1;
-                if (this.mode !== 0) {
-                    console.log('mode 1 not supported');
-                    return;
-                }
-                this.irqDisabled = (value >> 6) & 1;
+                if (this.mode === 1)
+                    this.clockSequencer();
 
-                if (this.irqDisabled === 0) {
-                    console.log('APU', this.irqDisabled ? 'irq disabled' : 'irq enabled');
-                    this.cpu.RequestIRQ();
-                }
+                this.irqDisabled = (value >> 6) & 1;
+               // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
+                console.log('APU', this.irqDisabled || this.mode? 'frame irq disabled' : 'frame irq enabled', value.toString(2));
+                this.cpu.irqLine = !this.mode && !this.irqDisabled ? 0 : 1;
                
                 break;
         }
@@ -199,33 +201,22 @@
         if (this.idividerStep === 89490) {
 
             this.idividerStep = 0;
-            this.isequencerStep++;
-            if (this.mode === 0) {
-                if (this.isequencerStep === 2) {
-                    if (!this.lc0Halt && this.lc0 > 0) {
-                        this.lc0--;
-                        if (!this.lc0 && this.irqDisabled === 0)
-                            this.cpu.RequestIRQ();
-
-                    }
-                    this.isequencerStep = 0;
-                }
-            }
-            //else if (this.mode === 1) {
-            //    if (this.isequencerStep === 0 || this.isequencerStep === 2) {
-            //        if (!this.lc0Halt && this.lc0 > 0) {
-            //            this.lc0--;
-            //            if (!this.lc0 && this.irqDisabled === 0)
-            //                this.cpu.RequestIRQ();
-
-            //        }
-            //    }
-            //    else if (this.isequencerStep === 5) {
-            //        this.isequencerStep = 0;
-            //    }
-            //}
+            this.clockSequencer();
+           
         }
 
     }
 
+    private clockSequencer() {
+       
+        if (this.isequencerStep === 0 || this.isequencerStep === 2) {
+            if (!this.lc0Halt && this.lc0 > 0) {
+                this.lc0--;
+            }
+        }
+
+        this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
+
+        this.cpu.irqLine = !this.mode && !this.irqDisabled && this.isequencerStep === 3 ? 0 : 1;
+    }
 }

@@ -20,27 +20,56 @@ class Mos6502 {
     private flgCarry: number = 0;
     private flgZero: number = 0;
     private flgInterruptDisable: number = 0;
+
+    //private get flgInterruptDisable() {
+    //    return this._flgInterruptDisable;
+    //}
+
+
+    //private set flgInterruptDisable(v) {
+    //    //console.log('flgInterruptDisable', v);
+    //    this._flgInterruptDisable = v;
+    //}
+
+
+    number = 0;
     private flgDecimalMode: number = 0;
     private flgBreakCommand: number = 0;
     private flgOverflow: number = 0;
     private flgNegative: number = 0;
 
+    public nmiLine = 1;
+    private nmiLinePrev = 1;
+    private nmiDetected: boolean;
     private nmiRequested: boolean;
-    private irqRequested: boolean;
+
+    private irqRequested: boolean = false;
+    public irqLine = 1;
+    private irqDetected: boolean;
+
+    private PollInterrupts() {
+        if (this.nmiDetected) {
+            this.nmiRequested = true;
+            this.nmiDetected = false
+        }
+        if (this.irqDetected) {
+            console.log('irq requested');
+            this.irqRequested = true;
+        }
+    }
+
+    private DetectInterrupts() {
+
+        if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
+            this.nmiDetected = true;
+        }
+        this.nmiLinePrev = this.nmiLine;
+        this.irqDetected = this.irqLine === 0;
+    }
 
     public Reset() {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
-    }
-
-    public RequestNMI() {
-        console.log('RequestNMI');
-        this.nmiRequested = true;
-    }
-
-    public RequestIRQ() {
-        console.log('RequestIRQ');
-        this.irqRequested = true;
     }
 
 
@@ -972,7 +1001,9 @@ class Mos6502 {
 
    */
     private PLP(): void {
-        this.rP = this.popByte();
+        var v = this.popByte();
+        this.rP = v;
+        console.log('plp', 'irq dsiabled:', this.flgInterruptDisable, 'v:', v.toString(2));
         
     }
 
@@ -1020,8 +1051,7 @@ class Mos6502 {
     }
 
     private NMI(): void {
-        console.log('process NMI');
-        this.nmiRequested = false;
+       // console.log('process NMI');
 
         this.pushWord(this.ip);
         this.pushByte(this.rP);
@@ -1030,8 +1060,10 @@ class Mos6502 {
     }
 
     private IRQ(): void {
+        if (!this.irqRequested)
+            console.log('wtf');
         console.log('process irq');
-        this.irqRequested = false;
+       
 
         this.pushWord(this.ip);
         this.pushByte(this.rP);
@@ -1265,21 +1297,37 @@ class Mos6502 {
 
     public step() {
 
+        if (this.t === this.tLim - 1)
+            this.PollInterrupts();
+
         if (this.t === this.tLim)
             this.t = 0;
 
         if (this.t === 0) {
-            if (this.nmiRequested) {
+            const nmiWasRequested = this.nmiRequested;
+            const irqWasRequested = this.irqRequested;
+            this.irqRequested = false;
+            this.nmiRequested = false;
+
+            if (nmiWasRequested) {
                 this.NMI();
+                
+                this.t = this.tLim = 0;
                 return;
             }
-            if (this.irqRequested && this.flgInterruptDisable === 0) {
+            if (irqWasRequested && !this.flgInterruptDisable) {
                 this.IRQ();
+                this.t = this.tLim = 0;
                 return;
             }
+
+            //if (irqWasRequested && this.flgInterruptDisable) {
+            //    console.log('flgInterruptDisable');
+            //}
         }
      
         this.processInstruction();
+        this.DetectInterrupts();
         this.t++;
     }
 
@@ -1330,17 +1378,18 @@ class Mos6502 {
 
             case 0x18: if(this.t === 0) {this.CLC(); this.ip += 1; this.tLim = 2;} break;
             case 0xd8: if(this.t === 0) {this.CLD(); this.ip += 1; this.tLim = 2;} break;
-            case 0x58: if (this.t === 0) { this.CLI(); this.ip += 1; this.tLim = 2; } break;
-                //switch (this.t) {
-                //    case 0:
-                //        this.ip += 1;
-                //        this.tLim = 2;
-                //        break;
-                //    case 1:
-                //        this.CLI();
-                //        break;
-                //}
-                //break;
+            case 0x58:
+                //if (this.t === 0) { this.CLI(); this.ip += 1; this.tLim = 2; } break;
+                switch (this.t) {
+                    case 0:
+                        this.ip += 1;
+                        this.tLim = 2;
+                        break;
+                    case 1:
+                        this.CLI();
+                        break;
+                }
+                break;
             case 0xb8: if(this.t === 0) {this.CLV(); this.ip += 1; this.tLim = 2;} break;
 
             case 0xc9: if(this.t === 0) {this.CMP(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;
@@ -1431,21 +1480,27 @@ class Mos6502 {
             case 0x48: if(this.t === 0) {this.PHA(); this.ip += 1; this.tLim = 3;} break;
             case 0x08: if(this.t === 0) {this.PHP(); this.ip += 1; this.tLim = 3;} break;
             case 0x68: if(this.t === 0) {this.PLA(); this.ip += 1; this.tLim = 4;} break;
-            case 0x28: if (this.t === 0) { this.PLP(); this.ip += 1; this.tLim = 4; } break;
-                //switch (this.t) {
-                //    case 0:
+            case 0x28:
+                //if (this.t === 0) { this.PLP(); this.ip += 1; this.tLim = 4; } break;
+                switch (this.t) {
+                    case 0:
 
-                //        this.ip += 1;
-                //        this.tLim = 4;
-                //        break;
-                //    case 3:
-                //        this.PLP();
+                        this.ip += 1;
+                        this.tLim = 4;
+                        break;
+                    case 3:
+                        this.PLP();
 
-                //        break;
-                //}
-                //break;
+                        break;
+                }
+                break;
 
-            case 0x2a: if(this.t === 0) {this.ROL(this.addrRA); this.ip += 1; this.tLim = 2;} break;
+            case 0x2a:
+                
+                if (this.t === 0) {
+                    this.ROL(this.addrRA); this.ip += 1; this.tLim = 2;
+                }
+                break;
             case 0x26: if(this.t === 0) {this.ROL(this.getAddrZeroPage()); this.ip += 2; this.tLim = 5;} break;
             case 0x36: if(this.t === 0) {this.ROL(this.getAddrZeroPageX()); this.ip += 2; this.tLim = 6;} break;
             case 0x2e: if(this.t === 0) {this.ROL(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
@@ -1471,17 +1526,18 @@ class Mos6502 {
 
             case 0x38: if(this.t === 0) {/*SEC*/ this.flgCarry = 1; this.ip += 1; this.tLim = 2;} break;
             case 0xf8: if(this.t === 0) {/*SED*/ this.flgDecimalMode = 1; this.ip += 1; this.tLim = 2;} break;
-            case 0x78: if (this.t === 0) {/*SED*/ this.SEI(); this.ip += 1; this.tLim = 2; } break;
-                //switch (this.t) {
-                //    case 0:
-                //        this.ip += 1;
-                //        this.tLim = 2;
-                //        break;
-                //    case 1:
-                //        this.SEI();
-                //        break;
-                //}
-                //break;
+            case 0x78:
+                //if (this.t === 0) {/*SED*/ this.SEI(); this.ip += 1; this.tLim = 2; } break;
+                switch (this.t) {
+                    case 0:
+                        this.ip += 1;
+                        this.tLim = 2;
+                        break;
+                    case 1:
+                        this.SEI();
+                        break;
+                }
+                break;
               
 
             case 0x85: if(this.t === 0) {this.STA(this.getAddrZeroPage()); this.ip += 2; this.tLim = 3;} break;

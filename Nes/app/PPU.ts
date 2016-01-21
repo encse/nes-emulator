@@ -317,9 +317,11 @@
             //vblank
             if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
                 this.nmi_output = false;
-                this.cpu.RequestNMI();
+                this.cpu.nmiLine = 0;
             }
-
+            if (this.sx === 10 && this.sy === PPU.syPostRender) {
+                this.cpu.nmiLine = 1;
+            }
           
         } else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
             //beginning of screen
