@@ -50,9 +50,9 @@ class Mos6502 {
     private PollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
-            this.nmiDetected = false
+            this.nmiDetected = false;
         }
-        if (this.irqDetected) {
+        if (this.irqDetected && !this.flgInterruptDisable) {
             console.log('irq requested');
             this.irqRequested = true;
         }
@@ -451,7 +451,7 @@ class Mos6502 {
     }
     private CLI(): void {
         console.log('$' + this.ip.toString(16),'CLI');
-        this.flgInterruptDisable= 0;
+        this.flgInterruptDisable = 0;
     }
     private SEI(): void {
         console.log('$' + this.ip.toString(16), 'SEI');
@@ -1317,7 +1317,7 @@ class Mos6502 {
                 this.t = this.tLim = 0;
                 return;
             }
-            if (irqWasRequested && !this.flgInterruptDisable) {
+            if (irqWasRequested) {
                 this.IRQ();
                 this.t = this.tLim = 0;
                 return;

@@ -515,7 +515,7 @@ var Mos6502 = (function () {
             this.nmiRequested = true;
             this.nmiDetected = false;
         }
-        if (this.irqDetected) {
+        if (this.irqDetected && !this.flgInterruptDisable) {
             console.log('irq requested');
             this.irqRequested = true;
         }
@@ -1649,7 +1649,7 @@ var Mos6502 = (function () {
                 this.t = this.tLim = 0;
                 return;
             }
-            if (irqWasRequested && !this.flgInterruptDisable) {
+            if (irqWasRequested) {
                 this.IRQ();
                 this.t = this.tLim = 0;
                 return;
