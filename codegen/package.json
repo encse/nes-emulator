@@ -1,0 +1,10 @@
+{
+  "name": "codegen",
+  "version": "0.0.0",
+  "description": "codegen",
+  "main": "app.js",
+  "author": {
+    "name": "encse",
+    "email": ""
+  }
+}
