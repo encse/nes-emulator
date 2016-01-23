@@ -47,7 +47,7 @@ class Mos6502 {
     public irqLine = 1;
     private irqDetected: boolean;
 
-    private PollInterrupts() {
+    private pollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
@@ -940,7 +940,7 @@ class Mos6502 {
         The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
      */
     private JSR(addr: number): void {
-        console.log('$' + this.ip.toString(16), 'JSR');
+       // console.log('$' + this.ip.toString(16), 'JSR');
         this.pushWord(this.ip + 3 - 1);
         this.ip = addr;
     }
@@ -950,7 +950,7 @@ class Mos6502 {
         The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
      */
     private RTS(): void {
-        console.log('$'+this.ip.toString(16), 'RTS');
+       // console.log('$'+this.ip.toString(16), 'RTS');
         this.ip = this.popWord() + 1;
     }
 
@@ -1043,13 +1043,43 @@ class Mos6502 {
         and not just 1.
 
    */
+    private addrBrk: number = 0;
     private BRK(): void {
-        console.log('process BRK');
-        this.pushWord(this.ip + 2);
-        this.flgBreakCommand = 1;
-        this.PHP();
-        this.flgInterruptDisable = 1;
-        this.ip = this.getWord(this.addrIRQ);
+        
+        switch(this.t) {
+            case 0:
+                //console.log('process BRK');
+                this.tLim = 7;
+                break;
+            case 1:
+                this.getByte(this.ip + 1);
+                break;
+            case 2:
+                this.pushHi(this.ip + 2);
+                break;
+            case 3:
+                this.pushLo(this.ip + 2);
+                break;
+            case 4:
+                this.pollInterrupts();
+                var nmi = this.nmiRequested;
+                var irq = this.irqRequested;
+
+                this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
+                this.flgBreakCommand = 1;
+                this.PHP();
+                break;
+            case 5:
+                this.ip = this.getByte(this.addrBrk);
+                this.flgInterruptDisable = 1;
+                break;
+            case 6:
+              //  this.pollInterrupts();
+             //   this.nmiRequested = this.irqRequested = false;
+
+                this.ip += this.getByte(this.addrBrk + 1) << 8;
+                break;
+        }
     }
 
     private NMI(): void {
@@ -1271,6 +1301,12 @@ class Mos6502 {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
     }
+    private pushHi(word: number) {
+        this.pushByte(word >> 8);
+    }
+    private pushLo(word: number) {
+        this.pushByte(word & 0xff);
+    }
 
     private popByte():number{
         this.sp = this.sp === 0xff ? 0 : this.sp + 1;
@@ -1300,7 +1336,7 @@ class Mos6502 {
     public step() {
 
         if (this.t === this.tLim - 1)
-            this.PollInterrupts();
+            this.pollInterrupts();
 
         if (this.t === this.tLim)
             this.t = 0;
@@ -1332,6 +1368,8 @@ class Mos6502 {
         this.DetectInterrupts();
         this.t++;
     }
+
+    //["0x7d ADC getByteAbsoluteX 3 4+pageCross"]
 
     currentOpcode : number;
     processInstruction() {
@@ -1376,7 +1414,19 @@ class Mos6502 {
             case 0x70: if(this.t === 0) {this.BVS(this.getSByteRelative()); this.ip += 2; this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;} break;
 
             case 0x24: if(this.t === 0) {this.BIT(this.getByteZeroPage()); this.ip += 2; this.tLim = 3;} break;
-            case 0x2c: if(this.t === 0) {this.BIT(this.getByteAbsolute()); this.ip += 3; this.tLim = 4;} break;
+            case 0x2c:
+                //if (this.t === 0) { this.BIT(this.getByteAbsolute()); this.ip += 3; this.tLim = 4; } break;
+                switch(this.t) {
+                    case 0:
+                       
+                        this.tLim = 4;
+                        break;
+                    case 3:
+                        this.BIT(this.getByteAbsolute());
+                        this.ip += 3;
+                        break;
+                }
+                break;
 
             case 0x18: if(this.t === 0) {this.CLC(); this.ip += 1; this.tLim = 2;} break;
             case 0xd8: if(this.t === 0) {this.CLD(); this.ip += 1; this.tLim = 2;} break;
@@ -1514,7 +1564,7 @@ class Mos6502 {
             case 0x6e: if(this.t === 0) {this.ROR(this.getAddrAbsolute()); this.ip += 3; this.tLim = 6;} break;
             case 0x7e: if(this.t === 0) {this.ROR(this.getAddrAbsoluteX()); this.ip += 3; this.tLim = 7;} break;
 
-            case 0x00: if(this.t === 0) {this.BRK(); this.tLim = 7;} break;
+            case 0x00: this.BRK(); break;
             case 0x40: if(this.t === 0) {this.RTI(); this.tLim = 6;} break;
 
             case 0xe9: if(this.t === 0) {this.SBC(this.getByteImmediate()); this.ip += 2; this.tLim = 2;} break;

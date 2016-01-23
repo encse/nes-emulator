@@ -506,11 +506,45 @@ var Mos6502 = (function () {
         this.nmiLinePrev = 1;
         this.irqRequested = false;
         this.irqLine = 1;
+        /**
+        BRK - Force Interrupt
+    
+            The BRK instruction forces the generation of an interrupt request.
+            The program counter and processor status are pushed on the stack then the IRQ interrupt vector
+             at $FFFE/F is loaded into the PC and the break flag in the status set to one.
+    
+            C	Carry Flag	Not affected
+            Z	Zero Flag	Not affected
+            I	Interrupt Disable	Not affected
+            D	Decimal Mode Flag	Not affected
+            B	Break Command	Set to 1
+            V	Overflow Flag	Not affected
+            N	Negative Flag	Not affected
+    
+            http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
+    
+            No actual "B" flag exists inside the 6502's processor status register. The B
+            flag only exists in the status flag byte pushed to the stack. Naturally,
+            when the flags are restored (via PLP or RTI), the B bit is discarded.
+    
+            Depending on the means, the B status flag will be pushed to the stack as
+            either 0 or 1.
+    
+            software instructions BRK & PHP will push the B flag as being 1.
+            hardware interrupts IRQ & NMI will push the B flag as being 0.
+    
+            Regardless of what ANY 6502 documentation says, BRK is a 2 byte opcode. The
+            first is #$00, and the second is a padding byte. This explains why interrupt
+            routines called by BRK always return 2 bytes after the actual BRK opcode,
+            and not just 1.
+    
+       */
+        this.addrBrk = 0;
         this.pageCross = 0;
         this.jumpSucceed = 0;
         this.jumpToNewPage = 0;
     }
-    Mos6502.prototype.PollInterrupts = function () {
+    Mos6502.prototype.pollInterrupts = function () {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
@@ -1337,7 +1371,7 @@ var Mos6502 = (function () {
         The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
      */
     Mos6502.prototype.JSR = function (addr) {
-        console.log('$' + this.ip.toString(16), 'JSR');
+        // console.log('$' + this.ip.toString(16), 'JSR');
         this.pushWord(this.ip + 3 - 1);
         this.ip = addr;
     };
@@ -1346,7 +1380,7 @@ var Mos6502 = (function () {
         The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
      */
     Mos6502.prototype.RTS = function () {
-        console.log('$' + this.ip.toString(16), 'RTS');
+        // console.log('$'+this.ip.toString(16), 'RTS');
         this.ip = this.popWord() + 1;
     };
     /**
@@ -1397,46 +1431,39 @@ var Mos6502 = (function () {
         this.rP = v;
         console.log('plp', 'irq dsiabled:', this.flgInterruptDisable, 'v:', v.toString(2));
     };
-    /**
-    BRK - Force Interrupt
-
-        The BRK instruction forces the generation of an interrupt request.
-        The program counter and processor status are pushed on the stack then the IRQ interrupt vector
-         at $FFFE/F is loaded into the PC and the break flag in the status set to one.
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Not affected
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Set to 1
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Not affected
-
-        http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
-
-        No actual "B" flag exists inside the 6502's processor status register. The B
-        flag only exists in the status flag byte pushed to the stack. Naturally,
-        when the flags are restored (via PLP or RTI), the B bit is discarded.
-
-        Depending on the means, the B status flag will be pushed to the stack as
-        either 0 or 1.
-
-        software instructions BRK & PHP will push the B flag as being 1.
-        hardware interrupts IRQ & NMI will push the B flag as being 0.
-
-        Regardless of what ANY 6502 documentation says, BRK is a 2 byte opcode. The
-        first is #$00, and the second is a padding byte. This explains why interrupt
-        routines called by BRK always return 2 bytes after the actual BRK opcode,
-        and not just 1.
-
-   */
     Mos6502.prototype.BRK = function () {
-        console.log('process BRK');
-        this.pushWord(this.ip + 2);
-        this.flgBreakCommand = 1;
-        this.PHP();
-        this.flgInterruptDisable = 1;
-        this.ip = this.getWord(this.addrIRQ);
+        switch (this.t) {
+            case 0:
+                //console.log('process BRK');
+                this.tLim = 7;
+                break;
+            case 1:
+                this.getByte(this.ip + 1);
+                break;
+            case 2:
+                this.pushHi(this.ip + 2);
+                break;
+            case 3:
+                this.pushLo(this.ip + 2);
+                break;
+            case 4:
+                this.pollInterrupts();
+                var nmi = this.nmiRequested;
+                var irq = this.irqRequested;
+                this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
+                this.flgBreakCommand = 1;
+                this.PHP();
+                break;
+            case 5:
+                this.ip = this.getByte(this.addrBrk);
+                this.flgInterruptDisable = 1;
+                break;
+            case 6:
+                //  this.pollInterrupts();
+                //   this.nmiRequested = this.irqRequested = false;
+                this.ip += this.getByte(this.addrBrk + 1) << 8;
+                break;
+        }
     };
     Mos6502.prototype.NMI = function () {
         // console.log('process NMI');
@@ -1618,6 +1645,12 @@ var Mos6502 = (function () {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
     };
+    Mos6502.prototype.pushHi = function (word) {
+        this.pushByte(word >> 8);
+    };
+    Mos6502.prototype.pushLo = function (word) {
+        this.pushByte(word & 0xff);
+    };
     Mos6502.prototype.popByte = function () {
         this.sp = this.sp === 0xff ? 0 : this.sp + 1;
         return this.memory.getByte(0x100 + this.sp);
@@ -1636,7 +1669,7 @@ var Mos6502 = (function () {
     };
     Mos6502.prototype.step = function () {
         if (this.t === this.tLim - 1)
-            this.PollInterrupts();
+            this.pollInterrupts();
         if (this.t === this.tLim)
             this.t = 0;
         if (this.t === 0) {
@@ -1876,10 +1909,15 @@ var Mos6502 = (function () {
                 }
                 break;
             case 0x2c:
-                if (this.t === 0) {
-                    this.BIT(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
+                //if (this.t === 0) { this.BIT(this.getByteAbsolute()); this.ip += 3; this.tLim = 4; } break;
+                switch (this.t) {
+                    case 0:
+                        this.tLim = 4;
+                        break;
+                    case 3:
+                        this.BIT(this.getByteAbsolute());
+                        this.ip += 3;
+                        break;
                 }
                 break;
             case 0x18:
@@ -2492,10 +2530,7 @@ var Mos6502 = (function () {
                 }
                 break;
             case 0x00:
-                if (this.t === 0) {
-                    this.BRK();
-                    this.tLim = 7;
-                }
+                this.BRK();
                 break;
             case 0x40:
                 if (this.t === 0) {
@@ -3621,6 +3656,7 @@ var PPU = (function () {
                     var res = this.flgVblank ? (1 << 7) : 0;
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
+                    this.cpu.nmiLine = 1;
                     return res;
                 }
             case 0x2007:
@@ -3745,31 +3781,40 @@ var PPU = (function () {
         }
         console.log(st);
     };
+    //iFrameX = 0;
+    // zizi = 0;
     PPU.prototype.step = function () {
+        if ((this.iFrame & 1) && !this.sx && !this.sy)
+            this.stepI();
+        this.stepI();
+        //this.zizi++;
+        //if (this.iFrameX != this.iFrame) {
+        //    console.log('zizi', this.zizi);
+        //    this.zizi = 0;
+        //    this.iFrameX = this.iFrame;
+        //}
+    };
+    PPU.prototype.stepI = function () {
         if (this.sx === 0 && this.sy === PPU.syPostRender) {
             //console.log('ppu vblank start', this.icycle);
-            this.sx = PPU.sxMin;
             this.imageData.data.set(this.buf8);
             this.ctx.putImageData(this.imageData, 0, 0);
             this.iFrame++;
             this.dataAddr = 0;
-            this.flgVblank = true;
-            this.imageGrayscale = this._imageGrayscale;
-            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
-            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
-            this.showBg = this._showBg;
-            this.showSprites = this._showSprites;
-            this.emphasizeRed = this._emphasizeRed;
-            this.emphasizeGreen = this._emphasizeGreen;
-            this.emphasizeBlue = this._emphasizeBlue;
         }
         else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
-            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
-                this.nmi_output = false;
-                this.cpu.nmiLine = 0;
+            var qqq = 1;
+            if (this.sx === 1 && this.sy === PPU.syPostRender + 1) {
+                this.flgVblank = true;
             }
-            if (this.sx === 10 && this.sy === PPU.syPostRender) {
+            if (this.sx === qqq && this.sy === PPU.syPostRender + 1) {
+                if (this.nmi_output) {
+                    this.nmi_output = false;
+                    this.cpu.nmiLine = 0;
+                }
+            }
+            if (this.sx === qqq + 10 && this.sy === PPU.syPostRender + 1) {
                 this.cpu.nmiLine = 1;
             }
         }

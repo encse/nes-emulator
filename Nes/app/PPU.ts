@@ -141,6 +141,7 @@
             let res = this.flgVblank ? (1 << 7) : 0;
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.flgVblank = false;
+            this.cpu.nmiLine = 1;
             return res;
         }
         case 0x2007:
@@ -290,36 +291,47 @@
 
     icycle = 0;
 
+    //iFrameX = 0;
+    // zizi = 0;
     public step() {
+        if ((this.iFrame & 1) && !this.sx && !this.sy)
+            this.stepI();
+
+        this.stepI();
+
+        //this.zizi++;
+
+        //if (this.iFrameX != this.iFrame) {
+        //    console.log('zizi', this.zizi);
+        //    this.zizi = 0;
+        //    this.iFrameX = this.iFrame;
+        //}
+    }
+
+    public stepI() {
 
 
         if (this.sx === 0 && this.sy === PPU.syPostRender) {
             //console.log('ppu vblank start', this.icycle);
-            this.sx = PPU.sxMin;
             (<any>this.imageData.data).set(this.buf8);
             this.ctx.putImageData(this.imageData, 0, 0);
             this.iFrame++;
              
             this.dataAddr = 0;
-            this.flgVblank = true;
-
-            this.imageGrayscale = this._imageGrayscale;
-            this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels;
-            this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels;
-            this.showBg = this._showBg;
-            this.showSprites = this._showSprites;
-            this.emphasizeRed = this._emphasizeRed;
-            this.emphasizeGreen = this._emphasizeGreen;
-            this.emphasizeBlue = this._emphasizeBlue;
-
-
+          
         } else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
             //vblank
-            if (this.sx === 1 && this.sy === PPU.syPostRender && this.flgVblank && this.nmi_output) {
-                this.nmi_output = false;
-                this.cpu.nmiLine = 0;
+            var qqq = 1;
+            if (this.sx === 1 && this.sy === PPU.syPostRender + 1) {
+                this.flgVblank = true;
             }
-            if (this.sx === 10 && this.sy === PPU.syPostRender) {
+            if (this.sx === qqq && this.sy === PPU.syPostRender + 1) {
+                if (this.nmi_output) {
+                    this.nmi_output = false;
+                    this.cpu.nmiLine = 0;
+                }
+            }
+            if (this.sx === qqq+10 && this.sy === PPU.syPostRender + 1) {
                 this.cpu.nmiLine = 1;
             }
           
@@ -382,6 +394,7 @@
             //end of scanline
             this.sx = 0;
             this.sy++;
+            
             if (this.sy === PPU.syPreRender + 1) {
                 this.sy = PPU.syFirstVisible;
             } else {
