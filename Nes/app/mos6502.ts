@@ -473,7 +473,7 @@ class Mos6502 {
         Z	Zero Flag	Set if A = M
         I	Interrupt Disable	Not affected
         D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
+        B	Break Command	Not affectedc
         V	Overflow Flag	Not affected
         N	Negative Flag	Set if bit 7 of the result is set
 
