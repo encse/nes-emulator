@@ -20,7 +20,7 @@ enum AddressingMode {
 
 enum StatementKind{
     ADC,
-    AND, EOR,
+    AND, EOR, ORA,
     ASL, LSR,
     BCC, BCS, BEQ, BMI, BNE, BPL, BVC, BVS,
     BIT,
@@ -29,7 +29,7 @@ enum StatementKind{
     CMP, CPX, CPY,
     DEC, DEX, DEY,
     INC, INX, INY,
-    JMP,
+    JMP, NOP,
     LDA, LDX, LDY
 }
 
@@ -41,7 +41,6 @@ enum MemoryAccessPattern {
     Read,
     ReadModifyWrite,
     Write,
-    FlgOnly,
     Jmp
 }
 
@@ -128,11 +127,9 @@ class Statement {
             switch (this.statementKind){
                 case StatementKind.DEX:
                 case StatementKind.INX:
-                case StatementKind.CPX:
                     return Register.X;
                 case StatementKind.DEY:
                 case StatementKind.INY:
-                case StatementKind.CPY:
                     return Register.Y;
                 case StatementKind.ASL:
                 case StatementKind.LSR:
@@ -161,6 +158,7 @@ class Statement {
                 case StatementKind.AND:
                 case StatementKind.BIT:
                 case StatementKind.EOR:
+                case StatementKind.ORA:
                 case StatementKind.LDA:
                 case StatementKind.ASL:
                 case StatementKind.LSR:
@@ -179,7 +177,7 @@ class Statement {
     get memoryAccessPattern() {
         switch (this.statementKind) {
             case StatementKind.ADC:
-            case StatementKind.AND: case StatementKind.EOR:
+            case StatementKind.AND: case StatementKind.EOR: case StatementKind.ORA:
             case StatementKind.BCC:
             case StatementKind.BCS:
             case StatementKind.BEQ:
@@ -193,17 +191,15 @@ class Statement {
             case StatementKind.DEX: case StatementKind.DEY:
             case StatementKind.INX: case StatementKind.INY:
             case StatementKind.LDA: case StatementKind.LDX: case StatementKind.LDY:
-                return MemoryAccessPattern.Read;
-            case StatementKind.ASL: case StatementKind.LSR:
-            case StatementKind.DEC:
-            case StatementKind.INC:
-                return MemoryAccessPattern.ReadModifyWrite;
+            case StatementKind.NOP:
             case StatementKind.CLC:
             case StatementKind.CLI:
             case StatementKind.CLD:
             case StatementKind.SEI:
             case StatementKind.CLV:
-                return MemoryAccessPattern.FlgOnly;
+                return MemoryAccessPattern.Read;
+            case StatementKind.ASL: case StatementKind.LSR: case StatementKind.DEC: case StatementKind.INC:
+                return MemoryAccessPattern.ReadModifyWrite;
             case StatementKind.JMP:
                 return MemoryAccessPattern.Jmp;
             default:
@@ -303,22 +299,6 @@ class McExpr extends Mc {
 
 }
 
-//class McBlock extends Mc {
-//    rgmc:Mc[];
-//    constructor(rgmc: (string|Mc)[]) {
-//        super('')
-//        this.rgmc = rgmc.map(mc => Mc.lift(mc));
-//    }
-
-//    write(ctx: Ctx) {
-//        ctx.writeLine('{');
-//        ctx.indent();
-//        this.rgmc.forEach(mc => mc.write(ctx));
-//        ctx.unindent();
-//        ctx.writeLine('}');
-//    }
-//}
-
 class McIf extends Mc {
     public mcTrue:Mc;
     public mcFalse:Mc;
@@ -409,11 +389,11 @@ class Cycle {
 
 export class Mos6502Gen {
 
-    private getRegAccess(reg) {
+    private getRegAccess(reg:Register) {
         return `this.r${Register[reg].toString()}`;
     }
 
-
+    private NOP(): Mc { return new McNop(); }
 
     private ADC(): Mc {
         return new McNop()
@@ -436,15 +416,17 @@ export class Mos6502Gen {
 
     private AND(): Mc { return this.BinOp('&'); }
     private EOR(): Mc { return this.BinOp('^'); }
+    private ORA(): Mc { return this.BinOp('|'); }
 
-    private CMP(): Mc {
+    private CMPReg(register:Register): Mc {
         return new McNop()
-            .then(`this.flgCarry = this.rA >= this.b ? 1 : 0`)
-            .then(`this.flgZero = this.rA === this.b ? 1 : 0`)
-            .then(`this.flgNegative = (this.rA - this.b) & 128 ? 1 : 0`);
+            .then(`this.flgCarry = ${this.getRegAccess(register)} >= this.b ? 1 : 0`)
+            .then(`this.flgZero =  ${this.getRegAccess(register)} === this.b ? 1 : 0`)
+            .then(`this.flgNegative = (${this.getRegAccess(register)} - this.b) & 128 ? 1 : 0`);
     }
-    private CPX(): Mc { return this.CMP(); }
-    private CPY(): Mc { return this.CMP(); }
+    private CMP(): Mc { return this.CMPReg(Register.A); }
+    private CPX(): Mc { return this.CMPReg(Register.X); }
+    private CPY(): Mc { return this.CMPReg(Register.Y); }
 
     private LD(): Mc {
         return new McNop()
@@ -572,8 +554,7 @@ export class Mos6502Gen {
                 throw 'not implemented';
         }
     }
-
-
+    
     private getZeroPageXYCycles(reg:Register, statement: Statement, mc:Mc): Cycle[] {
 
         var regAccess = this.getRegAccess(reg);
@@ -644,7 +625,6 @@ export class Mos6502Gen {
     private getZeroPageYCycles(statement: Statement, mc: Mc): Cycle[] {
         return this.getZeroPageXYCycles(Register.Y, statement, mc);
     }
-
 
     private getAbsoluteCycles(statement: Statement, mc: Mc): Cycle[] {
 
@@ -853,7 +833,6 @@ export class Mos6502Gen {
         return this.getAbsoluteXYCycles('rY', statement, mc);
     }
 
-
     private getImmediateCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
             new Cycle(1, 'fetch opcode, increment PC')
@@ -923,7 +902,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(5, 'fetch effective address high')
-                        .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) 0xff)`)
+                        .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .thenNextCycle(),
                     
                     new Cycle(6, 'read from effective address')
@@ -972,7 +951,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(6, 'read from effective address')
-                        .then(`this.b = this.memory.getByte(this.addr`)
+                        .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
                         .thenNextStatement()
@@ -1014,26 +993,6 @@ export class Mos6502Gen {
                 .thenNextStatement()
         ];
     }
-
-
-    //    this.BCC();
-    //    return ctx
-    //        .add(`this.addrPtr = this.memory.getByte(this.ip);`)
-    //        .nextIp()
-    //        .endStep()
-    //        .add(`this.addrLo = this.memory.getByte(this.addrPtr)`)
-    //        .endStep()
-    //        .add(`this.addrC = (this.addrLo + this.rY) >> 8;`)
-    //        .add(`this.addrLo = (this.addrLo + this.rY) & 0xff;`)
-    //        .add(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
-    //        .add(`this.addr = this.addrLo + (this.addrHi << 8);`)
-    //        .endStep()
-    //        .add(`this.b = this.memory.getByte(this.addr);`)
-    //        .add(`if (this.addrC > 0) { this.addr = this.addr + (this.addrO << 8); this.addrC = 0; ${ctx.rerun()} }`)
-    //        ;
-    //}
-
-
 
     private genStatement(statement:Statement) {
         var ctx = new Ctx();
@@ -1077,28 +1036,28 @@ export class Mos6502Gen {
 
         var statements = [
             new Statement(0x69, StatementKind.ADC, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0x65, StatementKind.ADC, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x65, StatementKind.ADC, AddressingMode.ZeroPage , 2, new CycleCount(3)),
             new Statement(0x75, StatementKind.ADC, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0x6d, StatementKind.ADC, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x6d, StatementKind.ADC, AddressingMode.Absolute , 3, new CycleCount(4)),
             new Statement(0x7d, StatementKind.ADC, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0x79, StatementKind.ADC, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
             new Statement(0x61, StatementKind.ADC, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0x71, StatementKind.ADC, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
      
             new Statement(0x29, StatementKind.AND, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0x25, StatementKind.AND, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x25, StatementKind.AND, AddressingMode.ZeroPage , 2, new CycleCount(3)),
             new Statement(0x35, StatementKind.AND, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0x2d, StatementKind.AND, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x2d, StatementKind.AND, AddressingMode.Absolute , 3, new CycleCount(4)),
             new Statement(0x3d, StatementKind.AND, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0x39, StatementKind.AND, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
             new Statement(0x21, StatementKind.AND, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0x31, StatementKind.AND, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
 
             new Statement(0x0a, StatementKind.ASL, AddressingMode.Accumulator, 1, new CycleCount(2)),
-            new Statement(0x06, StatementKind.ASL, AddressingMode.ZeroPage, 2, new CycleCount(5)),
-            new Statement(0x16, StatementKind.ASL, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
-            new Statement(0x0e, StatementKind.ASL, AddressingMode.Absolute, 3, new CycleCount(6)),
-            new Statement(0x1e, StatementKind.ASL, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x06, StatementKind.ASL, AddressingMode.ZeroPage   , 2, new CycleCount(5)),
+            new Statement(0x16, StatementKind.ASL, AddressingMode.ZeroPageX  , 2, new CycleCount(6)),
+            new Statement(0x0e, StatementKind.ASL, AddressingMode.Absolute   , 3, new CycleCount(6)),
+            new Statement(0x1e, StatementKind.ASL, AddressingMode.AbsoluteX  , 3, new CycleCount(7)),
 
             new Statement(0x90, StatementKind.BCC, AddressingMode.Relative, 2, new CycleCount(2).withBranchTaken().withPageCross()),
             new Statement(0xb0, StatementKind.BCS, AddressingMode.Relative, 2, new CycleCount(2).withBranchTaken().withPageCross()),
@@ -1185,6 +1144,17 @@ export class Mos6502Gen {
             new Statement(0x56, StatementKind.LSR, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
             new Statement(0x4e, StatementKind.LSR, AddressingMode.Absolute, 3, new CycleCount(6)),
             new Statement(0x5e, StatementKind.LSR, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+
+            new Statement(0xea, StatementKind.NOP, AddressingMode.Implied, 1, new CycleCount(2)),
+
+            new Statement(0x09, StatementKind.ORA, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x05, StatementKind.ORA, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x15, StatementKind.ORA, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
+            new Statement(0x0d, StatementKind.ORA, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x1d, StatementKind.ORA, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
+            new Statement(0x19, StatementKind.ORA, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
+            new Statement(0x01, StatementKind.ORA, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0x11, StatementKind.ORA, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
 
         ];
 

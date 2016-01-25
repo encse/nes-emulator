@@ -24,35 +24,37 @@ var StatementKind;
     StatementKind[StatementKind["ADC"] = 0] = "ADC";
     StatementKind[StatementKind["AND"] = 1] = "AND";
     StatementKind[StatementKind["EOR"] = 2] = "EOR";
-    StatementKind[StatementKind["ASL"] = 3] = "ASL";
-    StatementKind[StatementKind["LSR"] = 4] = "LSR";
-    StatementKind[StatementKind["BCC"] = 5] = "BCC";
-    StatementKind[StatementKind["BCS"] = 6] = "BCS";
-    StatementKind[StatementKind["BEQ"] = 7] = "BEQ";
-    StatementKind[StatementKind["BMI"] = 8] = "BMI";
-    StatementKind[StatementKind["BNE"] = 9] = "BNE";
-    StatementKind[StatementKind["BPL"] = 10] = "BPL";
-    StatementKind[StatementKind["BVC"] = 11] = "BVC";
-    StatementKind[StatementKind["BVS"] = 12] = "BVS";
-    StatementKind[StatementKind["BIT"] = 13] = "BIT";
-    StatementKind[StatementKind["CLC"] = 14] = "CLC";
-    StatementKind[StatementKind["CLI"] = 15] = "CLI";
-    StatementKind[StatementKind["CLD"] = 16] = "CLD";
-    StatementKind[StatementKind["CLV"] = 17] = "CLV";
-    StatementKind[StatementKind["SEI"] = 18] = "SEI";
-    StatementKind[StatementKind["CMP"] = 19] = "CMP";
-    StatementKind[StatementKind["CPX"] = 20] = "CPX";
-    StatementKind[StatementKind["CPY"] = 21] = "CPY";
-    StatementKind[StatementKind["DEC"] = 22] = "DEC";
-    StatementKind[StatementKind["DEX"] = 23] = "DEX";
-    StatementKind[StatementKind["DEY"] = 24] = "DEY";
-    StatementKind[StatementKind["INC"] = 25] = "INC";
-    StatementKind[StatementKind["INX"] = 26] = "INX";
-    StatementKind[StatementKind["INY"] = 27] = "INY";
-    StatementKind[StatementKind["JMP"] = 28] = "JMP";
-    StatementKind[StatementKind["LDA"] = 29] = "LDA";
-    StatementKind[StatementKind["LDX"] = 30] = "LDX";
-    StatementKind[StatementKind["LDY"] = 31] = "LDY";
+    StatementKind[StatementKind["ORA"] = 3] = "ORA";
+    StatementKind[StatementKind["ASL"] = 4] = "ASL";
+    StatementKind[StatementKind["LSR"] = 5] = "LSR";
+    StatementKind[StatementKind["BCC"] = 6] = "BCC";
+    StatementKind[StatementKind["BCS"] = 7] = "BCS";
+    StatementKind[StatementKind["BEQ"] = 8] = "BEQ";
+    StatementKind[StatementKind["BMI"] = 9] = "BMI";
+    StatementKind[StatementKind["BNE"] = 10] = "BNE";
+    StatementKind[StatementKind["BPL"] = 11] = "BPL";
+    StatementKind[StatementKind["BVC"] = 12] = "BVC";
+    StatementKind[StatementKind["BVS"] = 13] = "BVS";
+    StatementKind[StatementKind["BIT"] = 14] = "BIT";
+    StatementKind[StatementKind["CLC"] = 15] = "CLC";
+    StatementKind[StatementKind["CLI"] = 16] = "CLI";
+    StatementKind[StatementKind["CLD"] = 17] = "CLD";
+    StatementKind[StatementKind["CLV"] = 18] = "CLV";
+    StatementKind[StatementKind["SEI"] = 19] = "SEI";
+    StatementKind[StatementKind["CMP"] = 20] = "CMP";
+    StatementKind[StatementKind["CPX"] = 21] = "CPX";
+    StatementKind[StatementKind["CPY"] = 22] = "CPY";
+    StatementKind[StatementKind["DEC"] = 23] = "DEC";
+    StatementKind[StatementKind["DEX"] = 24] = "DEX";
+    StatementKind[StatementKind["DEY"] = 25] = "DEY";
+    StatementKind[StatementKind["INC"] = 26] = "INC";
+    StatementKind[StatementKind["INX"] = 27] = "INX";
+    StatementKind[StatementKind["INY"] = 28] = "INY";
+    StatementKind[StatementKind["JMP"] = 29] = "JMP";
+    StatementKind[StatementKind["NOP"] = 30] = "NOP";
+    StatementKind[StatementKind["LDA"] = 31] = "LDA";
+    StatementKind[StatementKind["LDX"] = 32] = "LDX";
+    StatementKind[StatementKind["LDY"] = 33] = "LDY";
 })(StatementKind || (StatementKind = {}));
 var Register;
 (function (Register) {
@@ -65,8 +67,7 @@ var MemoryAccessPattern;
     MemoryAccessPattern[MemoryAccessPattern["Read"] = 0] = "Read";
     MemoryAccessPattern[MemoryAccessPattern["ReadModifyWrite"] = 1] = "ReadModifyWrite";
     MemoryAccessPattern[MemoryAccessPattern["Write"] = 2] = "Write";
-    MemoryAccessPattern[MemoryAccessPattern["FlgOnly"] = 3] = "FlgOnly";
-    MemoryAccessPattern[MemoryAccessPattern["Jmp"] = 4] = "Jmp";
+    MemoryAccessPattern[MemoryAccessPattern["Jmp"] = 3] = "Jmp";
 })(MemoryAccessPattern || (MemoryAccessPattern = {}));
 var Ctx = (function () {
     function Ctx() {
@@ -145,11 +146,9 @@ var Statement = (function () {
                 switch (this.statementKind) {
                     case StatementKind.DEX:
                     case StatementKind.INX:
-                    case StatementKind.CPX:
                         return Register.X;
                     case StatementKind.DEY:
                     case StatementKind.INY:
-                    case StatementKind.CPY:
                         return Register.Y;
                     case StatementKind.ASL:
                     case StatementKind.LSR:
@@ -177,6 +176,7 @@ var Statement = (function () {
                     case StatementKind.AND:
                     case StatementKind.BIT:
                     case StatementKind.EOR:
+                    case StatementKind.ORA:
                     case StatementKind.LDA:
                     case StatementKind.ASL:
                     case StatementKind.LSR:
@@ -197,6 +197,7 @@ var Statement = (function () {
                 case StatementKind.ADC:
                 case StatementKind.AND:
                 case StatementKind.EOR:
+                case StatementKind.ORA:
                 case StatementKind.BCC:
                 case StatementKind.BCS:
                 case StatementKind.BEQ:
@@ -216,18 +217,18 @@ var Statement = (function () {
                 case StatementKind.LDA:
                 case StatementKind.LDX:
                 case StatementKind.LDY:
+                case StatementKind.NOP:
+                case StatementKind.CLC:
+                case StatementKind.CLI:
+                case StatementKind.CLD:
+                case StatementKind.SEI:
+                case StatementKind.CLV:
                     return MemoryAccessPattern.Read;
                 case StatementKind.ASL:
                 case StatementKind.LSR:
                 case StatementKind.DEC:
                 case StatementKind.INC:
                     return MemoryAccessPattern.ReadModifyWrite;
-                case StatementKind.CLC:
-                case StatementKind.CLI:
-                case StatementKind.CLD:
-                case StatementKind.SEI:
-                case StatementKind.CLV:
-                    return MemoryAccessPattern.FlgOnly;
                 case StatementKind.JMP:
                     return MemoryAccessPattern.Jmp;
                 default:
@@ -331,20 +332,6 @@ var McExpr = (function (_super) {
     };
     return McExpr;
 })(Mc);
-//class McBlock extends Mc {
-//    rgmc:Mc[];
-//    constructor(rgmc: (string|Mc)[]) {
-//        super('')
-//        this.rgmc = rgmc.map(mc => Mc.lift(mc));
-//    }
-//    write(ctx: Ctx) {
-//        ctx.writeLine('{');
-//        ctx.indent();
-//        this.rgmc.forEach(mc => mc.write(ctx));
-//        ctx.unindent();
-//        ctx.writeLine('}');
-//    }
-//}
 var McIf = (function (_super) {
     __extends(McIf, _super);
     function McIf(cond, mcTrue, mcFalse) {
@@ -425,6 +412,7 @@ var Mos6502Gen = (function () {
     Mos6502Gen.prototype.getRegAccess = function (reg) {
         return "this.r" + Register[reg].toString();
     };
+    Mos6502Gen.prototype.NOP = function () { return new McNop(); };
     Mos6502Gen.prototype.ADC = function () {
         return new McNop()
             .then("const sum = this.rA + this.b + this.flgCarry")
@@ -444,14 +432,16 @@ var Mos6502Gen = (function () {
     };
     Mos6502Gen.prototype.AND = function () { return this.BinOp('&'); };
     Mos6502Gen.prototype.EOR = function () { return this.BinOp('^'); };
-    Mos6502Gen.prototype.CMP = function () {
+    Mos6502Gen.prototype.ORA = function () { return this.BinOp('|'); };
+    Mos6502Gen.prototype.CMPReg = function (register) {
         return new McNop()
-            .then("this.flgCarry = this.rA >= this.b ? 1 : 0")
-            .then("this.flgZero = this.rA === this.b ? 1 : 0")
-            .then("this.flgNegative = (this.rA - this.b) & 128 ? 1 : 0");
+            .then("this.flgCarry = " + this.getRegAccess(register) + " >= this.b ? 1 : 0")
+            .then("this.flgZero =  " + this.getRegAccess(register) + " === this.b ? 1 : 0")
+            .then("this.flgNegative = (" + this.getRegAccess(register) + " - this.b) & 128 ? 1 : 0");
     };
-    Mos6502Gen.prototype.CPX = function () { return this.CMP(); };
-    Mos6502Gen.prototype.CPY = function () { return this.CMP(); };
+    Mos6502Gen.prototype.CMP = function () { return this.CMPReg(Register.A); };
+    Mos6502Gen.prototype.CPX = function () { return this.CMPReg(Register.X); };
+    Mos6502Gen.prototype.CPY = function () { return this.CMPReg(Register.Y); };
     Mos6502Gen.prototype.LD = function () {
         return new McNop()
             .then("this.flgZero = !this.b ? 1 : 0")
@@ -845,7 +835,7 @@ var Mos6502Gen = (function () {
                         .then("this.addr = this.addrLo + (this.addrHi << 8))")
                         .thenNextCycle(),
                     new Cycle(5, 'fetch effective address high')
-                        .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) 0xff)")
+                        .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
                         .thenNextCycle(),
                     new Cycle(6, 'read from effective address')
                         .then("this.b = this.memory.getByte(this.addr)")
@@ -887,7 +877,7 @@ var Mos6502Gen = (function () {
                     })
                         .thenNextCycle(),
                     new Cycle(6, 'read from effective address')
-                        .then("this.b = this.memory.getByte(this.addr")
+                        .then("this.b = this.memory.getByte(this.addr)")
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
                         .thenNextStatement()
@@ -925,22 +915,6 @@ var Mos6502Gen = (function () {
                 .thenNextStatement()
         ];
     };
-    //    this.BCC();
-    //    return ctx
-    //        .add(`this.addrPtr = this.memory.getByte(this.ip);`)
-    //        .nextIp()
-    //        .endStep()
-    //        .add(`this.addrLo = this.memory.getByte(this.addrPtr)`)
-    //        .endStep()
-    //        .add(`this.addrC = (this.addrLo + this.rY) >> 8;`)
-    //        .add(`this.addrLo = (this.addrLo + this.rY) & 0xff;`)
-    //        .add(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
-    //        .add(`this.addr = this.addrLo + (this.addrHi << 8);`)
-    //        .endStep()
-    //        .add(`this.b = this.memory.getByte(this.addr);`)
-    //        .add(`if (this.addrC > 0) { this.addr = this.addr + (this.addrO << 8); this.addrC = 0; ${ctx.rerun()} }`)
-    //        ;
-    //}
     Mos6502Gen.prototype.genStatement = function (statement) {
         var ctx = new Ctx();
         ctx.writeLine("case 0x" + statement.opcode.toString(16) + ": /* " + statement.mnemonic + " " + statement.cycleCount.toString() + " */ {");
@@ -1069,6 +1043,15 @@ var Mos6502Gen = (function () {
             new Statement(0x56, StatementKind.LSR, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
             new Statement(0x4e, StatementKind.LSR, AddressingMode.Absolute, 3, new CycleCount(6)),
             new Statement(0x5e, StatementKind.LSR, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0xea, StatementKind.NOP, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0x09, StatementKind.ORA, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x05, StatementKind.ORA, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x15, StatementKind.ORA, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
+            new Statement(0x0d, StatementKind.ORA, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x1d, StatementKind.ORA, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
+            new Statement(0x19, StatementKind.ORA, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
+            new Statement(0x01, StatementKind.ORA, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0x11, StatementKind.ORA, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
         ];
         var res = '';
         for (var i = 0; i < statements.length; i++) {
