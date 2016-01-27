@@ -4345,11 +4345,12 @@ var Most6502Base = (function () {
                     }
                     case 5: {
                         this.ip = this.memory.getByte(this.addrIRQ);
+                        this.flgInterruptDisable = 1;
                         this.t++;
                         break;
                     }
                     case 6: {
-                        this.ip |= this.memory.getByte(this.addrIRQ + 1) << 8;
+                        this.ip += this.memory.getByte(this.addrIRQ + 1) << 8;
                         this.t = 0;
                         break;
                     }
@@ -8756,10 +8757,10 @@ var Most6502Base = (function () {
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         var res = (this.rA & this.rX) + 256 - this.b;
-                        this.rX = res & 0xff;
-                        this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0;
+                        this.b = res & 0xff;
+                        this.flgNegative = (this.b & 128) !== 0 ? 1 : 0;
                         this.flgCarry = res > 255 ? 1 : 0;
-                        this.flgZero = this.rX === 0 ? 1 : 0;
+                        this.flgZero = this.b === 0 ? 1 : 0;
                         this.rX = this.b;
                         this.t = 0;
                         break;

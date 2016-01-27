@@ -755,10 +755,10 @@ var Mos6502Gen = (function () {
         // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
         return new McNop()
             .then("const res = (this.rA & this.rX) + 256 - this.b")
-            .then("this.rX = res & 0xff")
-            .then("this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0")
+            .then("this.b = res & 0xff")
+            .then("this.flgNegative = (this.b & 128) !== 0 ? 1 : 0")
             .then("this.flgCarry = res > 255 ? 1 : 0")
-            .then("this.flgZero = this.rX === 0 ? 1 : 0");
+            .then("this.flgZero = this.b === 0 ? 1 : 0");
     };
     Mos6502Gen.prototype.SYA = function () {
         //not implemented
@@ -1249,9 +1249,10 @@ var Mos6502Gen = (function () {
                 .thenNextCycle(),
             new Cycle(6, 'fetch PCL')
                 .then("this.ip = this.memory.getByte(this.addrIRQ)")
+                .then("this.flgInterruptDisable = 1")
                 .thenNextCycle(),
             new Cycle(7, 'fetch PCH')
-                .then("this.ip |= this.memory.getByte(this.addrIRQ + 1) << 8")
+                .then("this.ip += this.memory.getByte(this.addrIRQ + 1) << 8")
                 .thenNextStatement()
         ];
     };
