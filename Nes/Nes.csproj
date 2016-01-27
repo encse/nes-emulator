@@ -245,6 +245,8 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />
+    <TypeScriptCompile Include="app\Mos6502Base.ts" />
+    <TypeScriptCompile Include="app\Mos6502.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\MMC1.ts" />
@@ -252,7 +254,7 @@
     <TypeScriptCompile Include="app\ROM.ts" />
     <TypeScriptCompile Include="app\RAM.ts" />
     <TypeScriptCompile Include="app\Memory.ts" />
-    <TypeScriptCompile Include="app\Mos6502.ts" />
+    <TypeScriptCompile Include="app\Mos6502Old.ts" />
     <TypeScriptCompile Include="app\NesEmulator.ts" />
     <TypeScriptCompile Include="app\NesImage.ts" />
     <TypeScriptCompile Include="app\StepTest.ts" />

@@ -1,7 +1,4 @@
-﻿declare type generator = (ctx:Ctx) => Ctx;
-
-
-
+﻿
 enum AddressingMode {
     Accumulator,
     Implied,
@@ -34,14 +31,17 @@ enum StatementKind{
     LDA, LDX, LDY,
     PHA, PHP, PLA, PLP,
     BRK, RTI,
-    STA, STX, STY, SAX,
+    STA, STX, STY, 
     TAX, TAY, TSX, TXA, TXS, TYA,
     JSR, RTS,
+    DCP,
 
-    DCP, ISC
 
-}
-
+    SAX, LAX, ISC, SLO, RLA, SRE, RRA,
+    ANC, ALR, ARR, AXS,
+    SYA, SXA, XAA, XAS, AXA, LAR
+}             
+              
 enum Register {
     A = 1, X = 2, Y = 4, SP = 8
 }
@@ -51,6 +51,7 @@ enum MemoryAccessPattern {
     Pop,
     Read,
     ReadModifyWrite,
+    ReadModifyWriteAndModifyRegister,
     Write,
     Jmp
 }
@@ -126,7 +127,11 @@ class Statement {
 
     getCycles(gen: Mos6502Gen): Cycle[] {
         var mcPayload = gen[StatementKind[this.statementKind]]();
-        return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload);
+        var mcPostPayload = gen[StatementKind[this.statementKind] + 'Post'] ? gen[StatementKind[this.statementKind] + 'Post']() : null;
+        if (mcPostPayload && this.memoryAccessPattern != MemoryAccessPattern.ReadModifyWriteAndModifyRegister)
+            throw 'should not have postpayload';
+
+        return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload, mcPostPayload);
     }
 
     get mnemonic() {
@@ -152,6 +157,9 @@ class Statement {
                 case StatementKind.ROR:
                 case StatementKind.TAX:
                 case StatementKind.TAY:
+                case StatementKind.ANC:
+                case StatementKind.ALR:
+                case StatementKind.ARR:
                     return Register.A;
                 case StatementKind.TSX:
                     return Register.SP;
@@ -173,6 +181,7 @@ class Statement {
                 case StatementKind.DEX:
                 case StatementKind.TAX:
                 case StatementKind.TSX:
+                case StatementKind.AXS:
 
                     return Register.X;
 
@@ -196,15 +205,27 @@ class Statement {
                 case StatementKind.ROR:
                 case StatementKind.TXA:
                 case StatementKind.TYA:
+                case StatementKind.ANC:
+                case StatementKind.ALR:
+                case StatementKind.ARR:
                     return Register.A;
+
                 case StatementKind.TXS:
                     return Register.SP;
                 case StatementKind.CMP:
                 case StatementKind.CPX:
                 case StatementKind.CPY:
                 case StatementKind.NOP:
+                case StatementKind.SYA:
+                case StatementKind.SXA:
+                case StatementKind.XAA:
+                case StatementKind.AXA:
+                case StatementKind.XAS:
+                case StatementKind.LAR:
                     return null;
             
+                case StatementKind.LAX:
+                    return Register.A | Register.X
 
             }
 
@@ -237,11 +258,22 @@ class Statement {
             case StatementKind.TXA:
             case StatementKind.TXS:
             case StatementKind.TYA:
+            case StatementKind.LAX:
+            case StatementKind.ANC:
+            case StatementKind.ALR:
+            case StatementKind.ARR:
+            case StatementKind.AXS:
+            case StatementKind.SYA:
+            case StatementKind.SXA:
+            case StatementKind.XAA:
+            case StatementKind.AXA:
+            case StatementKind.XAS:
+            case StatementKind.LAR:
                 return MemoryAccessPattern.Read;
             case StatementKind.ASL: case StatementKind.LSR: case StatementKind.DEC: case StatementKind.INC:
             case StatementKind.ROL: case StatementKind.ROR: 
             case StatementKind.DCP:
-            case StatementKind.ISC:
+           
                 return MemoryAccessPattern.ReadModifyWrite;
             case StatementKind.JMP:
                 return MemoryAccessPattern.Jmp;
@@ -251,8 +283,16 @@ class Statement {
             case StatementKind.STY:
             case StatementKind.SAX:
                 return MemoryAccessPattern.Write;
+
+            case StatementKind.ISC:
+            case StatementKind.SLO:
+            case StatementKind.RLA:
+            case StatementKind.SRE:
+            case StatementKind.RRA:
+                return MemoryAccessPattern.ReadModifyWriteAndModifyRegister;
+
             default:
-                throw 'unknown statement kind';
+                throw 'unknown statement kind ' + StatementKind[this.statementKind];
         }
     }
 }
@@ -397,6 +437,8 @@ class Cycle {
     }
 
     then(mc: string | Mc) {
+        if (!mc)
+            return this;
         this.mc = this.mc.then(mc);
         return this;
     }
@@ -614,6 +656,12 @@ export class Mos6502Gen {
         return new Mc(`this.b = this.rA & this.rX`);
     }
 
+    private LAX(): Mc {
+        return new McNop()
+            .then(`this.flgZero = this.b === 0 ? 1 : 0`)
+            .then(`this.flgNegative = this.b >= 128 ? 1 : 0`);
+    }
+
     private TAX(): Mc {
         return new McNop()
             .then(`this.flgZero = this.b === 0 ? 1 : 0`)
@@ -650,9 +698,82 @@ export class Mos6502Gen {
             .then(`this.flgNegative = (this.rA - this.b) & 0x80 ? 1 : 0`);
     }
 
+
+
+    private ISC(): Mc { return this.INC(); }
+    private ISCPost(): Mc { return this.SBC().thenMoveBToReg(Register.A); }
+    private SLO(): Mc { return this.ASL(); }
+    private SLOPost(): Mc { return this.ORA().thenMoveBToReg(Register.A); }
+    private RLA(): Mc { return this.ROL(); }
+    private RLAPost(): Mc { return this.AND().thenMoveBToReg(Register.A); }
+    private SRE(): Mc { return this.LSR(); }
+    private SREPost(): Mc { return this.EOR().thenMoveBToReg(Register.A); }
+    private RRA(): Mc { return this.ROR(); }
+    private RRAPost(): Mc { return this.ADC().thenMoveBToReg(Register.A); }
+
+    private ALR(): Mc {
+        //ALR #i($4B ii; 2 cycles)
+        //Equivalent to AND #i then LSR A.
+        return this.AND().then(this.LSR());
+    }
+
+    private ANC(): Mc{
+        //Does AND #i, setting N and Z flags based on the result. 
+        //Then it copies N (bit 7) to C.ANC #$FF could be useful for sign- extending, much like CMP #$80.ANC #$00 acts like LDA #$00 followed by CLC.
+        return this.AND().
+            then(`this.flgCarry = this.flgNegative`);
+    }
+
+    private ARR():Mc {
+        //Similar to AND #i then ROR A, except sets the flags differently. N and Z are normal, but C is bit 6 and V is bit 6 xor bit 5.
+        return this.AND()
+            .then(this.ROR())
+            .then(`this.flgCarry = (this.b & (1 << 6)) !== 0 ? 1 : 0`)
+            .then(` this.flgOverflow = ((this.b & (1 << 6)) >> 6) ^ ((this.b & (1 << 5)) >> 5)`);
+    }
+
+    private AXS():Mc {
+        // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
+
+        return new McNop()
+            .then(`const res = (this.rA & this.rX) + 256 - this.b`)
+            .then(`this.rX = res & 0xff`)
+            .then(`this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0`)
+            .then(`this.flgCarry = res > 255 ? 1 : 0`)
+            .then(`this.flgZero = this.rX === 0 ? 1 : 0`);
+
+    }
+
+    private SYA(): Mc {
+        //not implemented
+        return new McNop();
+    }
+
+    private SXA(): Mc {
+        //not implemented
+        return new McNop();
+    }
+    private XAA(): Mc {
+        //not implemented
+        return new McNop();
+    }
+
+    private AXA(): Mc {
+        //not implemented
+        return new McNop();
+    }
+    private XAS(): Mc {
+        //not implemented
+        return new McNop();
+    }
+    private LAR(): Mc {
+        //not implemented
+        return new McNop();
+    }
+
     //http://nesdev.com/6502_cpu.txt
 
-    private getZeroPageCycles(statement:Statement, mc: Mc): Cycle[] {
+    private getZeroPageCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
         switch(statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -674,6 +795,7 @@ export class Mos6502Gen {
                 ];
              
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -690,12 +812,13 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(4, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
                     new Cycle(5, 'write the new value to effective address')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
 
@@ -713,7 +836,7 @@ export class Mos6502Gen {
 
                     new Cycle(3, 'write register to effective address')
                         .then(mc)
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
@@ -721,7 +844,7 @@ export class Mos6502Gen {
         }
     }
     
-    private getZeroPageXYCycles(reg:Register, statement: Statement, mc:Mc): Cycle[] {
+    private getZeroPageXYCycles(reg:Register, statement: Statement, mc:Mc, mcPost:Mc): Cycle[] {
 
         var regAccess = this.getRegAccess(reg);
 
@@ -751,6 +874,7 @@ export class Mos6502Gen {
                 ];
 
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -772,12 +896,13 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
                     new Cycle(6, 'write the new value to effective address')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -799,7 +924,7 @@ export class Mos6502Gen {
 
                     new Cycle(3, 'write register to effective address')
                         .then(mc)
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement()
                 ]
             default:
@@ -807,14 +932,14 @@ export class Mos6502Gen {
         }
     }
 
-    private getZeroPageXCycles(statement: Statement, mc: Mc): Cycle[] {
-        return this.getZeroPageXYCycles(Register.X, statement, mc);
+    private getZeroPageXCycles(statement: Statement, mc: Mc, mcPost:Mc): Cycle[] {
+        return this.getZeroPageXYCycles(Register.X, statement, mc, mcPost);
     }
-    private getZeroPageYCycles(statement: Statement, mc: Mc): Cycle[] {
-        return this.getZeroPageXYCycles(Register.Y, statement, mc);
+    private getZeroPageYCycles(statement: Statement, mc: Mc, mcPost:Mc): Cycle[] {
+        return this.getZeroPageXYCycles(Register.Y, statement, mc, mcPost);
     }
 
-    private getAbsoluteCycles(statement: Statement, mc: Mc): Cycle[] {
+    private getAbsoluteCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
 
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Jmp:
@@ -858,6 +983,7 @@ export class Mos6502Gen {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -879,12 +1005,13 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
                     new Cycle(6, 'write the new value to effective address')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -901,13 +1028,13 @@ export class Mos6502Gen {
 
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
-                        .then(`this.addr = this.addrLo + (this.addrHi << 8))`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
                     new Cycle(4, 'write register to effective address')
                         .then(mc)
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement()
                 ];
             default:
@@ -948,7 +1075,7 @@ export class Mos6502Gen {
         }
     }
 
-    private getAbsoluteXYCycles(rXY: string, statement: Statement, mc: Mc): Cycle[] {
+    private getAbsoluteXYCycles(rXY: string, statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
 
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
@@ -975,7 +1102,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrO << 8)`,
+                            if: `this.addr = this.addr + (this.addrC << 8)`,
                             else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
                         })
                         .thenNextCycle(),
@@ -988,7 +1115,8 @@ export class Mos6502Gen {
                  
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
-                return [
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
+               return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
@@ -1020,12 +1148,13 @@ export class Mos6502Gen {
                         .thenNextCycle(),
                     
                     new Cycle(6, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
                     new Cycle(7, 'write the new value to effective address')
-                        .then(`this.setByte(this.addr, this.b)`)
+                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
 
                 ];
@@ -1070,12 +1199,12 @@ export class Mos6502Gen {
 
     }
 
-    private getAbsoluteXCycles(statement: Statement, mc: Mc): Cycle[] {
-        return this.getAbsoluteXYCycles('rX', statement, mc);
+    private getAbsoluteXCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
+        return this.getAbsoluteXYCycles('rX', statement, mc, mcPost);
     }
 
-    private getAbsoluteYCycles(statement: Statement, mc: Mc): Cycle[] {
-        return this.getAbsoluteXYCycles('rY', statement, mc);
+    private getAbsoluteYCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
+        return this.getAbsoluteXYCycles('rY', statement, mc, mcPost);
     }
 
     private getImmediateCycles(statement: Statement, mc: Mc): Cycle[] {
@@ -1260,7 +1389,7 @@ export class Mos6502Gen {
            }
     }
 
-    private getIndirectXCycles(statement: Statement, mc: Mc): Cycle[] {
+    private getIndirectXCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -1279,12 +1408,12 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr))`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
-                        .then(`this.addr = this.addrLo + (this.addrHi << 8))`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
                     
                     new Cycle(6, 'read from effective address')
@@ -1294,6 +1423,7 @@ export class Mos6502Gen {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -1310,12 +1440,12 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr))`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
-                        .then(`this.addr = this.addrLo + (this.addrHi << 8))`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
                     new Cycle(6, 'read from effective address')
@@ -1329,6 +1459,7 @@ export class Mos6502Gen {
 
                     new Cycle(8, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -1348,12 +1479,12 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr))`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
-                        .then(`this.addr = this.addrLo + (this.addrHi << 8))`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
                     new Cycle(6, 'write to effective address')
@@ -1366,7 +1497,7 @@ export class Mos6502Gen {
         }
     }
 
-    private getIndirectYCycles(statement: Statement, mc: Mc): Cycle[] {
+    private getIndirectYCycles(statement: Statement, mc: Mc, mcPost : Mc): Cycle[] {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -1381,7 +1512,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
@@ -1407,6 +1538,7 @@ export class Mos6502Gen {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -1419,7 +1551,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
@@ -1448,6 +1580,7 @@ export class Mos6502Gen {
 
                     new Cycle(8, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
+                        .then(mcPost)
                         .thenNextStatement()
 
                 ];
@@ -1465,7 +1598,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'fetch effective address low')
-                        .then(`this.addrLo = this.memory.getByte(this.addrPtr`)
+                        .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
@@ -1530,26 +1663,27 @@ export class Mos6502Gen {
         var ctx = new Ctx();
 
         ctx.writeLine(`case 0x${statement.opcode.toString(16)}: /* ${statement.mnemonic} ${statement.cycleCount.toString()} */ {`);
-
+        ctx.indent();
         var rgcycle = statement.getCycles(this);
+    
+        ctx.writeLine('switch (this.t) {');
         ctx.indented(() => {
-            ctx.writeLine('switch (this.t) {');
-            ctx.indented(() => {
-                for (let icycle = 0; icycle < rgcycle.length; icycle++) {
-                    var cycle = rgcycle[icycle];
+            for (let icycle = 0; icycle < rgcycle.length; icycle++) {
+                var cycle = rgcycle[icycle];
 
-                    ctx.writeLine(`case ${icycle}: {`);
-                    ctx.indented(() => {
-                        cycle.mc.write(ctx);
-                        ctx.writeLine('break;');
-                    });
-                    ctx.writeLine(`}`);
-                }
-            });
-            ctx.writeLine('}');
+                ctx.writeLine(`case ${icycle}: {`);
+                ctx.indented(() => {
+                    cycle.mc.write(ctx);
+                    ctx.writeLine('break;');
+                });
+                ctx.writeLine(`}`);
+            }
         });
+        ctx.writeLine('}');
+        
         ctx.writeLine('break;');
-
+        ctx.unindent();
+        ctx.writeLine('}');
         var res = ctx.getOutput();
         if (rgcycle.length !== statement.cycleCount.maxCycle()) {
             console.error(`${statement.mnemonic}: cycle count doesn't match. Expected ${statement.cycleCount.maxCycle()}, found ${rgcycle.length}`);
@@ -1666,11 +1800,11 @@ export class Mos6502Gen {
             new Statement(0xae, StatementKind.LDX, AddressingMode.Absolute, 3, new CycleCount(4)),
             new Statement(0xbe, StatementKind.LDX, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
 
-            new Statement(0xa2, StatementKind.LDY, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0xa6, StatementKind.LDY, AddressingMode.ZeroPage, 2, new CycleCount(3)),
-            new Statement(0xb6, StatementKind.LDY, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0xae, StatementKind.LDY, AddressingMode.Absolute, 3, new CycleCount(4)),
-            new Statement(0xbe, StatementKind.LDY, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xa0, StatementKind.LDY, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xa4, StatementKind.LDY, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0xb4, StatementKind.LDY, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
+            new Statement(0xac, StatementKind.LDY, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0xbc, StatementKind.LDY, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
 
             new Statement(0x4a, StatementKind.LSR, AddressingMode.Accumulator, 1, new CycleCount(2)),
             new Statement(0x46, StatementKind.LSR, AddressingMode.ZeroPage, 2, new CycleCount(5)),
@@ -1719,9 +1853,9 @@ export class Mos6502Gen {
             new Statement(0xe1, StatementKind.SBC, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0xf1, StatementKind.SBC, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
 
-            new Statement(0x18, StatementKind.SEC, AddressingMode.Implied, 1, new CycleCount(2)),
-            new Statement(0xd8, StatementKind.SED, AddressingMode.Implied, 1, new CycleCount(2)),
-            new Statement(0x58, StatementKind.SEI, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0x38, StatementKind.SEC, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0xf8, StatementKind.SED, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0x78, StatementKind.SEI, AddressingMode.Implied, 1, new CycleCount(2)),
 
             new Statement(0x85, StatementKind.STA, AddressingMode.ZeroPage, 2, new CycleCount(3)),
             new Statement(0x95, StatementKind.STA, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
@@ -1789,24 +1923,162 @@ export class Mos6502Gen {
             new Statement(0xd7, StatementKind.DCP, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
             new Statement(0xdb, StatementKind.DCP, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
             new Statement(0xdf, StatementKind.DCP, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            
+            new Statement(0xe3, StatementKind.ISC, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0xe7, StatementKind.ISC, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0xef, StatementKind.ISC, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0xf3, StatementKind.ISC, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0xf7, StatementKind.ISC, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0xfb, StatementKind.ISC, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0xff, StatementKind.ISC, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+
+            new Statement(0xab, StatementKind.LAX, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xa7, StatementKind.LAX, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0xb7, StatementKind.LAX, AddressingMode.ZeroPageY, 2, new CycleCount(4)),
+            new Statement(0xaf, StatementKind.LAX, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0xbf, StatementKind.LAX, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xa3, StatementKind.LAX, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0xb3, StatementKind.LAX, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
+
+            new Statement(0x83, StatementKind.SAX, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0x87, StatementKind.SAX, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x8f, StatementKind.SAX, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x97, StatementKind.SAX, AddressingMode.ZeroPageY, 2, new CycleCount(4)),
+
+            new Statement(0x03, StatementKind.SLO, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x07, StatementKind.SLO, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x0f, StatementKind.SLO, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x13, StatementKind.SLO, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x17, StatementKind.SLO, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x1b, StatementKind.SLO, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x1f, StatementKind.SLO, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
 
 
-            //new Statement(0xe3, StatementKind.ISC, AddressingMode.IndirectX, 2, new CycleCount(8)),
-            //new Statement(0xe7, StatementKind.ISC, AddressingMode.ZeroPage, 2, new CycleCount(5)),
-            //new Statement(0xef, StatementKind.ISC, AddressingMode.Absolute, 3, new CycleCount(6)),
-            //new Statement(0xf3, StatementKind.ISC, AddressingMode.IndirectY, 2, new CycleCount(8)),
-            //new Statement(0xf7, StatementKind.ISC, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
-            //new Statement(0xfb, StatementKind.ISC, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
-            //new Statement(0xff, StatementKind.ISC, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x23, StatementKind.RLA, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x27, StatementKind.RLA, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x2f, StatementKind.RLA, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x33, StatementKind.RLA, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x37, StatementKind.RLA, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x3b, StatementKind.RLA, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x3f, StatementKind.RLA, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+
+            new Statement(0x63, StatementKind.RRA, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x67, StatementKind.RRA, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x6f, StatementKind.RRA, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x73, StatementKind.RRA, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x77, StatementKind.RRA, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x7b, StatementKind.RRA, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x7f, StatementKind.RRA, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+
+            new Statement(0x43, StatementKind.SRE, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x47, StatementKind.SRE, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x4f, StatementKind.SRE, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x53, StatementKind.SRE, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x57, StatementKind.SRE, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x5b, StatementKind.SRE, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x5f, StatementKind.SRE, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+
+            new Statement(0x0b, StatementKind.ANC, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x2b, StatementKind.ANC, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x4b, StatementKind.ALR, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x6b, StatementKind.ARR, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xcb, StatementKind.AXS, AddressingMode.Immediate, 2, new CycleCount(2)),
+
+            new Statement(0x9c, StatementKind.SYA, AddressingMode.AbsoluteX, 3, new CycleCount(5)),
+            new Statement(0x9e, StatementKind.SXA, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0x8b, StatementKind.XAA, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x93, StatementKind.AXA, AddressingMode.IndirectY, 2, new CycleCount(6)),
+            new Statement(0x9b, StatementKind.XAS, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0x9f, StatementKind.AXA, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
 
         ];
 
-        var res = '';
+        var res = `///<reference path="Memory.ts"/>
+
+class Most6502Base {
+    opcode: number;
+    memory: Memory;
+    ip: number = 0;
+    sp: number = 0;
+    t: number = 0;
+    b: number = 0;
+    rA: number = 0;
+    rX: number = 0;
+    rY: number = 0;
+
+    private flgCarry: number = 0;
+    private flgZero: number = 0;
+    private flgNegative: number = 0;
+    private flgOverflow: number = 0;
+    private flgInterruptDisable: number = 1;
+    private flgDecimalMode: number = 0;
+    private flgBreakCommand: number = 0;
+
+    addr: number;
+    addrHi: number;
+    addrLo: number;
+    addrPtr: number;
+    ptrLo: number;
+    ptrHi: number;
+    ipC: number;
+    addrC: number;
+
+    public addrReset = 0xfffc;
+    public addrIRQ = 0xfffe;
+    public addrNMI = 0xfffa;
+  
+    private pushByte(byte: number) {
+        this.memory.setByte(0x100 + this.sp, byte & 0xff);
+        this.sp = this.sp === 0 ? 0xff : this.sp - 1;
+    }
+
+    private popByte():number{
+        this.sp = this.sp === 0xff ? 0 : this.sp + 1;
+        return this.memory.getByte(0x100 + this.sp);
+    }
+
+    public get rP(): number {
+        return (this.flgNegative << 7) +
+            (this.flgOverflow << 6) +
+            (1 << 5) +
+            (this.flgBreakCommand << 4) +
+            (this.flgDecimalMode << 3) +
+            (this.flgInterruptDisable << 2) +
+            (this.flgZero << 1) +
+            (this.flgCarry << 0);
+    }
+
+    public set rP(byte: number) {
+        this.flgNegative = (byte >> 7) & 1;
+        this.flgOverflow = (byte >> 6) & 1;
+        //skip (byte >> 5) & 1;
+        //skip this.flgBreakCommand = (byte >> 4) & 1;
+        this.flgBreakCommand = 0;
+        this.flgDecimalMode = (byte >> 3) & 1;
+        this.flgInterruptDisable = (byte >> 2) & 1;
+        this.flgZero = (byte >> 1) & 1;
+        this.flgCarry = (byte >> 0) & 1;
+    }
+
+    public clk() {
+
+        if (this.t === 0) {
+            this.opcode = this.memory.getByte(this.ip);
+            this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
+        }
+
+        switch (this.opcode) {
+`;
+
         for (let i=0;i<statements.length;i++) {
             res += this.genStatement(statements[i]);
         }
 
-     //   return 'done';
+        res += `}
+        }
+    }
+`;
         return res;
     }
 }

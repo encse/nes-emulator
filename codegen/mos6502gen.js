@@ -73,17 +73,32 @@ var StatementKind;
     StatementKind[StatementKind["STA"] = 45] = "STA";
     StatementKind[StatementKind["STX"] = 46] = "STX";
     StatementKind[StatementKind["STY"] = 47] = "STY";
-    StatementKind[StatementKind["SAX"] = 48] = "SAX";
-    StatementKind[StatementKind["TAX"] = 49] = "TAX";
-    StatementKind[StatementKind["TAY"] = 50] = "TAY";
-    StatementKind[StatementKind["TSX"] = 51] = "TSX";
-    StatementKind[StatementKind["TXA"] = 52] = "TXA";
-    StatementKind[StatementKind["TXS"] = 53] = "TXS";
-    StatementKind[StatementKind["TYA"] = 54] = "TYA";
-    StatementKind[StatementKind["JSR"] = 55] = "JSR";
-    StatementKind[StatementKind["RTS"] = 56] = "RTS";
-    StatementKind[StatementKind["DCP"] = 57] = "DCP";
-    StatementKind[StatementKind["ISC"] = 58] = "ISC";
+    StatementKind[StatementKind["TAX"] = 48] = "TAX";
+    StatementKind[StatementKind["TAY"] = 49] = "TAY";
+    StatementKind[StatementKind["TSX"] = 50] = "TSX";
+    StatementKind[StatementKind["TXA"] = 51] = "TXA";
+    StatementKind[StatementKind["TXS"] = 52] = "TXS";
+    StatementKind[StatementKind["TYA"] = 53] = "TYA";
+    StatementKind[StatementKind["JSR"] = 54] = "JSR";
+    StatementKind[StatementKind["RTS"] = 55] = "RTS";
+    StatementKind[StatementKind["DCP"] = 56] = "DCP";
+    StatementKind[StatementKind["SAX"] = 57] = "SAX";
+    StatementKind[StatementKind["LAX"] = 58] = "LAX";
+    StatementKind[StatementKind["ISC"] = 59] = "ISC";
+    StatementKind[StatementKind["SLO"] = 60] = "SLO";
+    StatementKind[StatementKind["RLA"] = 61] = "RLA";
+    StatementKind[StatementKind["SRE"] = 62] = "SRE";
+    StatementKind[StatementKind["RRA"] = 63] = "RRA";
+    StatementKind[StatementKind["ANC"] = 64] = "ANC";
+    StatementKind[StatementKind["ALR"] = 65] = "ALR";
+    StatementKind[StatementKind["ARR"] = 66] = "ARR";
+    StatementKind[StatementKind["AXS"] = 67] = "AXS";
+    StatementKind[StatementKind["SYA"] = 68] = "SYA";
+    StatementKind[StatementKind["SXA"] = 69] = "SXA";
+    StatementKind[StatementKind["XAA"] = 70] = "XAA";
+    StatementKind[StatementKind["XAS"] = 71] = "XAS";
+    StatementKind[StatementKind["AXA"] = 72] = "AXA";
+    StatementKind[StatementKind["LAR"] = 73] = "LAR";
 })(StatementKind || (StatementKind = {}));
 var Register;
 (function (Register) {
@@ -98,8 +113,9 @@ var MemoryAccessPattern;
     MemoryAccessPattern[MemoryAccessPattern["Pop"] = 1] = "Pop";
     MemoryAccessPattern[MemoryAccessPattern["Read"] = 2] = "Read";
     MemoryAccessPattern[MemoryAccessPattern["ReadModifyWrite"] = 3] = "ReadModifyWrite";
-    MemoryAccessPattern[MemoryAccessPattern["Write"] = 4] = "Write";
-    MemoryAccessPattern[MemoryAccessPattern["Jmp"] = 5] = "Jmp";
+    MemoryAccessPattern[MemoryAccessPattern["ReadModifyWriteAndModifyRegister"] = 4] = "ReadModifyWriteAndModifyRegister";
+    MemoryAccessPattern[MemoryAccessPattern["Write"] = 5] = "Write";
+    MemoryAccessPattern[MemoryAccessPattern["Jmp"] = 6] = "Jmp";
 })(MemoryAccessPattern || (MemoryAccessPattern = {}));
 var Ctx = (function () {
     function Ctx() {
@@ -163,7 +179,10 @@ var Statement = (function () {
     }
     Statement.prototype.getCycles = function (gen) {
         var mcPayload = gen[StatementKind[this.statementKind]]();
-        return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload);
+        var mcPostPayload = gen[StatementKind[this.statementKind] + 'Post'] ? gen[StatementKind[this.statementKind] + 'Post']() : null;
+        if (mcPostPayload && this.memoryAccessPattern != MemoryAccessPattern.ReadModifyWriteAndModifyRegister)
+            throw 'should not have postpayload';
+        return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload, mcPostPayload);
     };
     Object.defineProperty(Statement.prototype, "mnemonic", {
         get: function () {
@@ -191,6 +210,9 @@ var Statement = (function () {
                     case StatementKind.ROR:
                     case StatementKind.TAX:
                     case StatementKind.TAY:
+                    case StatementKind.ANC:
+                    case StatementKind.ALR:
+                    case StatementKind.ARR:
                         return Register.A;
                     case StatementKind.TSX:
                         return Register.SP;
@@ -210,6 +232,7 @@ var Statement = (function () {
                     case StatementKind.DEX:
                     case StatementKind.TAX:
                     case StatementKind.TSX:
+                    case StatementKind.AXS:
                         return Register.X;
                     case StatementKind.LDY:
                     case StatementKind.DEY:
@@ -229,6 +252,9 @@ var Statement = (function () {
                     case StatementKind.ROR:
                     case StatementKind.TXA:
                     case StatementKind.TYA:
+                    case StatementKind.ANC:
+                    case StatementKind.ALR:
+                    case StatementKind.ARR:
                         return Register.A;
                     case StatementKind.TXS:
                         return Register.SP;
@@ -236,7 +262,15 @@ var Statement = (function () {
                     case StatementKind.CPX:
                     case StatementKind.CPY:
                     case StatementKind.NOP:
+                    case StatementKind.SYA:
+                    case StatementKind.SXA:
+                    case StatementKind.XAA:
+                    case StatementKind.AXA:
+                    case StatementKind.XAS:
+                    case StatementKind.LAR:
                         return null;
+                    case StatementKind.LAX:
+                        return Register.A | Register.X;
                 }
             throw ('missing output register for ' + this.mnemonic);
         },
@@ -290,6 +324,17 @@ var Statement = (function () {
                 case StatementKind.TXA:
                 case StatementKind.TXS:
                 case StatementKind.TYA:
+                case StatementKind.LAX:
+                case StatementKind.ANC:
+                case StatementKind.ALR:
+                case StatementKind.ARR:
+                case StatementKind.AXS:
+                case StatementKind.SYA:
+                case StatementKind.SXA:
+                case StatementKind.XAA:
+                case StatementKind.AXA:
+                case StatementKind.XAS:
+                case StatementKind.LAR:
                     return MemoryAccessPattern.Read;
                 case StatementKind.ASL:
                 case StatementKind.LSR:
@@ -298,7 +343,6 @@ var Statement = (function () {
                 case StatementKind.ROL:
                 case StatementKind.ROR:
                 case StatementKind.DCP:
-                case StatementKind.ISC:
                     return MemoryAccessPattern.ReadModifyWrite;
                 case StatementKind.JMP:
                     return MemoryAccessPattern.Jmp;
@@ -307,8 +351,14 @@ var Statement = (function () {
                 case StatementKind.STY:
                 case StatementKind.SAX:
                     return MemoryAccessPattern.Write;
+                case StatementKind.ISC:
+                case StatementKind.SLO:
+                case StatementKind.RLA:
+                case StatementKind.SRE:
+                case StatementKind.RRA:
+                    return MemoryAccessPattern.ReadModifyWriteAndModifyRegister;
                 default:
-                    throw 'unknown statement kind';
+                    throw 'unknown statement kind ' + StatementKind[this.statementKind];
             }
         },
         enumerable: true,
@@ -453,6 +503,8 @@ var Cycle = (function () {
         return this;
     };
     Cycle.prototype.then = function (mc) {
+        if (!mc)
+            return this;
         this.mc = this.mc.then(mc);
         return this;
     };
@@ -631,6 +683,11 @@ var Mos6502Gen = (function () {
     Mos6502Gen.prototype.SAX = function () {
         return new Mc("this.b = this.rA & this.rX");
     };
+    Mos6502Gen.prototype.LAX = function () {
+        return new McNop()
+            .then("this.flgZero = this.b === 0 ? 1 : 0")
+            .then("this.flgNegative = this.b >= 128 ? 1 : 0");
+    };
     Mos6502Gen.prototype.TAX = function () {
         return new McNop()
             .then("this.flgZero = this.b === 0 ? 1 : 0")
@@ -664,8 +721,69 @@ var Mos6502Gen = (function () {
             .then("this.flgZero = this.rA === this.b? 1 : 0")
             .then("this.flgNegative = (this.rA - this.b) & 0x80 ? 1 : 0");
     };
+    Mos6502Gen.prototype.ISC = function () { return this.INC(); };
+    Mos6502Gen.prototype.ISCPost = function () { return this.SBC().thenMoveBToReg(Register.A); };
+    Mos6502Gen.prototype.SLO = function () { return this.ASL(); };
+    Mos6502Gen.prototype.SLOPost = function () { return this.ORA().thenMoveBToReg(Register.A); };
+    Mos6502Gen.prototype.RLA = function () { return this.ROL(); };
+    Mos6502Gen.prototype.RLAPost = function () { return this.AND().thenMoveBToReg(Register.A); };
+    Mos6502Gen.prototype.SRE = function () { return this.LSR(); };
+    Mos6502Gen.prototype.SREPost = function () { return this.EOR().thenMoveBToReg(Register.A); };
+    Mos6502Gen.prototype.RRA = function () { return this.ROR(); };
+    Mos6502Gen.prototype.RRAPost = function () { return this.ADC().thenMoveBToReg(Register.A); };
+    Mos6502Gen.prototype.ALR = function () {
+        //ALR #i($4B ii; 2 cycles)
+        //Equivalent to AND #i then LSR A.
+        return this.AND().then(this.LSR());
+    };
+    Mos6502Gen.prototype.ANC = function () {
+        //Does AND #i, setting N and Z flags based on the result. 
+        //Then it copies N (bit 7) to C.ANC #$FF could be useful for sign- extending, much like CMP #$80.ANC #$00 acts like LDA #$00 followed by CLC.
+        return this.AND().
+            then("this.flgCarry = this.flgNegative");
+    };
+    Mos6502Gen.prototype.ARR = function () {
+        //Similar to AND #i then ROR A, except sets the flags differently. N and Z are normal, but C is bit 6 and V is bit 6 xor bit 5.
+        return this.AND()
+            .then(this.ROR())
+            .then("this.flgCarry = (this.b & (1 << 6)) !== 0 ? 1 : 0")
+            .then(" this.flgOverflow = ((this.b & (1 << 6)) >> 6) ^ ((this.b & (1 << 5)) >> 5)");
+    };
+    Mos6502Gen.prototype.AXS = function () {
+        // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
+        return new McNop()
+            .then("const res = (this.rA & this.rX) + 256 - this.b")
+            .then("this.rX = res & 0xff")
+            .then("this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0")
+            .then("this.flgCarry = res > 255 ? 1 : 0")
+            .then("this.flgZero = this.rX === 0 ? 1 : 0");
+    };
+    Mos6502Gen.prototype.SYA = function () {
+        //not implemented
+        return new McNop();
+    };
+    Mos6502Gen.prototype.SXA = function () {
+        //not implemented
+        return new McNop();
+    };
+    Mos6502Gen.prototype.XAA = function () {
+        //not implemented
+        return new McNop();
+    };
+    Mos6502Gen.prototype.AXA = function () {
+        //not implemented
+        return new McNop();
+    };
+    Mos6502Gen.prototype.XAS = function () {
+        //not implemented
+        return new McNop();
+    };
+    Mos6502Gen.prototype.LAR = function () {
+        //not implemented
+        return new McNop();
+    };
     //http://nesdev.com/6502_cpu.txt
-    Mos6502Gen.prototype.getZeroPageCycles = function (statement, mc) {
+    Mos6502Gen.prototype.getZeroPageCycles = function (statement, mc, mcPost) {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -684,6 +802,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -697,11 +816,12 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(4, 'write the value back to effective address, and do the operation on it')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(5, 'write the new value to effective address')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -716,14 +836,14 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(3, 'write register to effective address')
                         .then(mc)
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .thenNextStatement(),
                 ];
             default:
                 throw 'not implemented';
         }
     };
-    Mos6502Gen.prototype.getZeroPageXYCycles = function (reg, statement, mc) {
+    Mos6502Gen.prototype.getZeroPageXYCycles = function (reg, statement, mc, mcPost) {
         var regAccess = this.getRegAccess(reg);
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
@@ -747,6 +867,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -764,11 +885,12 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(6, 'write the new value to effective address')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -787,20 +909,20 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(3, 'write register to effective address')
                         .then(mc)
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .thenNextStatement()
                 ];
             default:
                 throw 'not implemented';
         }
     };
-    Mos6502Gen.prototype.getZeroPageXCycles = function (statement, mc) {
-        return this.getZeroPageXYCycles(Register.X, statement, mc);
+    Mos6502Gen.prototype.getZeroPageXCycles = function (statement, mc, mcPost) {
+        return this.getZeroPageXYCycles(Register.X, statement, mc, mcPost);
     };
-    Mos6502Gen.prototype.getZeroPageYCycles = function (statement, mc) {
-        return this.getZeroPageXYCycles(Register.Y, statement, mc);
+    Mos6502Gen.prototype.getZeroPageYCycles = function (statement, mc, mcPost) {
+        return this.getZeroPageXYCycles(Register.Y, statement, mc, mcPost);
     };
-    Mos6502Gen.prototype.getAbsoluteCycles = function (statement, mc) {
+    Mos6502Gen.prototype.getAbsoluteCycles = function (statement, mc, mcPost) {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Jmp:
                 return [
@@ -838,6 +960,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -855,11 +978,12 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(6, 'write the new value to effective address')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -874,12 +998,12 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then("this.addrHi = this.memory.getByte(this.ip)")
-                        .then("this.addr = this.addrLo + (this.addrHi << 8))")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(4, 'write register to effective address')
                         .then(mc)
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .thenNextStatement()
                 ];
             default:
@@ -914,7 +1038,7 @@ var Mos6502Gen = (function () {
                 throw 'not implemented';
         }
     };
-    Mos6502Gen.prototype.getAbsoluteXYCycles = function (rXY, statement, mc) {
+    Mos6502Gen.prototype.getAbsoluteXYCycles = function (rXY, statement, mc, mcPost) {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -937,7 +1061,7 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrO << 8)",
+                        if: "this.addr = this.addr + (this.addrC << 8)",
                         else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
                     })
                         .thenNextCycle(),
@@ -948,6 +1072,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -975,11 +1100,12 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(6, 'write the value back to effective address, and do the operation on it')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(7, 'write the new value to effective address')
-                        .then("this.setByte(this.addr, this.b)")
+                        .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -1015,11 +1141,11 @@ var Mos6502Gen = (function () {
                 throw 'not implemented';
         }
     };
-    Mos6502Gen.prototype.getAbsoluteXCycles = function (statement, mc) {
-        return this.getAbsoluteXYCycles('rX', statement, mc);
+    Mos6502Gen.prototype.getAbsoluteXCycles = function (statement, mc, mcPost) {
+        return this.getAbsoluteXYCycles('rX', statement, mc, mcPost);
     };
-    Mos6502Gen.prototype.getAbsoluteYCycles = function (statement, mc) {
-        return this.getAbsoluteXYCycles('rY', statement, mc);
+    Mos6502Gen.prototype.getAbsoluteYCycles = function (statement, mc, mcPost) {
+        return this.getAbsoluteXYCycles('rY', statement, mc, mcPost);
     };
     Mos6502Gen.prototype.getImmediateCycles = function (statement, mc) {
         return [
@@ -1193,7 +1319,7 @@ var Mos6502Gen = (function () {
                 ];
         }
     };
-    Mos6502Gen.prototype.getIndirectXCycles = function (statement, mc) {
+    Mos6502Gen.prototype.getIndirectXCycles = function (statement, mc, mcPost) {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -1209,11 +1335,11 @@ var Mos6502Gen = (function () {
                         .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr))")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(5, 'fetch effective address high')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
-                        .then("this.addr = this.addrLo + (this.addrHi << 8))")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenNextCycle(),
                     new Cycle(6, 'read from effective address')
                         .then("this.b = this.memory.getByte(this.addr)")
@@ -1222,6 +1348,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -1235,11 +1362,11 @@ var Mos6502Gen = (function () {
                         .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr))")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(5, 'fetch effective address high')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
-                        .then("this.addr = this.addrLo + (this.addrHi << 8))")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenNextCycle(),
                     new Cycle(6, 'read from effective address')
                         .then("this.b = this.memory.getByte(this.addr)")
@@ -1250,6 +1377,7 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(8, 'write the new value to effective address')
                         .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -1266,11 +1394,11 @@ var Mos6502Gen = (function () {
                         .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr))")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(5, 'fetch effective address high')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
-                        .then("this.addr = this.addrLo + (this.addrHi << 8))")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenNextCycle(),
                     new Cycle(6, 'write to effective address')
                         .then(mc)
@@ -1281,7 +1409,7 @@ var Mos6502Gen = (function () {
                 throw 'not implemented';
         }
     };
-    Mos6502Gen.prototype.getIndirectYCycles = function (statement, mc) {
+    Mos6502Gen.prototype.getIndirectYCycles = function (statement, mc, mcPost) {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
@@ -1294,7 +1422,7 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
@@ -1317,6 +1445,7 @@ var Mos6502Gen = (function () {
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
+            case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
@@ -1327,7 +1456,7 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
@@ -1351,6 +1480,7 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(8, 'write the new value to effective address')
                         .then("this.memory.setByte(this.addr, this.b)")
+                        .then(mcPost)
                         .thenNextStatement()
                 ];
             case MemoryAccessPattern.Write:
@@ -1364,7 +1494,7 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'fetch effective address low')
-                        .then("this.addrLo = this.memory.getByte(this.addrPtr")
+                        .then("this.addrLo = this.memory.getByte(this.addrPtr)")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then("this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)")
@@ -1420,23 +1550,24 @@ var Mos6502Gen = (function () {
     Mos6502Gen.prototype.genStatement = function (statement) {
         var ctx = new Ctx();
         ctx.writeLine("case 0x" + statement.opcode.toString(16) + ": /* " + statement.mnemonic + " " + statement.cycleCount.toString() + " */ {");
+        ctx.indent();
         var rgcycle = statement.getCycles(this);
+        ctx.writeLine('switch (this.t) {');
         ctx.indented(function () {
-            ctx.writeLine('switch (this.t) {');
-            ctx.indented(function () {
-                for (var icycle = 0; icycle < rgcycle.length; icycle++) {
-                    var cycle = rgcycle[icycle];
-                    ctx.writeLine("case " + icycle + ": {");
-                    ctx.indented(function () {
-                        cycle.mc.write(ctx);
-                        ctx.writeLine('break;');
-                    });
-                    ctx.writeLine("}");
-                }
-            });
-            ctx.writeLine('}');
+            for (var icycle = 0; icycle < rgcycle.length; icycle++) {
+                var cycle = rgcycle[icycle];
+                ctx.writeLine("case " + icycle + ": {");
+                ctx.indented(function () {
+                    cycle.mc.write(ctx);
+                    ctx.writeLine('break;');
+                });
+                ctx.writeLine("}");
+            }
         });
+        ctx.writeLine('}');
         ctx.writeLine('break;');
+        ctx.unindent();
+        ctx.writeLine('}');
         var res = ctx.getOutput();
         if (rgcycle.length !== statement.cycleCount.maxCycle()) {
             console.error(statement.mnemonic + ": cycle count doesn't match. Expected " + statement.cycleCount.maxCycle() + ", found " + rgcycle.length);
@@ -1536,11 +1667,11 @@ var Mos6502Gen = (function () {
             new Statement(0xb6, StatementKind.LDX, AddressingMode.ZeroPageY, 2, new CycleCount(4)),
             new Statement(0xae, StatementKind.LDX, AddressingMode.Absolute, 3, new CycleCount(4)),
             new Statement(0xbe, StatementKind.LDX, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
-            new Statement(0xa2, StatementKind.LDY, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0xa6, StatementKind.LDY, AddressingMode.ZeroPage, 2, new CycleCount(3)),
-            new Statement(0xb6, StatementKind.LDY, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0xae, StatementKind.LDY, AddressingMode.Absolute, 3, new CycleCount(4)),
-            new Statement(0xbe, StatementKind.LDY, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xa0, StatementKind.LDY, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xa4, StatementKind.LDY, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0xb4, StatementKind.LDY, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
+            new Statement(0xac, StatementKind.LDY, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0xbc, StatementKind.LDY, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0x4a, StatementKind.LSR, AddressingMode.Accumulator, 1, new CycleCount(2)),
             new Statement(0x46, StatementKind.LSR, AddressingMode.ZeroPage, 2, new CycleCount(5)),
             new Statement(0x56, StatementKind.LSR, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
@@ -1579,9 +1710,9 @@ var Mos6502Gen = (function () {
             new Statement(0xf9, StatementKind.SBC, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
             new Statement(0xe1, StatementKind.SBC, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0xf1, StatementKind.SBC, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
-            new Statement(0x18, StatementKind.SEC, AddressingMode.Implied, 1, new CycleCount(2)),
-            new Statement(0xd8, StatementKind.SED, AddressingMode.Implied, 1, new CycleCount(2)),
-            new Statement(0x58, StatementKind.SEI, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0x38, StatementKind.SEC, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0xf8, StatementKind.SED, AddressingMode.Implied, 1, new CycleCount(2)),
+            new Statement(0x78, StatementKind.SEI, AddressingMode.Implied, 1, new CycleCount(2)),
             new Statement(0x85, StatementKind.STA, AddressingMode.ZeroPage, 2, new CycleCount(3)),
             new Statement(0x95, StatementKind.STA, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
             new Statement(0x8d, StatementKind.STA, AddressingMode.Absolute, 3, new CycleCount(4)),
@@ -1638,12 +1769,70 @@ var Mos6502Gen = (function () {
             new Statement(0xd7, StatementKind.DCP, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
             new Statement(0xdb, StatementKind.DCP, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
             new Statement(0xdf, StatementKind.DCP, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0xe3, StatementKind.ISC, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0xe7, StatementKind.ISC, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0xef, StatementKind.ISC, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0xf3, StatementKind.ISC, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0xf7, StatementKind.ISC, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0xfb, StatementKind.ISC, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0xff, StatementKind.ISC, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0xab, StatementKind.LAX, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xa7, StatementKind.LAX, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0xb7, StatementKind.LAX, AddressingMode.ZeroPageY, 2, new CycleCount(4)),
+            new Statement(0xaf, StatementKind.LAX, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0xbf, StatementKind.LAX, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xa3, StatementKind.LAX, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0xb3, StatementKind.LAX, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
+            new Statement(0x83, StatementKind.SAX, AddressingMode.IndirectX, 2, new CycleCount(6)),
+            new Statement(0x87, StatementKind.SAX, AddressingMode.ZeroPage, 2, new CycleCount(3)),
+            new Statement(0x8f, StatementKind.SAX, AddressingMode.Absolute, 3, new CycleCount(4)),
+            new Statement(0x97, StatementKind.SAX, AddressingMode.ZeroPageY, 2, new CycleCount(4)),
+            new Statement(0x03, StatementKind.SLO, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x07, StatementKind.SLO, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x0f, StatementKind.SLO, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x13, StatementKind.SLO, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x17, StatementKind.SLO, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x1b, StatementKind.SLO, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x1f, StatementKind.SLO, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x23, StatementKind.RLA, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x27, StatementKind.RLA, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x2f, StatementKind.RLA, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x33, StatementKind.RLA, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x37, StatementKind.RLA, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x3b, StatementKind.RLA, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x3f, StatementKind.RLA, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x63, StatementKind.RRA, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x67, StatementKind.RRA, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x6f, StatementKind.RRA, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x73, StatementKind.RRA, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x77, StatementKind.RRA, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x7b, StatementKind.RRA, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x7f, StatementKind.RRA, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x43, StatementKind.SRE, AddressingMode.IndirectX, 2, new CycleCount(8)),
+            new Statement(0x47, StatementKind.SRE, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x4f, StatementKind.SRE, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x53, StatementKind.SRE, AddressingMode.IndirectY, 2, new CycleCount(8)),
+            new Statement(0x57, StatementKind.SRE, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x5b, StatementKind.SRE, AddressingMode.AbsoluteY, 3, new CycleCount(7)),
+            new Statement(0x5f, StatementKind.SRE, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
+            new Statement(0x0b, StatementKind.ANC, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x2b, StatementKind.ANC, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x4b, StatementKind.ALR, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x6b, StatementKind.ARR, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0xcb, StatementKind.AXS, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x9c, StatementKind.SYA, AddressingMode.AbsoluteX, 3, new CycleCount(5)),
+            new Statement(0x9e, StatementKind.SXA, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0x8b, StatementKind.XAA, AddressingMode.Immediate, 2, new CycleCount(2)),
+            new Statement(0x93, StatementKind.AXA, AddressingMode.IndirectY, 2, new CycleCount(6)),
+            new Statement(0x9b, StatementKind.XAS, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0x9f, StatementKind.AXA, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
+            new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
         ];
-        var res = '';
+        var res = "///<reference path=\"Memory.ts\"/>\n\nclass Most6502Base {\n    opcode: number;\n    memory: Memory;\n    ip: number = 0;\n    sp: number = 0;\n    t: number = 0;\n    b: number = 0;\n    rA: number = 0;\n    rX: number = 0;\n    rY: number = 0;\n\n    private flgCarry: number = 0;\n    private flgZero: number = 0;\n    private flgNegative: number = 0;\n    private flgOverflow: number = 0;\n    private flgInterruptDisable: number = 1;\n    private flgDecimalMode: number = 0;\n    private flgBreakCommand: number = 0;\n\n    addr: number;\n    addrHi: number;\n    addrLo: number;\n    addrPtr: number;\n    ptrLo: number;\n    ptrHi: number;\n    ipC: number;\n    addrC: number;\n\n    public addrReset = 0xfffc;\n    public addrIRQ = 0xfffe;\n    public addrNMI = 0xfffa;\n  \n    private pushByte(byte: number) {\n        this.memory.setByte(0x100 + this.sp, byte & 0xff);\n        this.sp = this.sp === 0 ? 0xff : this.sp - 1;\n    }\n\n    private popByte():number{\n        this.sp = this.sp === 0xff ? 0 : this.sp + 1;\n        return this.memory.getByte(0x100 + this.sp);\n    }\n\n    public get rP(): number {\n        return (this.flgNegative << 7) +\n            (this.flgOverflow << 6) +\n            (1 << 5) +\n            (this.flgBreakCommand << 4) +\n            (this.flgDecimalMode << 3) +\n            (this.flgInterruptDisable << 2) +\n            (this.flgZero << 1) +\n            (this.flgCarry << 0);\n    }\n\n    public set rP(byte: number) {\n        this.flgNegative = (byte >> 7) & 1;\n        this.flgOverflow = (byte >> 6) & 1;\n        //skip (byte >> 5) & 1;\n        //skip this.flgBreakCommand = (byte >> 4) & 1;\n        this.flgBreakCommand = 0;\n        this.flgDecimalMode = (byte >> 3) & 1;\n        this.flgInterruptDisable = (byte >> 2) & 1;\n        this.flgZero = (byte >> 1) & 1;\n        this.flgCarry = (byte >> 0) & 1;\n    }\n\n    public clk() {\n\n        if (this.t === 0) {\n            this.opcode = this.memory.getByte(this.ip);\n            this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;\n        }\n\n        switch (this.opcode) {\n";
         for (var i = 0; i < statements.length; i++) {
             res += this.genStatement(statements[i]);
         }
-        //   return 'done';
+        res += "}\n        }\n    }\n";
         return res;
     };
     return Mos6502Gen;

@@ -153,7 +153,7 @@
             return res;
         }
         default:
-            throw 'unimplemented read from addr ' + addr;
+            console.error('unimplemented read from addr ' + addr);
             return 0;
         }
     }

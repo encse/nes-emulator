@@ -56,7 +56,7 @@ class StepTest {
                 log(actual);
                 break;
             }
-            nesemu.step();
+            nesemu.cpu.stepInstr();
             prevLine = line;
             line = this.readLine();
         };
