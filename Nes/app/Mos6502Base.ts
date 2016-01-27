@@ -179,6 +179,7 @@ case 0x6d: /* ADC Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -225,7 +226,8 @@ case 0x7d: /* ADC AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 const sum = this.rA + this.b + this.flgCarry;
                 const bothPositive = this.b < 128 && this.rA < 128;
@@ -238,7 +240,6 @@ case 0x7d: /* ADC AbsoluteX 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -283,7 +284,8 @@ case 0x79: /* ADC AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 const sum = this.rA + this.b + this.flgCarry;
                 const bothPositive = this.b < 128 && this.rA < 128;
@@ -296,7 +298,6 @@ case 0x79: /* ADC AbsoluteY 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -330,7 +331,8 @@ case 0x61: /* ADC IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -391,7 +393,8 @@ case 0x71: /* ADC IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 const sum = this.rA + this.b + this.flgCarry;
                 const bothPositive = this.b < 128 && this.rA < 128;
@@ -404,7 +407,6 @@ case 0x71: /* ADC IndirectY 5pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -515,6 +517,7 @@ case 0x2d: /* AND Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -556,7 +559,8 @@ case 0x3d: /* AND AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b &= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -564,7 +568,6 @@ case 0x3d: /* AND AbsoluteX 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -604,7 +607,8 @@ case 0x39: /* AND AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b &= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -612,7 +616,6 @@ case 0x39: /* AND AbsoluteY 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -641,7 +644,8 @@ case 0x21: /* AND IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -697,7 +701,8 @@ case 0x31: /* AND IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b &= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -705,7 +710,6 @@ case 0x31: /* AND IndirectY 5pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -832,6 +836,7 @@ case 0xe: /* ASL Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -883,7 +888,7 @@ case 0x1e: /* ASL AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -930,17 +935,17 @@ case 0x90: /* BCC Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -967,17 +972,17 @@ case 0xb0: /* BCS Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1004,17 +1009,17 @@ case 0xf0: /* BEQ Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1041,17 +1046,17 @@ case 0x30: /* BMI Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1078,17 +1083,17 @@ case 0xd0: /* BNE Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1115,17 +1120,17 @@ case 0x10: /* BPL Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1152,17 +1157,17 @@ case 0x50: /* BVC Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1189,17 +1194,17 @@ case 0x70: /* BVS Relative 2pc bc  */ {
         case 2: {
             this.memory.getByte(this.ip);
             this.b = this.b >= 128 ? this.b - 256 : this.b;
-            this.ipC = (this.ip & 0xff) + this.b >> 8;
-            this.ip += this.b;
-            if (this.ipC) {
+            this.ipC = ((this.ip & 0xff) + this.b) >> 8;
+            if (((this.ip & 0xff) + this.b) >> 8) {
                 this.t++;
             } else {
+                this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
             break;
         }
         case 3: {
-            this.ip += this.ipC << 8;
+            this.ip = (this.ip + this.b) & 0xffff;
             this.t = 0;
             break;
         }
@@ -1221,11 +1226,9 @@ case 0x24: /* BIT ZeroPage 3 */ {
         }
         case 2: {
             this.b = this.memory.getByte(this.addr);
-            this.b = this.rA & this.b;
-            this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 128 ? 1 : 0;
             this.flgOverflow = this.b & 64 ? 1 : 0;
-            this.rA = this.b;
+            this.flgZero = !(this.rA & this.b) ? 1 : 0;
             this.t = 0;
             break;
         }
@@ -1247,17 +1250,16 @@ case 0x2c: /* BIT Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
         }
         case 3: {
             this.b = this.memory.getByte(this.addr);
-            this.b = this.rA & this.b;
-            this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 128 ? 1 : 0;
             this.flgOverflow = this.b & 64 ? 1 : 0;
-            this.rA = this.b;
+            this.flgZero = !(this.rA & this.b) ? 1 : 0;
             this.t = 0;
             break;
         }
@@ -1321,7 +1323,7 @@ case 0xb8: /* CLV Implied 2 */ {
         }
         case 1: {
             this.memory.getByte(this.ip);
-            this.flgOverflow = 1;
+            this.flgOverflow = 0;
             this.t = 0;
             break;
         }
@@ -1416,6 +1418,7 @@ case 0xcd: /* CMP Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -1456,14 +1459,14 @@ case 0xdd: /* CMP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgCarry = this.rA >= this.b ? 1 : 0;
                 this.flgZero =  this.rA === this.b ? 1 : 0;
                 this.flgNegative = (this.rA - this.b) & 128 ? 1 : 0;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -1502,14 +1505,14 @@ case 0xd9: /* CMP AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgCarry = this.rA >= this.b ? 1 : 0;
                 this.flgZero =  this.rA === this.b ? 1 : 0;
                 this.flgNegative = (this.rA - this.b) & 128 ? 1 : 0;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -1537,7 +1540,8 @@ case 0xc1: /* CMP IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -1592,14 +1596,14 @@ case 0xd1: /* CMP IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgCarry = this.rA >= this.b ? 1 : 0;
                 this.flgZero =  this.rA === this.b ? 1 : 0;
                 this.flgNegative = (this.rA - this.b) & 128 ? 1 : 0;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -1671,6 +1675,7 @@ case 0xec: /* CPX Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -1744,6 +1749,7 @@ case 0xcc: /* CPY Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -1848,6 +1854,7 @@ case 0xce: /* DEC Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -1898,7 +1905,7 @@ case 0xde: /* DEC AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -2053,6 +2060,7 @@ case 0xee: /* INC Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -2103,7 +2111,7 @@ case 0xfe: /* INC AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -2260,6 +2268,7 @@ case 0x4d: /* EOR Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -2301,7 +2310,8 @@ case 0x5d: /* EOR AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b ^= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -2309,7 +2319,6 @@ case 0x5d: /* EOR AbsoluteX 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -2349,7 +2358,8 @@ case 0x59: /* EOR AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b ^= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -2357,7 +2367,6 @@ case 0x59: /* EOR AbsoluteY 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -2386,7 +2395,8 @@ case 0x41: /* EOR IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -2442,7 +2452,8 @@ case 0x51: /* EOR IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b ^= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -2450,7 +2461,6 @@ case 0x51: /* EOR IndirectY 5pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -2608,6 +2618,7 @@ case 0xad: /* LDA Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -2648,14 +2659,14 @@ case 0xbd: /* LDA AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = !this.b ? 1 : 0;
                 this.flgNegative = this.b & 128 ? 1 : 0;
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -2694,14 +2705,14 @@ case 0xb9: /* LDA AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = !this.b ? 1 : 0;
                 this.flgNegative = this.b & 128 ? 1 : 0;
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -2729,7 +2740,8 @@ case 0xa1: /* LDA IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -2784,14 +2796,14 @@ case 0xb1: /* LDA IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = !this.b ? 1 : 0;
                 this.flgNegative = this.b & 128 ? 1 : 0;
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -2893,6 +2905,7 @@ case 0xae: /* LDX Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -2933,14 +2946,14 @@ case 0xbe: /* LDX AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = !this.b ? 1 : 0;
                 this.flgNegative = this.b & 128 ? 1 : 0;
                 this.rX = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -3042,6 +3055,7 @@ case 0xac: /* LDY Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -3082,14 +3096,14 @@ case 0xbc: /* LDY AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = !this.b ? 1 : 0;
                 this.flgNegative = this.b & 128 ? 1 : 0;
                 this.rY = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -3215,6 +3229,7 @@ case 0x4e: /* LSR Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -3266,7 +3281,7 @@ case 0x5e: /* LSR AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -3399,6 +3414,7 @@ case 0xd: /* ORA Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -3440,7 +3456,8 @@ case 0x1d: /* ORA AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b |= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -3448,7 +3465,6 @@ case 0x1d: /* ORA AbsoluteX 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -3488,7 +3504,8 @@ case 0x19: /* ORA AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b |= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -3496,7 +3513,6 @@ case 0x19: /* ORA AbsoluteY 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -3525,7 +3541,8 @@ case 0x1: /* ORA IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -3581,7 +3598,8 @@ case 0x11: /* ORA IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b |= this.rA;
                 this.flgZero = !this.b ? 1 : 0;
@@ -3589,7 +3607,6 @@ case 0x11: /* ORA IndirectY 5pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -3811,6 +3828,7 @@ case 0x2e: /* ROL Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -3863,7 +3881,7 @@ case 0x3e: /* ROL AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -4006,6 +4024,7 @@ case 0x6e: /* ROR Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -4058,7 +4077,7 @@ case 0x7e: /* ROR AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -4272,6 +4291,7 @@ case 0xed: /* SBC Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -4319,7 +4339,8 @@ case 0xfd: /* SBC AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b = 255 - this.b;
                 const sum = this.rA + this.b + this.flgCarry;
@@ -4333,7 +4354,6 @@ case 0xfd: /* SBC AbsoluteX 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -4379,7 +4399,8 @@ case 0xf9: /* SBC AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b = 255 - this.b;
                 const sum = this.rA + this.b + this.flgCarry;
@@ -4393,7 +4414,6 @@ case 0xf9: /* SBC AbsoluteY 4pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -4428,7 +4448,8 @@ case 0xe1: /* SBC IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -4490,7 +4511,8 @@ case 0xf1: /* SBC IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.b = 255 - this.b;
                 const sum = this.rA + this.b + this.flgCarry;
@@ -4504,7 +4526,6 @@ case 0xf1: /* SBC IndirectY 5pc  */ {
                 this.rA = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -4677,7 +4698,7 @@ case 0x9d: /* STA AbsoluteX 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -4716,7 +4737,7 @@ case 0x99: /* STA AbsoluteY 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -4744,7 +4765,8 @@ case 0x81: /* STA IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -4797,7 +4819,7 @@ case 0x91: /* STA IndirectY 6 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -5109,8 +5131,7 @@ case 0x20: /* JSR JSR 6 */ {
             break;
         }
         case 5: {
-            this.ip = this.addrLo;
-            this.ip |= this.memory.getByte(this.ip) << 8;
+            this.ip = (this.memory.getByte(this.ip) << 8) + this.addrLo;
             this.t = 0;
             break;
         }
@@ -5561,6 +5582,7 @@ case 0xc: /* NOP Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -5598,11 +5620,11 @@ case 0x1c: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -5638,11 +5660,11 @@ case 0x3c: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -5678,11 +5700,11 @@ case 0x5c: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -5718,11 +5740,11 @@ case 0x7c: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -5758,11 +5780,11 @@ case 0xdc: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -5798,15 +5820,41 @@ case 0xfc: /* NOP AbsoluteX 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
             this.b = this.memory.getByte(this.addr);
+            this.t = 0;
+            break;
+        }
+    }
+    break;
+}
+case 0xeb: /* SBC Immediate 2 */ {
+    switch (this.t) {
+        case 0: {
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 1: {
+            this.b = this.memory.getByte(this.ip);
+            this.ip++;
+            this.b = 255 - this.b;
+            const sum = this.rA + this.b + this.flgCarry;
+            const bothPositive = this.b < 128 && this.rA < 128;
+            const bothNegative = this.b >= 128 && this.rA >= 128;
+            this.flgCarry = sum > 255 ? 1 : 0;
+            this.b = sum % 256;
+            this.flgNegative = this.b >= 128 ? 1 : 0;
+            this.flgZero = this.b === 0 ? 1 : 0;
+            this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
+            this.rA = this.b;
             this.t = 0;
             break;
         }
@@ -5827,7 +5875,8 @@ case 0xc3: /* DCP IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -5914,6 +5963,7 @@ case 0xcf: /* DCP Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -5969,7 +6019,7 @@ case 0xd3: /* DCP IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6062,7 +6112,7 @@ case 0xdb: /* DCP AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6114,7 +6164,7 @@ case 0xdf: /* DCP AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6155,7 +6205,8 @@ case 0xe3: /* ISC IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -6260,6 +6311,7 @@ case 0xef: /* ISC Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -6324,7 +6376,7 @@ case 0xf3: /* ISC IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6435,7 +6487,7 @@ case 0xfb: /* ISC AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6496,7 +6548,7 @@ case 0xff: /* ISC AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -6623,6 +6675,7 @@ case 0xaf: /* LAX Absolute 4 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -6664,7 +6717,8 @@ case 0xbf: /* LAX AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
@@ -6672,7 +6726,6 @@ case 0xbf: /* LAX AbsoluteY 4pc  */ {
                 this.rX = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -6701,7 +6754,8 @@ case 0xa3: /* LAX IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -6757,7 +6811,8 @@ case 0xb3: /* LAX IndirectY 5pc  */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
@@ -6765,7 +6820,6 @@ case 0xb3: /* LAX IndirectY 5pc  */ {
                 this.rX = this.b;
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -6794,7 +6848,8 @@ case 0x83: /* SAX IndirectX 6 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -6911,7 +6966,8 @@ case 0x3: /* SLO IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -7006,6 +7062,7 @@ case 0xf: /* SLO Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -7065,7 +7122,7 @@ case 0x13: /* SLO IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7166,7 +7223,7 @@ case 0x1b: /* SLO AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7222,7 +7279,7 @@ case 0x1f: /* SLO AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7267,7 +7324,8 @@ case 0x23: /* RLA IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -7364,6 +7422,7 @@ case 0x2f: /* RLA Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -7424,7 +7483,7 @@ case 0x33: /* RLA IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7527,7 +7586,7 @@ case 0x3b: /* RLA AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7584,7 +7643,7 @@ case 0x3f: /* RLA AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7630,7 +7689,8 @@ case 0x63: /* RRA IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -7737,6 +7797,7 @@ case 0x6f: /* RRA Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -7802,7 +7863,7 @@ case 0x73: /* RRA IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7915,7 +7976,7 @@ case 0x7b: /* RRA AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -7977,7 +8038,7 @@ case 0x7f: /* RRA AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -8028,7 +8089,8 @@ case 0x43: /* SRE IndirectX 8 */ {
             break;
         }
         case 2: {
-            this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff;
+            this.memory.getByte(this.addrPtr);
+            this.addrPtr = (this.addrPtr + this.rX) & 0xff;
             this.t++;
             break;
         }
@@ -8123,6 +8185,7 @@ case 0x4f: /* SRE Absolute 6 */ {
         }
         case 2: {
             this.addrHi = this.memory.getByte(this.ip);
+            this.addr = this.addrLo + (this.addrHi << 8);
             this.ip++;
             this.t++;
             break;
@@ -8182,7 +8245,7 @@ case 0x53: /* SRE IndirectY 8 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -8283,7 +8346,7 @@ case 0x5b: /* SRE AbsoluteY 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -8339,7 +8402,7 @@ case 0x5f: /* SRE AbsoluteX 7 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
             }
             this.t++;
             break;
@@ -8510,11 +8573,11 @@ case 0x9c: /* SYA AbsoluteX 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -8550,11 +8613,11 @@ case 0x9e: /* SXA AbsoluteY 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -8610,11 +8673,11 @@ case 0x93: /* AXA IndirectY 6 */ {
         case 4: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 5: {
@@ -8650,11 +8713,11 @@ case 0x9b: /* XAS AbsoluteY 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -8690,11 +8753,11 @@ case 0x9f: /* AXA AbsoluteY 5 */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -8730,11 +8793,11 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
         case 3: {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
-                this.addr = this.addr + (this.addrC << 8);
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
             } else {
                 this.t = 0;
             }
-            this.t++;
             break;
         }
         case 4: {
@@ -8745,6 +8808,8 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
     }
     break;
 }
+
+    default: throw 'invalid opcode $' + this.opcode.toString(16); 
 }
         }
     }

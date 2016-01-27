@@ -195,7 +195,6 @@ class Statement {
                 case StatementKind.ADC:
                 case StatementKind.SBC:
                 case StatementKind.AND:
-                case StatementKind.BIT:
                 case StatementKind.EOR:
                 case StatementKind.ORA:
                 case StatementKind.LDA:
@@ -222,6 +221,8 @@ class Statement {
                 case StatementKind.AXA:
                 case StatementKind.XAS:
                 case StatementKind.LAR:
+                case StatementKind.BIT:
+
                     return null;
             
                 case StatementKind.LAX:
@@ -316,6 +317,10 @@ class Mc {
 
     then(mc: string | Mc): Mc {
         return new McCons(this, Mc.lift(mc));
+    }
+
+    thenNextCycle(): Mc {
+        return new McCons(this, new McNextCycle());
     }
 
     thenNextStatement(): Mc {
@@ -540,10 +545,10 @@ export class Mos6502Gen {
     private BIT(): Mc {
 
         return new McNop()
-            .then(`this.b = this.rA & this.b`)
-            .then(`this.flgZero = !this.b ? 1 : 0`)
             .then(`this.flgNegative = this.b & 128 ? 1 : 0`)
-            .then(`this.flgOverflow = this.b & 64 ? 1 : 0`);
+            .then(`this.flgOverflow = this.b & 64 ? 1 : 0`)
+            .then(`this.flgZero = !(this.rA & this.b) ? 1 : 0`)
+          ;
     }
 
     private ASL(): Mc {
@@ -616,7 +621,7 @@ export class Mos6502Gen {
     private SEI(): Mc { return new Mc(`this.flgInterruptDisable = 1`) } 
     private SEC(): Mc { return new Mc(`this.flgCarry = 1`) } 
     private SED(): Mc { return new Mc(`this.flgDecimalMode = 1`) } 
-    private CLV(): Mc { return new Mc(`this.flgOverflow = 1`) } 
+    private CLV(): Mc { return new Mc(`this.flgOverflow = 0`) } 
 
     private JMP(): Mc { return new McNop(); }
 
@@ -973,9 +978,9 @@ export class Mos6502Gen {
 
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
-
                     new Cycle(4, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
@@ -997,6 +1002,7 @@ export class Mos6502Gen {
 
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
+                        .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
@@ -1102,10 +1108,9 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`,
+                            if: new Mc(`this.addr = (this.addr + (this.addrC << 8)) & 0xffff`).thenNextCycle(),
                             else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
-                        })
-                        .thenNextCycle(),
+                        }),
 
                     new Cycle(5, 're-read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
@@ -1139,7 +1144,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`
                         })
                         .thenNextCycle(),
 
@@ -1182,7 +1187,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
                         })
                         .thenNextCycle(),
 
@@ -1258,8 +1263,7 @@ export class Mos6502Gen {
                 .then(`this.pushByte(this.ip & 0xff)`)
                 .thenNextCycle(),
             new Cycle(6, 'copy low address byte to PCL, fetch high address byte to PCH')
-                .then(`this.ip = this.addrLo`)
-                .then(`this.ip |= this.memory.getByte(this.ip) << 8`).withDummyPcIncrement()
+                .then(`this.ip = (this.memory.getByte(this.ip) << 8) + this.addrLo`).withDummyPcIncrement()
                 .thenNextStatement()
         ];
     }
@@ -1404,7 +1408,8 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'read from the address, add X to it')
-                        .then(`this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff`)
+                        .then(`this.memory.getByte(this.addrPtr)`)
+                        .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
@@ -1436,7 +1441,8 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'read from the address, add X to it')
-                        .then(`this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff`)
+                        .then(`this.memory.getByte(this.addrPtr)`)
+                        .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
@@ -1475,7 +1481,8 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(3, 'read from the address, add X to it')
-                        .then(`this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff`)
+                        .then(`this.memory.getByte(this.addrPtr)`)
+                        .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
                     new Cycle(4, 'fetch effective address low')
@@ -1526,10 +1533,9 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`,
+                            if: new Mc(`this.addr = (this.addr + (this.addrC << 8)) & 0xffff`).thenNextCycle(),
                             else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
-                        })
-                        .thenNextCycle(),
+                        }),
 
                     new Cycle(6, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
@@ -1565,7 +1571,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
                         })
                         .thenNextCycle(),
 
@@ -1612,7 +1618,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = this.addr + (this.addrC << 8)`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
                         })
                         .thenNextCycle(),
 
@@ -1645,16 +1651,15 @@ export class Mos6502Gen {
             new Cycle(3, 'fetch opcode of next instruction, if branch is taken add operand to pc')
                 .then(`this.memory.getByte(this.ip)`)
                 .then(`this.b = this.b >= 128 ? this.b - 256 : this.b`)
-                .then(`this.ipC = (this.ip & 0xff) + this.b >> 8`)
-                .then(`this.ip += this.b`)
+                .then(`this.ipC = ((this.ip & 0xff) + this.b) >> 8`)
                 .thenIf({
-                    cond: 'this.ipC',
+                    cond: '((this.ip & 0xff) + this.b) >> 8',
                     if: new McNextCycle(),
-                    else: new McNextStatement()
+                    else: new Mc(`this.ip = (this.ip + this.b) & 0xffff`).thenNextStatement()
                 }),
 
             new Cycle(4, 'Fix PCH.')
-                .then(`this.ip += this.ipC << 8`)
+                .then(`this.ip = (this.ip + this.b) & 0xffff`)
                 .thenNextStatement()
         ];
     }
@@ -1916,6 +1921,8 @@ export class Mos6502Gen {
             new Statement(0xdc, StatementKind.NOP, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0xfc, StatementKind.NOP, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
 
+            new Statement(0xeb, StatementKind.SBC, AddressingMode.Immediate, 2, new CycleCount(2)),
+
             new Statement(0xc3, StatementKind.DCP, AddressingMode.IndirectX, 2, new CycleCount(8)),
             new Statement(0xc7, StatementKind.DCP, AddressingMode.ZeroPage, 2, new CycleCount(5)),
             new Statement(0xcf, StatementKind.DCP, AddressingMode.Absolute, 3, new CycleCount(6)),
@@ -2075,7 +2082,9 @@ class Most6502Base {
             res += this.genStatement(statements[i]);
         }
 
-        res += `}
+        res += `
+    default: throw 'invalid opcode $' + this.opcode.toString(16); 
+}
         }
     }
 `;

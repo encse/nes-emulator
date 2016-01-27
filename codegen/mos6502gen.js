@@ -242,7 +242,6 @@ var Statement = (function () {
                     case StatementKind.ADC:
                     case StatementKind.SBC:
                     case StatementKind.AND:
-                    case StatementKind.BIT:
                     case StatementKind.EOR:
                     case StatementKind.ORA:
                     case StatementKind.LDA:
@@ -268,6 +267,7 @@ var Statement = (function () {
                     case StatementKind.AXA:
                     case StatementKind.XAS:
                     case StatementKind.LAR:
+                    case StatementKind.BIT:
                         return null;
                     case StatementKind.LAX:
                         return Register.A | Register.X;
@@ -384,6 +384,9 @@ var Mc = (function () {
     };
     Mc.prototype.then = function (mc) {
         return new McCons(this, Mc.lift(mc));
+    };
+    Mc.prototype.thenNextCycle = function () {
+        return new McCons(this, new McNextCycle());
     };
     Mc.prototype.thenNextStatement = function () {
         return new McCons(this, new McNextStatement());
@@ -588,10 +591,9 @@ var Mos6502Gen = (function () {
     Mos6502Gen.prototype.LDY = function () { return this.LD(); };
     Mos6502Gen.prototype.BIT = function () {
         return new McNop()
-            .then("this.b = this.rA & this.b")
-            .then("this.flgZero = !this.b ? 1 : 0")
             .then("this.flgNegative = this.b & 128 ? 1 : 0")
-            .then("this.flgOverflow = this.b & 64 ? 1 : 0");
+            .then("this.flgOverflow = this.b & 64 ? 1 : 0")
+            .then("this.flgZero = !(this.rA & this.b) ? 1 : 0");
     };
     Mos6502Gen.prototype.ASL = function () {
         return new McNop()
@@ -653,7 +655,7 @@ var Mos6502Gen = (function () {
     Mos6502Gen.prototype.SEI = function () { return new Mc("this.flgInterruptDisable = 1"); };
     Mos6502Gen.prototype.SEC = function () { return new Mc("this.flgCarry = 1"); };
     Mos6502Gen.prototype.SED = function () { return new Mc("this.flgDecimalMode = 1"); };
-    Mos6502Gen.prototype.CLV = function () { return new Mc("this.flgOverflow = 1"); };
+    Mos6502Gen.prototype.CLV = function () { return new Mc("this.flgOverflow = 0"); };
     Mos6502Gen.prototype.JMP = function () { return new McNop(); };
     Mos6502Gen.prototype.PHA = function () {
         return new Mc("this.pushByte(this.rA)");
@@ -951,6 +953,7 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then("this.addrHi = this.memory.getByte(this.ip)")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(4, 'read from effective address')
@@ -972,6 +975,7 @@ var Mos6502Gen = (function () {
                         .thenNextCycle(),
                     new Cycle(3, 'fetch high byte of address, increment PC')
                         .then("this.addrHi = this.memory.getByte(this.ip)")
+                        .then("this.addr = this.addrLo + (this.addrHi << 8)")
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(4, 'read from effective address')
@@ -1061,10 +1065,9 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)",
+                        if: new Mc("this.addr = (this.addr + (this.addrC << 8)) & 0xffff").thenNextCycle(),
                         else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
-                    })
-                        .thenNextCycle(),
+                    }),
                     new Cycle(5, 're-read from effective address')
                         .then("this.b = this.memory.getByte(this.addr)")
                         .then(mc)
@@ -1093,7 +1096,7 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)"
+                        if: "this.addr = (this.addr + (this.addrC << 8)) & 0xffff"
                     })
                         .thenNextCycle(),
                     new Cycle(5, 're-read from effective address')
@@ -1129,7 +1132,7 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)",
+                        if: "this.addr = (this.addr + (this.addrC << 8)) & 0xffff",
                     })
                         .thenNextCycle(),
                     new Cycle(5, 'write to effective address')
@@ -1195,8 +1198,7 @@ var Mos6502Gen = (function () {
                 .then("this.pushByte(this.ip & 0xff)")
                 .thenNextCycle(),
             new Cycle(6, 'copy low address byte to PCL, fetch high address byte to PCH')
-                .then("this.ip = this.addrLo")
-                .then("this.ip |= this.memory.getByte(this.ip) << 8").withDummyPcIncrement()
+                .then("this.ip = (this.memory.getByte(this.ip) << 8) + this.addrLo").withDummyPcIncrement()
                 .thenNextStatement()
         ];
     };
@@ -1332,7 +1334,8 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'read from the address, add X to it')
-                        .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
+                        .then("this.memory.getByte(this.addrPtr)")
+                        .then("this.addrPtr = (this.addrPtr + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
                         .then("this.addrLo = this.memory.getByte(this.addrPtr)")
@@ -1359,7 +1362,8 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'read from the address, add X to it')
-                        .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
+                        .then("this.memory.getByte(this.addrPtr)")
+                        .then("this.addrPtr = (this.addrPtr + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
                         .then("this.addrLo = this.memory.getByte(this.addrPtr)")
@@ -1391,7 +1395,8 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(3, 'read from the address, add X to it')
-                        .then("this.addrPtr = (this.memory.getByte(this.addrPtr) + this.rX) & 0xff")
+                        .then("this.memory.getByte(this.addrPtr)")
+                        .then("this.addrPtr = (this.addrPtr + this.rX) & 0xff")
                         .thenNextCycle(),
                     new Cycle(4, 'fetch effective address low')
                         .then("this.addrLo = this.memory.getByte(this.addrPtr)")
@@ -1434,10 +1439,9 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)",
+                        if: new Mc("this.addr = (this.addr + (this.addrC << 8)) & 0xffff").thenNextCycle(),
                         else: mc.thenMoveBToReg(statement.regOut).thenNextStatement()
-                    })
-                        .thenNextCycle(),
+                    }),
                     new Cycle(6, 'read from effective address')
                         .then("this.b = this.memory.getByte(this.addr)")
                         .then(mc)
@@ -1468,7 +1472,7 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)",
+                        if: "this.addr = (this.addr + (this.addrC << 8)) & 0xffff",
                     })
                         .thenNextCycle(),
                     new Cycle(6, 'read from effective address')
@@ -1506,7 +1510,7 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenIf({
                         cond: "this.addrC",
-                        if: "this.addr = this.addr + (this.addrC << 8)",
+                        if: "this.addr = (this.addr + (this.addrC << 8)) & 0xffff",
                     })
                         .thenNextCycle(),
                     new Cycle(6, 'write to effective address')
@@ -1535,15 +1539,14 @@ var Mos6502Gen = (function () {
             new Cycle(3, 'fetch opcode of next instruction, if branch is taken add operand to pc')
                 .then("this.memory.getByte(this.ip)")
                 .then("this.b = this.b >= 128 ? this.b - 256 : this.b")
-                .then("this.ipC = (this.ip & 0xff) + this.b >> 8")
-                .then("this.ip += this.b")
+                .then("this.ipC = ((this.ip & 0xff) + this.b) >> 8")
                 .thenIf({
-                cond: 'this.ipC',
+                cond: '((this.ip & 0xff) + this.b) >> 8',
                 if: new McNextCycle(),
-                else: new McNextStatement()
+                else: new Mc("this.ip = (this.ip + this.b) & 0xffff").thenNextStatement()
             }),
             new Cycle(4, 'Fix PCH.')
-                .then("this.ip += this.ipC << 8")
+                .then("this.ip = (this.ip + this.b) & 0xffff")
                 .thenNextStatement()
         ];
     };
@@ -1762,6 +1765,7 @@ var Mos6502Gen = (function () {
             new Statement(0x7c, StatementKind.NOP, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0xdc, StatementKind.NOP, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0xfc, StatementKind.NOP, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xeb, StatementKind.SBC, AddressingMode.Immediate, 2, new CycleCount(2)),
             new Statement(0xc3, StatementKind.DCP, AddressingMode.IndirectX, 2, new CycleCount(8)),
             new Statement(0xc7, StatementKind.DCP, AddressingMode.ZeroPage, 2, new CycleCount(5)),
             new Statement(0xcf, StatementKind.DCP, AddressingMode.Absolute, 3, new CycleCount(6)),
@@ -1832,7 +1836,7 @@ var Mos6502Gen = (function () {
         for (var i = 0; i < statements.length; i++) {
             res += this.genStatement(statements[i]);
         }
-        res += "}\n        }\n    }\n";
+        res += "\n    default: throw 'invalid opcode $' + this.opcode.toString(16); \n}\n        }\n    }\n";
         return res;
     };
     return Mos6502Gen;

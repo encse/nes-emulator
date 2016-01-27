@@ -18,7 +18,7 @@ class StepTest {
     };
 
     public run(nesemu: NesEmulator, expectedOutput:string, log:(st: string)=>void ):void {
-        var prevLine = "BEGIN";
+        var prevLines = [];
         this.expectedOutput = expectedOutput;
         this.ich = 0;
         var line = this.readLine();
@@ -51,13 +51,22 @@ class StepTest {
             const actual = tsto(nesemu.cpu.ip, nesemu.cpu.rA, nesemu.cpu.rX, nesemu.cpu.rY, nesemu.cpu.rP, nesemu.cpu.sp);
 
             if (expected !== actual) {
-                log(prevLine);
+                prevLines.forEach(prevLine => log(prevLine));
                 log(expected);
                 log(actual);
                 break;
             }
-            nesemu.cpu.stepInstr();
-            prevLine = line;
+            prevLines.push(line);
+
+            try {
+                nesemu.cpu.stepInstr();
+            }
+            catch(e) {
+                log(e);
+                prevLines.forEach(prevLine => log(prevLine));
+            }
+            if (prevLines.length > 10)
+                prevLines.shift();
             line = this.readLine();
         };
 
