@@ -1,12 +1,11 @@
 ﻿///<reference path="Memory.ts"/>
 ///<reference path="Mos6502Base.ts"/>
 
-class Mos6502 extends  Most6502Base {
-    public irqLine = 1;
-    public nmiLine = 1;
+class Mos6502 extends Most6502Base {
+  
 
     public constructor(public memory: Memory) {
-        super();
+        super(memory);
     }
     public step() {
 
@@ -28,7 +27,7 @@ class Mos6502 extends  Most6502Base {
         return this.memory.getByte(addr) + 256 * this.memory.getByte(addr + 1);
     }
 
-    public Reset() {
+    public reset() {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
     }

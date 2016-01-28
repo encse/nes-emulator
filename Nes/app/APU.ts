@@ -77,7 +77,7 @@
     private getter(addr: number) {
         switch(addr) {
             case 0x4015:
-                if(this.cpu.irqLine ===0) {
+                if(this.cpu.irqLine === 0) {
                     console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
                 }
@@ -217,8 +217,10 @@
 
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
-        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3)
+        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3) {
             this.cpu.irqLine = 0;
-        //console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
+            console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
+            
+        }
     }
 }

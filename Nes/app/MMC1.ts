@@ -73,7 +73,7 @@ class MMC1 {
         this.memory = new CompoundMemory(
             new RepeatedMemory(4, new RAM(0x800)),
             new RAM(0x2000),
-            new RAM(0x4000),
+            new RAM(0x8000),
             PRGBanks[0],
             PRGBanks[1]
         );
@@ -154,16 +154,16 @@ class MMC1 {
                          +---------------+---------------+
         */
         if (this.P === 1) {
-            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
         }
         else if (this.S === 0) {
-            this.memory.rgmemory[1] = this.PRGBanks[0];
-            this.memory.rgmemory[2] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[3] = this.PRGBanks[0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
         }
         else {
-            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[2] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
         }
 
         /*

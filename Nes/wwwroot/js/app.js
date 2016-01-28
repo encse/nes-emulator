@@ -179,9 +179,10 @@ var APU = (function () {
             }
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
-        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3)
+        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3) {
             this.cpu.irqLine = 0;
-        //console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
+            console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
+        }
     };
     return APU;
 })();
@@ -297,7 +298,7 @@ var MMC1 = (function () {
             PRGBanks.push(new RAM(0x4000));
         while (VROMBanks.length < 2)
             VROMBanks.push(new RAM(0x1000));
-        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x4000), PRGBanks[0], PRGBanks[1]);
+        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
         this.nametableA = new RAM(0x400);
         this.nametableB = new RAM(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
@@ -424,16 +425,16 @@ var MMC1 = (function () {
                          +---------------+---------------+
         */
         if (this.P === 1) {
-            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[2] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
         }
         else if (this.S === 0) {
-            this.memory.rgmemory[1] = this.PRGBanks[0];
-            this.memory.rgmemory[2] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[3] = this.PRGBanks[0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
         }
         else {
-            this.memory.rgmemory[1] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[2] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
         }
         /*
             CHR Setup:
@@ -476,7 +477,8 @@ var MMC1 = (function () {
 })();
 ///<reference path="Memory.ts"/>
 var Most6502Base = (function () {
-    function Most6502Base() {
+    function Most6502Base(memory) {
+        this.memory = memory;
         this.ip = 0;
         this.sp = 0;
         this.t = 0;
@@ -484,17 +486,52 @@ var Most6502Base = (function () {
         this.rA = 0;
         this.rX = 0;
         this.rY = 0;
+        this.nmiRequested = false;
+        this.irqRequested = false;
+        this.nmiLine = 1;
+        this.nmiLinePrev = 1;
+        this.irqLine = 1;
         this.flgCarry = 0;
         this.flgZero = 0;
         this.flgNegative = 0;
         this.flgOverflow = 0;
-        this.flgInterruptDisable = 1;
+        this._flgInterruptDisable = 0;
         this.flgDecimalMode = 0;
         this.flgBreakCommand = 0;
         this.addrReset = 0xfffc;
         this.addrIRQ = 0xfffe;
         this.addrNMI = 0xfffa;
+        this.enablePCIncrement = true;
     }
+    Most6502Base.prototype.pollInterrupts = function () {
+        if (this.nmiDetected) {
+            this.nmiRequested = true;
+            this.nmiDetected = false;
+            console.log('nmi Requested');
+        }
+        if (this.irqDetected) {
+            console.log('irq requested');
+            this.irqRequested = true;
+        }
+    };
+    Most6502Base.prototype.detectInterrupts = function () {
+        if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
+            this.nmiDetected = true;
+        }
+        this.nmiLinePrev = this.nmiLine;
+        this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
+    };
+    Object.defineProperty(Most6502Base.prototype, "flgInterruptDisable", {
+        get: function () {
+            return this._flgInterruptDisable;
+        },
+        set: function (x) {
+            //console.log('flgInterruptDisable', x);
+            this._flgInterruptDisable = x;
+        },
+        enumerable: true,
+        configurable: true
+    });
     Most6502Base.prototype.pushByte = function (byte) {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
@@ -530,7 +567,18 @@ var Most6502Base = (function () {
     });
     Most6502Base.prototype.clk = function () {
         if (this.t === 0) {
-            this.opcode = this.memory.getByte(this.ip);
+            var nmiWasRequested = this.nmiRequested;
+            var irqWasRequested = this.irqRequested;
+            this.irqRequested = false;
+            this.nmiRequested = false;
+            if (nmiWasRequested || irqWasRequested) {
+                console.log('processing irq/nmi');
+                this.enablePCIncrement = false;
+                this.opcode = 0;
+            }
+            else {
+                this.opcode = this.memory.getByte(this.ip);
+            }
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
         switch (this.opcode) {
@@ -4605,13 +4653,15 @@ var Most6502Base = (function () {
             case 0x0: {
                 switch (this.t) {
                     case 0: {
-                        this.ip++;
+                        if (this.enablePCIncrement)
+                            this.ip++;
                         this.t++;
                         break;
                     }
                     case 1: {
                         this.memory.getByte(this.ip);
-                        this.ip++;
+                        if (this.enablePCIncrement)
+                            this.ip++;
                         this.t++;
                         break;
                     }
@@ -4626,6 +4676,10 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 4: {
+                        //  this.pollInterrupts();
+                        //   var nmi = this.nmiRequested;
+                        //   var irq = this.irqRequested;
+                        //    this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
                         this.flgBreakCommand = 1;
                         this.pushByte(this.rP);
                         this.flgBreakCommand = 0;
@@ -4640,6 +4694,7 @@ var Most6502Base = (function () {
                     }
                     case 6: {
                         this.ip += this.memory.getByte(this.addrIRQ + 1) << 8;
+                        this.enablePCIncrement = true;
                         this.t = 0;
                         break;
                     }
@@ -9325,6 +9380,9 @@ var Most6502Base = (function () {
             }
             default: throw 'invalid opcode $' + this.opcode.toString(16);
         }
+        if (this.t === 0)
+            this.pollInterrupts();
+        this.detectInterrupts();
     };
     return Most6502Base;
 })();
@@ -9338,10 +9396,8 @@ var __extends = (this && this.__extends) || function (d, b) {
 var Mos6502 = (function (_super) {
     __extends(Mos6502, _super);
     function Mos6502(memory) {
-        _super.call(this);
+        _super.call(this, memory);
         this.memory = memory;
-        this.irqLine = 1;
-        this.nmiLine = 1;
     }
     Mos6502.prototype.step = function () {
         this.clk();
@@ -9357,7 +9413,7 @@ var Mos6502 = (function (_super) {
     Mos6502.prototype.getWord = function (addr) {
         return this.memory.getByte(addr) + 256 * this.memory.getByte(addr + 1);
     };
-    Mos6502.prototype.Reset = function () {
+    Mos6502.prototype.reset = function () {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
     };
@@ -12399,7 +12455,7 @@ var NesEmulator = (function () {
         this.cpu = new Mos6502(this.memory);
         this.apu = new APU(this.memory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.cpu.Reset();
+        this.cpu.reset();
     }
     NesEmulator.prototype.setCtx = function (ctx) {
         this.ppu.setCtx(ctx);

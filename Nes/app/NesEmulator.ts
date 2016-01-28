@@ -52,7 +52,7 @@ class NesEmulator {
         this.apu = new APU(this.memory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
 
-        this.cpu.Reset();
+        this.cpu.reset();
 
     }
     public setCtx(ctx:CanvasRenderingContext2D) {
