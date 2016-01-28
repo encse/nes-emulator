@@ -10,7 +10,7 @@ class Most6502Base {
     rX: number = 0;
     rY: number = 0;
 
-    public nmiRequested = false;
+      public nmiRequested = false;
     public irqRequested = false;
     public nmiLine = 1;
     public nmiLinePrev = 1;
@@ -44,14 +44,7 @@ class Most6502Base {
     private flgZero: number = 0;
     private flgNegative: number = 0;
     private flgOverflow: number = 0;
-    _flgInterruptDisable: number = 0;
-    get flgInterruptDisable() {
-        return this._flgInterruptDisable;
-    }
-    set flgInterruptDisable(x) {
-        //console.log('flgInterruptDisable', x);
-         this._flgInterruptDisable = x;
-    }
+    private flgInterruptDisable: number = 1;
     private flgDecimalMode: number = 0;
     private flgBreakCommand: number = 0;
 
@@ -67,11 +60,12 @@ class Most6502Base {
     public addrReset = 0xfffc;
     public addrIRQ = 0xfffe;
     public addrNMI = 0xfffa;
-
+ 
     private enablePCIncrement = true;
     private addrBrk : number;
     public constructor(public memory: Memory) {
     }
+ 
     private pushByte(byte: number) {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
@@ -108,7 +102,7 @@ class Most6502Base {
     public clk() {
 
         if (this.t === 0) {
-
+ 
             const nmiWasRequested = this.nmiRequested;
             const irqWasRequested = this.irqRequested;
             this.irqRequested = false;
@@ -4161,15 +4155,13 @@ case 0x7e: /* ROR AbsoluteX 7 */ {
 case 0x0: /* BRK BRK 7 */ {
     switch (this.t) {
         case 0: {
-            if(this.enablePCIncrement)
-                this.ip++;
+            if(this.enablePCIncrement) this.ip++;
             this.t++;
             break;
         }
         case 1: {
             this.memory.getByte(this.ip);
-            if (this.enablePCIncrement)
-                this.ip++;
+            if(this.enablePCIncrement) this.ip++;
             this.t++;
             break;
         }
@@ -4184,12 +4176,10 @@ case 0x0: /* BRK BRK 7 */ {
             break;
         }
         case 4: {
-          //  this.pollInterrupts();
-         //   var nmi = this.nmiRequested;
-         //   var irq = this.irqRequested;
-
-        //    this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
-
+            // this.pollInterrupts()1;
+            // var nmi = this.nmiRequested;
+            // var irq = this.irqRequested1;
+            // this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
             this.flgBreakCommand = 1;
             this.pushByte(this.rP);
             this.flgBreakCommand = 0;
@@ -8878,5 +8868,6 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
         if (this.t===0)
             this.pollInterrupts();  
         this.detectInterrupts();
-    }
+        }
+
     }
