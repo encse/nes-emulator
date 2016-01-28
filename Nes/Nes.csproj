@@ -50,6 +50,23 @@
     <Content Include="wwwroot\test\cpu_interrupts\source\common\text_out.s" />
     <Content Include="wwwroot\test\cpu_interrupts\source\readme.txt" />
     <Content Include="wwwroot\test\instr_misc\readme.txt" />
+    <Content Include="wwwroot\test\instr_misc\source\01-abs_x_wrap.s" />
+    <Content Include="wwwroot\test\instr_misc\source\02-branch_wrap.s" />
+    <Content Include="wwwroot\test\instr_misc\source\03-dummy_reads.s" />
+    <Content Include="wwwroot\test\instr_misc\source\04-dummy_reads_apu.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\build_rom.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\console.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\crc.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\delay.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\macros.inc" />
+    <Content Include="wwwroot\test\instr_misc\source\common\neshw.inc" />
+    <Content Include="wwwroot\test\instr_misc\source\common\ppu.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\print.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\shell.inc" />
+    <Content Include="wwwroot\test\instr_misc\source\common\shell.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\testing.s" />
+    <Content Include="wwwroot\test\instr_misc\source\common\text_out.s" />
+    <Content Include="wwwroot\test\instr_misc\source\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\readme.txt" />
     <Content Include="wwwroot\test\instr_test-v5\source\01-basics.s" />
     <Content Include="wwwroot\test\instr_test-v5\source\02-implied.s" />
@@ -242,6 +259,9 @@
     <Content Include="wwwroot\test\cpu_interrupts\source\common\ascii.chr" />
     <Content Include="wwwroot\test\cpu_interrupts\source\common\devcart.bin" />
     <Content Include="wwwroot\test\cpu_interrupts\source\nes.cfg" />
+    <Content Include="wwwroot\test\instr_misc\source\common\ascii.chr" />
+    <Content Include="wwwroot\test\instr_misc\source\common\devcart.bin" />
+    <Content Include="wwwroot\test\instr_misc\source\nes.cfg" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />

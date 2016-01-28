@@ -86,12 +86,17 @@
 
     public iFrame = 0;
 
-    constructor(memory: CompoundMemory, public vmemory: Memory, private cpu:Mos6502) {
+    constructor(memory: CompoundMemory, public vmemory: CompoundMemory, private cpu:Mos6502) {
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
 
-        memory.shadowSetter(0x2000, 0x2007, this.setter.bind(this));
-        memory.shadowGetter(0x2000, 0x2007, this.getter.bind(this));
+        memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
+        memory.shadowGetter(0x2000, 0x3fff, this.ppuRegistersGetter.bind(this));
+
+        vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
+        vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
+        vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
     }
 
     public setCtx(ctx: CanvasRenderingContext2D) {
@@ -102,9 +107,28 @@
         this.data = new Uint32Array(this.buf);
     }
 
-    private getter(addr: number) {
+    private nameTableSetter(addr: number, value: number)
+    {
+        return this.vmemory.setByte(addr - 0x1000, value);
+    }
+
+    private nameTableGetter(addr: number) {
+        return this.vmemory.getByte(addr - 0x1000);
+    }
+
+    private paletteSetter(addr: number, value: number) {
+        return this.vmemory.setByte(0x3000 + (addr - 0x3f20) % 0x20, value);
+    }
+
+    private paletteGetter(addr: number) {
+        return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
+    }
+
+
+    private ppuRegistersGetter(addr: number) {
+        addr = (addr - 0x2000) % 8;
         switch (addr) {
-        case 0x2002:
+        case 0x2:
         {
                 /*
                 7  bit  0
@@ -144,7 +168,7 @@
             this.cpu.nmiLine = 1;
             return res;
         }
-        case 0x2007:
+        case 0x7:
         {
             let res = this.vmemory.getByte(this.v & 0x3fff);
             this.v += this.daddrWrite;
@@ -158,12 +182,12 @@
         }
     }
 
-    private setter(addr: number, value: number) {
+    private ppuRegistersSetter(addr: number, value: number) {
         value &= 0xff;
-
+        addr = (addr - 0x2000) % 8;
      
         switch (addr) {
-        case 0x2000:
+        case 0x0:
             this.t = (this.v & 0x73ff) | ((value & 3) << 10);
             this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
             this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
@@ -173,7 +197,7 @@
 
           
             break;
-        case 0x2001:
+        case 0x1:
             var x = this.showBg;
             this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
             this.showBgInLeftmost8Pixels =this._showBgInLeftmost8Pixels = !!(value & 0x02);
@@ -187,7 +211,7 @@
             //    console.log('show:', x, '->', this.showBg);
 
             break;
-        case 0x2005:
+        case 0x5:
             if (this.w === 0) {
                 this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
                 this.x = value & 7;
@@ -202,7 +226,7 @@
         // The first write to this register will set 8 lower address bits.
         // The second write will set 6 upper bits.The address will increment
         // either by 1 or by 32 after each access to $2007.
-        case 0x2006: 
+        case 0x6: 
                 
             
             if (this.w === 0) {
@@ -214,7 +238,7 @@
             }
             this.w = 1 - this.w;
             break;
-        case 0x2007:
+        case 0x7:
             var vold = this.v;
           
             this.vmemory.setByte(this.v & 0x3fff, value);

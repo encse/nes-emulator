@@ -71,7 +71,9 @@ class MMC1 {
             VROMBanks.push(new RAM(0x1000));
 
         this.memory = new CompoundMemory(
-            new RAM(0x8000),
+            new RepeatedMemory(4, new RAM(0x800)),
+            new RAM(0x2000),
+            new RAM(0x4000),
             PRGBanks[0],
             PRGBanks[1]
         );
