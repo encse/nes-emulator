@@ -5,7 +5,7 @@
 class NesEmulator {
     public cpu: Mos6502;
     public memory: CompoundMemory;
-    public vmemory: Memory;
+    public vmemory: CompoundMemory;
     public ppu: PPU;
     public apu: APU;
 
