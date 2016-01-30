@@ -1,7 +1,7 @@
 ﻿class APU {
 
     mode = 0;
-    irqDisabled = 0;
+    frameIRQDisabled = 0;
     idividerStep = 0;
     isequencerStep = 0;
     lc0 = 0;
@@ -75,14 +75,19 @@
 
     
     private getter(addr: number) {
+
+        console.log('APU get', addr.toString(16));
+
         switch(addr) {
             case 0x4015:
-                if(this.cpu.irqLine === 0) {
+                var res = (!this.cpu.irqLine ? 1 : 0) << 6 +
+                    (this.lc0 > 0 ? 1 : 0);
+
+                if (this.cpu.irqLine === 0) {
                     console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
                 }
-
-                return this.lc0 > 0 ? 1 : 0;
+                return res;
         }
          // When $4015 is read, the status of the channels' length counters and bytes
             // remaining in the current DMC sample, and interrupt flags are returned.
@@ -102,6 +107,7 @@
     }
 
     private setter(addr: number, value: number) {
+        console.log('APU set', addr.toString(16), value.toString(16));
         switch (addr) {
             case 0x4000:
 
@@ -182,11 +188,10 @@
                 if (this.mode === 1)
                     this.clockSequencer();
 
-                this.irqDisabled = (value >> 6) & 1;
+                this.frameIRQDisabled = (value >> 6) & 1;
                // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
-                console.log('APU', this.irqDisabled || this.mode? 'frame irq disabled' : 'frame irq enabled', value.toString(2));
-                this.cpu.irqLine = !this.mode && !this.irqDisabled ? 0 : 1;
-               
+                this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
+                console.log('APU this.cpu.irqline', this.cpu.irqLine);
                 break;
         }
        // console.log('set ', addr.toString(16), value);
@@ -213,14 +218,14 @@
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
+            
         }
 
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
-        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3) {
+        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
             this.cpu.irqLine = 0;
-            console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
-            
+            console.log('APU', 'end of frame, this.cpu.irqLine', this.cpu.irqLine);
         }
     }
 }

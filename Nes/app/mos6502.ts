@@ -7,6 +7,9 @@ class Mos6502 extends Most6502Base {
     public constructor(public memory: Memory) {
         super(memory);
     }
+    public trace(opcode: number) {
+        //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
+    }
     public step() {
 
         this.clk();

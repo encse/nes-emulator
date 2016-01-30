@@ -54,7 +54,7 @@ var APU = (function () {
     function APU(memory, cpu) {
         this.cpu = cpu;
         this.mode = 0;
-        this.irqDisabled = 0;
+        this.frameIRQDisabled = 0;
         this.idividerStep = 0;
         this.isequencerStep = 0;
         this.lc0 = 0;
@@ -69,13 +69,16 @@ var APU = (function () {
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
     APU.prototype.getter = function (addr) {
+        console.log('APU get', addr.toString(16));
         switch (addr) {
             case 0x4015:
+                var res = (!this.cpu.irqLine ? 1 : 0) << 6 +
+                    (this.lc0 > 0 ? 1 : 0);
                 if (this.cpu.irqLine === 0) {
                     console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
                 }
-                return this.lc0 > 0 ? 1 : 0;
+                return res;
         }
         // When $4015 is read, the status of the channels' length counters and bytes
         // remaining in the current DMC sample, and interrupt flags are returned.
@@ -91,6 +94,7 @@ var APU = (function () {
         return 0;
     };
     APU.prototype.setter = function (addr, value) {
+        console.log('APU set', addr.toString(16), value.toString(16));
         switch (addr) {
             case 0x4000:
                 //$4000 / 4 ddle nnnn   duty, loop env/ disable length, env disable, vol / env period
@@ -154,10 +158,10 @@ var APU = (function () {
                 this.mode = (value >> 7) & 1;
                 if (this.mode === 1)
                     this.clockSequencer();
-                this.irqDisabled = (value >> 6) & 1;
+                this.frameIRQDisabled = (value >> 6) & 1;
                 // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
-                console.log('APU', this.irqDisabled || this.mode ? 'frame irq disabled' : 'frame irq enabled', value.toString(2));
-                this.cpu.irqLine = !this.mode && !this.irqDisabled ? 0 : 1;
+                this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
+                console.log('APU this.cpu.irqline', this.cpu.irqLine);
                 break;
         }
         // console.log('set ', addr.toString(16), value);
@@ -179,12 +183,301 @@ var APU = (function () {
             }
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
-        if (!this.mode && !this.irqDisabled && this.isequencerStep === 3) {
+        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
             this.cpu.irqLine = 0;
-            console.log('APU', 'this.cpu.irqLine', this.cpu.irqLine);
+            console.log('APU', 'end of frame, this.cpu.irqLine', this.cpu.irqLine);
         }
     };
     return APU;
+})();
+///<reference path="Memory.ts"/>
+var CompoundMemory = (function () {
+    function CompoundMemory() {
+        var _this = this;
+        var rgmemory = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            rgmemory[_i - 0] = arguments[_i];
+        }
+        this.rgmemory = [];
+        this.setters = [];
+        this.getters = [];
+        this.sizeI = 0;
+        this.rgmemory = rgmemory;
+        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
+    }
+    CompoundMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
+        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
+    };
+    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
+        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
+    };
+    CompoundMemory.prototype.getByte = function (addr) {
+        for (var i = 0; i < this.getters.length; i++) {
+            var getter = this.getters[i];
+            if (getter.addrFirst <= addr && addr <= getter.addrLast) {
+                return getter.getter(addr);
+            }
+        }
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size())
+                return memory.getByte(addr);
+            else
+                addr -= memory.size();
+        }
+        throw 'address out of bounds';
+    };
+    CompoundMemory.prototype.setByte = function (addr, value) {
+        for (var i = 0; i < this.setters.length; i++) {
+            var setter = this.setters[i];
+            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
+                setter.setter(addr, value);
+                return;
+            }
+        }
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size()) {
+                memory.setByte(addr, value);
+                return;
+            }
+            else
+                addr -= memory.size();
+        }
+    };
+    return CompoundMemory;
+})();
+///<reference path="Memory.ts"/>
+var RAM = (function () {
+    function RAM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    RAM.fromBytes = function (memory) {
+        var res = new RAM(0);
+        res.memory = memory;
+        return res;
+    };
+    RAM.prototype.size = function () {
+        return this.memory.length;
+    };
+    RAM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    RAM.prototype.setByte = function (addr, value) {
+        this.memory[addr] = value & 0xff;
+    };
+    return RAM;
+})();
+///<reference path="Memory.ts"/>
+///<reference path="RAM.ts"/>
+///<reference path="CompoundMemory.ts"/>
+var MMC1 = (function () {
+    function MMC1(PRGBanks, VROMBanks) {
+        this.PRGBanks = PRGBanks;
+        this.VROMBanks = VROMBanks;
+        this.iWrite = 0;
+        this.rTemp = 0;
+        /**
+         * $8000-9FFF:  [...C PSMM]
+         */
+        this.r0 = 0;
+        /**
+         *  $A000-BFFF:  [...C CCCC]
+            CHR Reg 0
+         */
+        this.r1 = 0;
+        /**
+         *  $C000-DFFF:  [...C CCCC]
+         *  CHR Reg 1
+         */
+        this.r2 = 0;
+        /**
+         * $E000-FFFF:  [...W PPPP]
+         */
+        this.r3 = 0;
+        while (PRGBanks.length < 2)
+            PRGBanks.push(new RAM(0x4000));
+        while (VROMBanks.length < 2)
+            VROMBanks.push(new RAM(0x1000));
+        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
+        this.nametableA = new RAM(0x400);
+        this.nametableB = new RAM(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
+        this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], this.nametable, new RAM(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+    }
+    Object.defineProperty(MMC1.prototype, "C", {
+        /** CHR Mode (0=8k mode, 1=4k mode) */
+        get: function () { return (this.r0 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "P", {
+        /** PRG Size (0=32k mode, 1=16k mode) */
+        get: function () { return (this.r0 >> 3) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "S", {
+        /**
+         * Slot select:
+         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
+         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
+         *  This bit is ignored when 'P' is clear (32k mode)
+         */
+        get: function () { return (this.r0 >> 2) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "M", {
+        /**
+         *  Mirroring control:
+         *  %00 = 1ScA
+         *  %01 = 1ScB
+         *  %10 = Vert
+         *  %11 = Horz
+         */
+        get: function () { return this.r0 & 3; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "CHR0", {
+        get: function () { return this.r1 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "CHR1", {
+        get: function () { return this.r1 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "PRG0", {
+        get: function () { return this.r3 & 15; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "W", {
+        /**
+         * W = WRAM Disable (0=enabled, 1=disabled)
+         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
+         * Later ones do.
+         */
+        get: function () { return (this.r3 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    MMC1.prototype.setByte = function (addr, value) {
+        /*Temporary reg port ($8000-FFFF):
+            [r... ...d]
+                r = reset flag
+                d = data bit
+
+        When 'r' is set:
+            - 'd' is ignored
+            - hidden temporary reg is reset (so that the next write is the "first" write)
+            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
+            - other bits of $8000 (and other regs) are unchanged
+
+        When 'r' is clear:
+            - 'd' proceeds as the next bit written in the 5-bit sequence
+            - If this completes the 5-bit sequence:
+                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
+                - temporary reg is reset (so that next write is the "first" write)
+        */
+        value &= 0xff;
+        var flgReset = value >> 7;
+        var flgData = value & 0x1;
+        if (flgReset === 1) {
+            this.rTemp = 0;
+            this.P = 1;
+            this.S = 1;
+            this.iWrite = 0;
+        }
+        else {
+            this.rTemp = (this.rTemp << 1) + flgData;
+            this.iWrite++;
+            if (this.iWrite === 5) {
+                if (addr <= 0x9fff)
+                    this.r0 = this.rTemp;
+                else if (addr <= 0xbfff)
+                    this.r1 = this.rTemp;
+                else if (addr <= 0xdfff)
+                    this.r2 = this.rTemp;
+                else if (addr <= 0xffff)
+                    this.r3 = this.rTemp;
+                this.update();
+            }
+        }
+    };
+    MMC1.prototype.update = function () {
+        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
+        /*
+            PRG Setup:
+            --------------------------
+            There is 1 PRG reg and 3 PRG modes.
+
+                           $8000   $A000   $C000   $E000
+                         +-------------------------------+
+            P=0:         |            <$E000>            |
+                         +-------------------------------+
+            P=1, S=0:    |     { 0 }     |     $E000     |
+                         +---------------+---------------+
+            P=1, S=1:    |     $E000     |     {$0F}     |
+                         +---------------+---------------+
+        */
+        if (this.P === 1) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+        }
+        else if (this.S === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
+        }
+        else {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
+        }
+        /*
+            CHR Setup:
+            --------------------------
+            There are 2 CHR regs and 2 CHR modes.
+
+                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
+                      +---------------------------------------------------------------+
+            C=0:      |                            <$A000>                            |
+                      +---------------------------------------------------------------+
+            C=1:      |             $A000             |             $C000             |
+                      +-------------------------------+-------------------------------+
+        */
+        if (this.C === 0) {
+            console.log('chr:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
+            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
+        }
+        else {
+            console.log('chr mode 2:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
+            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
+        }
+        if (this.M === 0) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+        else if (this.M === 1) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 2) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 3) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+    };
+    return MMC1;
 })();
 ///<reference path="Memory.ts"/>
 var Most6502Base = (function () {
@@ -196,7 +489,7 @@ var Most6502Base = (function () {
         this.b = 0;
         this.rA = 0;
         this.rX = 0;
-        this.rY = 0;
+        this._rY = 0;
         this.nmiRequested = false;
         this.irqRequested = false;
         this.nmiLine = 1;
@@ -214,6 +507,14 @@ var Most6502Base = (function () {
         this.addrNMI = 0xfffa;
         this.enablePCIncrement = true;
     }
+    Object.defineProperty(Most6502Base.prototype, "rY", {
+        get: function () { return this._rY; },
+        set: function (v) {
+            this._rY = v;
+        },
+        enumerable: true,
+        configurable: true
+    });
     Most6502Base.prototype.pollInterrupts = function () {
         if (this.nmiDetected) {
             this.nmiRequested = true;
@@ -265,6 +566,499 @@ var Most6502Base = (function () {
         enumerable: true,
         configurable: true
     });
+    Most6502Base.prototype.trace = function (opcode) {
+    };
+    Most6502Base.prototype.opcodeToMnemonic = function (opcode) {
+        if (opcode === 105)
+            return 'ADC Immediate';
+        if (opcode === 101)
+            return 'ADC ZeroPage';
+        if (opcode === 117)
+            return 'ADC ZeroPageX';
+        if (opcode === 109)
+            return 'ADC Absolute';
+        if (opcode === 125)
+            return 'ADC AbsoluteX';
+        if (opcode === 121)
+            return 'ADC AbsoluteY';
+        if (opcode === 97)
+            return 'ADC IndirectX';
+        if (opcode === 113)
+            return 'ADC IndirectY';
+        if (opcode === 41)
+            return 'AND Immediate';
+        if (opcode === 37)
+            return 'AND ZeroPage';
+        if (opcode === 53)
+            return 'AND ZeroPageX';
+        if (opcode === 45)
+            return 'AND Absolute';
+        if (opcode === 61)
+            return 'AND AbsoluteX';
+        if (opcode === 57)
+            return 'AND AbsoluteY';
+        if (opcode === 33)
+            return 'AND IndirectX';
+        if (opcode === 49)
+            return 'AND IndirectY';
+        if (opcode === 10)
+            return 'ASL Accumulator';
+        if (opcode === 6)
+            return 'ASL ZeroPage';
+        if (opcode === 22)
+            return 'ASL ZeroPageX';
+        if (opcode === 14)
+            return 'ASL Absolute';
+        if (opcode === 30)
+            return 'ASL AbsoluteX';
+        if (opcode === 144)
+            return 'BCC Relative';
+        if (opcode === 176)
+            return 'BCS Relative';
+        if (opcode === 240)
+            return 'BEQ Relative';
+        if (opcode === 48)
+            return 'BMI Relative';
+        if (opcode === 208)
+            return 'BNE Relative';
+        if (opcode === 16)
+            return 'BPL Relative';
+        if (opcode === 80)
+            return 'BVC Relative';
+        if (opcode === 112)
+            return 'BVS Relative';
+        if (opcode === 36)
+            return 'BIT ZeroPage';
+        if (opcode === 44)
+            return 'BIT Absolute';
+        if (opcode === 24)
+            return 'CLC Implied';
+        if (opcode === 216)
+            return 'CLD Implied';
+        if (opcode === 88)
+            return 'CLI Implied';
+        if (opcode === 184)
+            return 'CLV Implied';
+        if (opcode === 201)
+            return 'CMP Immediate';
+        if (opcode === 197)
+            return 'CMP ZeroPage';
+        if (opcode === 213)
+            return 'CMP ZeroPageX';
+        if (opcode === 205)
+            return 'CMP Absolute';
+        if (opcode === 221)
+            return 'CMP AbsoluteX';
+        if (opcode === 217)
+            return 'CMP AbsoluteY';
+        if (opcode === 193)
+            return 'CMP IndirectX';
+        if (opcode === 209)
+            return 'CMP IndirectY';
+        if (opcode === 224)
+            return 'CPX Immediate';
+        if (opcode === 228)
+            return 'CPX ZeroPage';
+        if (opcode === 236)
+            return 'CPX Absolute';
+        if (opcode === 192)
+            return 'CPY Immediate';
+        if (opcode === 196)
+            return 'CPY ZeroPage';
+        if (opcode === 204)
+            return 'CPY Absolute';
+        if (opcode === 198)
+            return 'DEC ZeroPage';
+        if (opcode === 214)
+            return 'DEC ZeroPageX';
+        if (opcode === 206)
+            return 'DEC Absolute';
+        if (opcode === 222)
+            return 'DEC AbsoluteX';
+        if (opcode === 202)
+            return 'DEX Accumulator';
+        if (opcode === 136)
+            return 'DEY Accumulator';
+        if (opcode === 230)
+            return 'INC ZeroPage';
+        if (opcode === 246)
+            return 'INC ZeroPageX';
+        if (opcode === 238)
+            return 'INC Absolute';
+        if (opcode === 254)
+            return 'INC AbsoluteX';
+        if (opcode === 232)
+            return 'INX Accumulator';
+        if (opcode === 200)
+            return 'INY Accumulator';
+        if (opcode === 73)
+            return 'EOR Immediate';
+        if (opcode === 69)
+            return 'EOR ZeroPage';
+        if (opcode === 85)
+            return 'EOR ZeroPageX';
+        if (opcode === 77)
+            return 'EOR Absolute';
+        if (opcode === 93)
+            return 'EOR AbsoluteX';
+        if (opcode === 89)
+            return 'EOR AbsoluteY';
+        if (opcode === 65)
+            return 'EOR IndirectX';
+        if (opcode === 81)
+            return 'EOR IndirectY';
+        if (opcode === 76)
+            return 'JMP Absolute';
+        if (opcode === 108)
+            return 'JMP AbsoluteIndirect';
+        if (opcode === 169)
+            return 'LDA Immediate';
+        if (opcode === 165)
+            return 'LDA ZeroPage';
+        if (opcode === 181)
+            return 'LDA ZeroPageX';
+        if (opcode === 173)
+            return 'LDA Absolute';
+        if (opcode === 189)
+            return 'LDA AbsoluteX';
+        if (opcode === 185)
+            return 'LDA AbsoluteY';
+        if (opcode === 161)
+            return 'LDA IndirectX';
+        if (opcode === 177)
+            return 'LDA IndirectY';
+        if (opcode === 162)
+            return 'LDX Immediate';
+        if (opcode === 166)
+            return 'LDX ZeroPage';
+        if (opcode === 182)
+            return 'LDX ZeroPageY';
+        if (opcode === 174)
+            return 'LDX Absolute';
+        if (opcode === 190)
+            return 'LDX AbsoluteY';
+        if (opcode === 160)
+            return 'LDY Immediate';
+        if (opcode === 164)
+            return 'LDY ZeroPage';
+        if (opcode === 180)
+            return 'LDY ZeroPageX';
+        if (opcode === 172)
+            return 'LDY Absolute';
+        if (opcode === 188)
+            return 'LDY AbsoluteX';
+        if (opcode === 74)
+            return 'LSR Accumulator';
+        if (opcode === 70)
+            return 'LSR ZeroPage';
+        if (opcode === 86)
+            return 'LSR ZeroPageX';
+        if (opcode === 78)
+            return 'LSR Absolute';
+        if (opcode === 94)
+            return 'LSR AbsoluteX';
+        if (opcode === 234)
+            return 'NOP Implied';
+        if (opcode === 9)
+            return 'ORA Immediate';
+        if (opcode === 5)
+            return 'ORA ZeroPage';
+        if (opcode === 21)
+            return 'ORA ZeroPageX';
+        if (opcode === 13)
+            return 'ORA Absolute';
+        if (opcode === 29)
+            return 'ORA AbsoluteX';
+        if (opcode === 25)
+            return 'ORA AbsoluteY';
+        if (opcode === 1)
+            return 'ORA IndirectX';
+        if (opcode === 17)
+            return 'ORA IndirectY';
+        if (opcode === 72)
+            return 'PHA Implied';
+        if (opcode === 8)
+            return 'PHP Implied';
+        if (opcode === 104)
+            return 'PLA Implied';
+        if (opcode === 40)
+            return 'PLP Implied';
+        if (opcode === 42)
+            return 'ROL Accumulator';
+        if (opcode === 38)
+            return 'ROL ZeroPage';
+        if (opcode === 54)
+            return 'ROL ZeroPageX';
+        if (opcode === 46)
+            return 'ROL Absolute';
+        if (opcode === 62)
+            return 'ROL AbsoluteX';
+        if (opcode === 106)
+            return 'ROR Accumulator';
+        if (opcode === 102)
+            return 'ROR ZeroPage';
+        if (opcode === 118)
+            return 'ROR ZeroPageX';
+        if (opcode === 110)
+            return 'ROR Absolute';
+        if (opcode === 126)
+            return 'ROR AbsoluteX';
+        if (opcode === 0)
+            return 'BRK BRK';
+        if (opcode === 64)
+            return 'RTI RTI';
+        if (opcode === 233)
+            return 'SBC Immediate';
+        if (opcode === 229)
+            return 'SBC ZeroPage';
+        if (opcode === 245)
+            return 'SBC ZeroPageX';
+        if (opcode === 237)
+            return 'SBC Absolute';
+        if (opcode === 253)
+            return 'SBC AbsoluteX';
+        if (opcode === 249)
+            return 'SBC AbsoluteY';
+        if (opcode === 225)
+            return 'SBC IndirectX';
+        if (opcode === 241)
+            return 'SBC IndirectY';
+        if (opcode === 56)
+            return 'SEC Implied';
+        if (opcode === 248)
+            return 'SED Implied';
+        if (opcode === 120)
+            return 'SEI Implied';
+        if (opcode === 133)
+            return 'STA ZeroPage';
+        if (opcode === 149)
+            return 'STA ZeroPageX';
+        if (opcode === 141)
+            return 'STA Absolute';
+        if (opcode === 157)
+            return 'STA AbsoluteX';
+        if (opcode === 153)
+            return 'STA AbsoluteY';
+        if (opcode === 129)
+            return 'STA IndirectX';
+        if (opcode === 145)
+            return 'STA IndirectY';
+        if (opcode === 134)
+            return 'STX ZeroPage';
+        if (opcode === 150)
+            return 'STX ZeroPageY';
+        if (opcode === 142)
+            return 'STX Absolute';
+        if (opcode === 132)
+            return 'STY ZeroPage';
+        if (opcode === 148)
+            return 'STY ZeroPageX';
+        if (opcode === 140)
+            return 'STY Absolute';
+        if (opcode === 170)
+            return 'TAX Accumulator';
+        if (opcode === 168)
+            return 'TAY Accumulator';
+        if (opcode === 186)
+            return 'TSX Accumulator';
+        if (opcode === 138)
+            return 'TXA Accumulator';
+        if (opcode === 154)
+            return 'TXS Accumulator';
+        if (opcode === 152)
+            return 'TYA Accumulator';
+        if (opcode === 32)
+            return 'JSR JSR';
+        if (opcode === 96)
+            return 'RTS RTS';
+        if (opcode === 26)
+            return 'NOP Implied';
+        if (opcode === 58)
+            return 'NOP Implied';
+        if (opcode === 90)
+            return 'NOP Implied';
+        if (opcode === 122)
+            return 'NOP Implied';
+        if (opcode === 218)
+            return 'NOP Implied';
+        if (opcode === 250)
+            return 'NOP Implied';
+        if (opcode === 4)
+            return 'NOP ZeroPage';
+        if (opcode === 20)
+            return 'NOP ZeroPageX';
+        if (opcode === 52)
+            return 'NOP ZeroPageX';
+        if (opcode === 68)
+            return 'NOP ZeroPage';
+        if (opcode === 84)
+            return 'NOP ZeroPageX';
+        if (opcode === 116)
+            return 'NOP ZeroPageX';
+        if (opcode === 212)
+            return 'NOP ZeroPageX';
+        if (opcode === 244)
+            return 'NOP ZeroPageX';
+        if (opcode === 100)
+            return 'NOP ZeroPage';
+        if (opcode === 128)
+            return 'NOP Immediate';
+        if (opcode === 130)
+            return 'NOP Immediate';
+        if (opcode === 194)
+            return 'NOP Immediate';
+        if (opcode === 226)
+            return 'NOP Immediate';
+        if (opcode === 137)
+            return 'NOP Immediate';
+        if (opcode === 12)
+            return 'NOP Absolute';
+        if (opcode === 28)
+            return 'NOP AbsoluteX';
+        if (opcode === 60)
+            return 'NOP AbsoluteX';
+        if (opcode === 92)
+            return 'NOP AbsoluteX';
+        if (opcode === 124)
+            return 'NOP AbsoluteX';
+        if (opcode === 220)
+            return 'NOP AbsoluteX';
+        if (opcode === 252)
+            return 'NOP AbsoluteX';
+        if (opcode === 235)
+            return 'SBC Immediate';
+        if (opcode === 195)
+            return 'DCP IndirectX';
+        if (opcode === 199)
+            return 'DCP ZeroPage';
+        if (opcode === 207)
+            return 'DCP Absolute';
+        if (opcode === 211)
+            return 'DCP IndirectY';
+        if (opcode === 215)
+            return 'DCP ZeroPageX';
+        if (opcode === 219)
+            return 'DCP AbsoluteY';
+        if (opcode === 223)
+            return 'DCP AbsoluteX';
+        if (opcode === 227)
+            return 'ISC IndirectX';
+        if (opcode === 231)
+            return 'ISC ZeroPage';
+        if (opcode === 239)
+            return 'ISC Absolute';
+        if (opcode === 243)
+            return 'ISC IndirectY';
+        if (opcode === 247)
+            return 'ISC ZeroPageX';
+        if (opcode === 251)
+            return 'ISC AbsoluteY';
+        if (opcode === 255)
+            return 'ISC AbsoluteX';
+        if (opcode === 171)
+            return 'LAX Immediate';
+        if (opcode === 167)
+            return 'LAX ZeroPage';
+        if (opcode === 183)
+            return 'LAX ZeroPageY';
+        if (opcode === 175)
+            return 'LAX Absolute';
+        if (opcode === 191)
+            return 'LAX AbsoluteY';
+        if (opcode === 163)
+            return 'LAX IndirectX';
+        if (opcode === 179)
+            return 'LAX IndirectY';
+        if (opcode === 131)
+            return 'SAX IndirectX';
+        if (opcode === 135)
+            return 'SAX ZeroPage';
+        if (opcode === 143)
+            return 'SAX Absolute';
+        if (opcode === 151)
+            return 'SAX ZeroPageY';
+        if (opcode === 3)
+            return 'SLO IndirectX';
+        if (opcode === 7)
+            return 'SLO ZeroPage';
+        if (opcode === 15)
+            return 'SLO Absolute';
+        if (opcode === 19)
+            return 'SLO IndirectY';
+        if (opcode === 23)
+            return 'SLO ZeroPageX';
+        if (opcode === 27)
+            return 'SLO AbsoluteY';
+        if (opcode === 31)
+            return 'SLO AbsoluteX';
+        if (opcode === 35)
+            return 'RLA IndirectX';
+        if (opcode === 39)
+            return 'RLA ZeroPage';
+        if (opcode === 47)
+            return 'RLA Absolute';
+        if (opcode === 51)
+            return 'RLA IndirectY';
+        if (opcode === 55)
+            return 'RLA ZeroPageX';
+        if (opcode === 59)
+            return 'RLA AbsoluteY';
+        if (opcode === 63)
+            return 'RLA AbsoluteX';
+        if (opcode === 99)
+            return 'RRA IndirectX';
+        if (opcode === 103)
+            return 'RRA ZeroPage';
+        if (opcode === 111)
+            return 'RRA Absolute';
+        if (opcode === 115)
+            return 'RRA IndirectY';
+        if (opcode === 119)
+            return 'RRA ZeroPageX';
+        if (opcode === 123)
+            return 'RRA AbsoluteY';
+        if (opcode === 127)
+            return 'RRA AbsoluteX';
+        if (opcode === 67)
+            return 'SRE IndirectX';
+        if (opcode === 71)
+            return 'SRE ZeroPage';
+        if (opcode === 79)
+            return 'SRE Absolute';
+        if (opcode === 83)
+            return 'SRE IndirectY';
+        if (opcode === 87)
+            return 'SRE ZeroPageX';
+        if (opcode === 91)
+            return 'SRE AbsoluteY';
+        if (opcode === 95)
+            return 'SRE AbsoluteX';
+        if (opcode === 11)
+            return 'ANC Immediate';
+        if (opcode === 43)
+            return 'ANC Immediate';
+        if (opcode === 75)
+            return 'ALR Immediate';
+        if (opcode === 107)
+            return 'ARR Immediate';
+        if (opcode === 203)
+            return 'AXS Immediate';
+        if (opcode === 156)
+            return 'SYA AbsoluteX';
+        if (opcode === 158)
+            return 'SXA AbsoluteY';
+        if (opcode === 139)
+            return 'XAA Immediate';
+        if (opcode === 147)
+            return 'AXA IndirectY';
+        if (opcode === 155)
+            return 'XAS AbsoluteY';
+        if (opcode === 159)
+            return 'AXA AbsoluteY';
+        if (opcode === 187)
+            return 'LAR AbsoluteY';
+        return '???';
+    };
     Most6502Base.prototype.clk = function () {
         if (this.t === 0) {
             var nmiWasRequested = this.nmiRequested;
@@ -279,6 +1073,7 @@ var Most6502Base = (function () {
             else {
                 this.opcode = this.memory.getByte(this.ip);
             }
+            this.trace(this.opcode);
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
         switch (this.opcode) {
@@ -9099,6 +9894,9 @@ var Mos6502 = (function (_super) {
         _super.call(this, memory);
         this.memory = memory;
     }
+    Mos6502.prototype.trace = function (opcode) {
+        //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
+    };
     Mos6502.prototype.step = function () {
         this.clk();
     };
@@ -9119,710 +9917,6 @@ var Mos6502 = (function (_super) {
     };
     return Mos6502;
 })(Most6502Base);
-///<reference path="Memory.ts"/>
-var RepeatedMemory = (function () {
-    function RepeatedMemory(count, memory) {
-        this.count = count;
-        this.memory = memory;
-        this.sizeI = this.memory.size() * this.count;
-    }
-    RepeatedMemory.prototype.size = function () {
-        return this.sizeI;
-    };
-    RepeatedMemory.prototype.getByte = function (addr) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.getByte(addr % this.sizeI);
-    };
-    RepeatedMemory.prototype.setByte = function (addr, value) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.setByte(addr % this.sizeI, value);
-    };
-    return RepeatedMemory;
-})();
-///<reference path="Memory.ts"/>
-var CompoundMemory = (function () {
-    function CompoundMemory() {
-        var _this = this;
-        var rgmemory = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            rgmemory[_i - 0] = arguments[_i];
-        }
-        this.rgmemory = [];
-        this.setters = [];
-        this.getters = [];
-        this.sizeI = 0;
-        this.rgmemory = rgmemory;
-        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
-    }
-    CompoundMemory.prototype.size = function () {
-        return this.sizeI;
-    };
-    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
-        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
-    };
-    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
-        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
-    };
-    CompoundMemory.prototype.getByte = function (addr) {
-        for (var i = 0; i < this.getters.length; i++) {
-            var getter = this.getters[i];
-            if (getter.addrFirst <= addr && addr <= getter.addrLast) {
-                return getter.getter(addr);
-            }
-        }
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            if (addr < memory.size())
-                return memory.getByte(addr);
-            else
-                addr -= memory.size();
-        }
-        throw 'address out of bounds';
-    };
-    CompoundMemory.prototype.setByte = function (addr, value) {
-        for (var i = 0; i < this.setters.length; i++) {
-            var setter = this.setters[i];
-            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
-                setter.setter(addr, value);
-                return;
-            }
-        }
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            if (addr < memory.size()) {
-                memory.setByte(addr, value);
-                return;
-            }
-            else
-                addr -= memory.size();
-        }
-    };
-    return CompoundMemory;
-})();
-///<reference path="Memory.ts"/>
-var RAM = (function () {
-    function RAM(size) {
-        this.memory = new Uint8Array(size);
-    }
-    RAM.fromBytes = function (memory) {
-        var res = new RAM(0);
-        res.memory = memory;
-        return res;
-    };
-    RAM.prototype.size = function () {
-        return this.memory.length;
-    };
-    RAM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    RAM.prototype.setByte = function (addr, value) {
-        this.memory[addr] = value & 0xff;
-    };
-    return RAM;
-})();
-///<reference path="Memory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="CompoundMemory.ts"/>
-var MMC1 = (function () {
-    function MMC1(PRGBanks, VROMBanks) {
-        this.PRGBanks = PRGBanks;
-        this.VROMBanks = VROMBanks;
-        this.iWrite = 0;
-        this.rTemp = 0;
-        /**
-         * $8000-9FFF:  [...C PSMM]
-         */
-        this.r0 = 0;
-        /**
-         *  $A000-BFFF:  [...C CCCC]
-            CHR Reg 0
-         */
-        this.r1 = 0;
-        /**
-         *  $C000-DFFF:  [...C CCCC]
-         *  CHR Reg 1
-         */
-        this.r2 = 0;
-        /**
-         * $E000-FFFF:  [...W PPPP]
-         */
-        this.r3 = 0;
-        while (PRGBanks.length < 2)
-            PRGBanks.push(new RAM(0x4000));
-        while (VROMBanks.length < 2)
-            VROMBanks.push(new RAM(0x1000));
-        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
-        this.nametableA = new RAM(0x400);
-        this.nametableB = new RAM(0x400);
-        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
-        this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], this.nametable, new RAM(0x1000));
-        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-    }
-    Object.defineProperty(MMC1.prototype, "C", {
-        /** CHR Mode (0=8k mode, 1=4k mode) */
-        get: function () { return (this.r0 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "P", {
-        /** PRG Size (0=32k mode, 1=16k mode) */
-        get: function () { return (this.r0 >> 3) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "S", {
-        /**
-         * Slot select:
-         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
-         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
-         *  This bit is ignored when 'P' is clear (32k mode)
-         */
-        get: function () { return (this.r0 >> 2) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "M", {
-        /**
-         *  Mirroring control:
-         *  %00 = 1ScA
-         *  %01 = 1ScB
-         *  %10 = Vert
-         *  %11 = Horz
-         */
-        get: function () { return this.r0 & 3; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "CHR0", {
-        get: function () { return this.r1 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "CHR1", {
-        get: function () { return this.r1 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "PRG0", {
-        get: function () { return this.r3 & 15; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "W", {
-        /**
-         * W = WRAM Disable (0=enabled, 1=disabled)
-         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
-         * Later ones do.
-         */
-        get: function () { return (this.r3 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    MMC1.prototype.setByte = function (addr, value) {
-        /*Temporary reg port ($8000-FFFF):
-            [r... ...d]
-                r = reset flag
-                d = data bit
-
-        When 'r' is set:
-            - 'd' is ignored
-            - hidden temporary reg is reset (so that the next write is the "first" write)
-            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
-            - other bits of $8000 (and other regs) are unchanged
-
-        When 'r' is clear:
-            - 'd' proceeds as the next bit written in the 5-bit sequence
-            - If this completes the 5-bit sequence:
-                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
-                - temporary reg is reset (so that next write is the "first" write)
-        */
-        value &= 0xff;
-        var flgReset = value >> 7;
-        var flgData = value & 0x1;
-        if (flgReset === 1) {
-            this.rTemp = 0;
-            this.P = 1;
-            this.S = 1;
-            this.iWrite = 0;
-        }
-        else {
-            this.rTemp = (this.rTemp << 1) + flgData;
-            this.iWrite++;
-            if (this.iWrite === 5) {
-                if (addr <= 0x9fff)
-                    this.r0 = this.rTemp;
-                else if (addr <= 0xbfff)
-                    this.r1 = this.rTemp;
-                else if (addr <= 0xdfff)
-                    this.r2 = this.rTemp;
-                else if (addr <= 0xffff)
-                    this.r3 = this.rTemp;
-                this.update();
-            }
-        }
-    };
-    MMC1.prototype.update = function () {
-        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
-        /*
-            PRG Setup:
-            --------------------------
-            There is 1 PRG reg and 3 PRG modes.
-
-                           $8000   $A000   $C000   $E000
-                         +-------------------------------+
-            P=0:         |            <$E000>            |
-                         +-------------------------------+
-            P=1, S=0:    |     { 0 }     |     $E000     |
-                         +---------------+---------------+
-            P=1, S=1:    |     $E000     |     {$0F}     |
-                         +---------------+---------------+
-        */
-        if (this.P === 1) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
-        }
-        else if (this.S === 0) {
-            this.memory.rgmemory[3] = this.PRGBanks[0];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
-        }
-        else {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
-        }
-        /*
-            CHR Setup:
-            --------------------------
-            There are 2 CHR regs and 2 CHR modes.
-
-                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
-                      +---------------------------------------------------------------+
-            C=0:      |                            <$A000>                            |
-                      +---------------------------------------------------------------+
-            C=1:      |             $A000             |             $C000             |
-                      +-------------------------------+-------------------------------+
-        */
-        if (this.C === 0) {
-            console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
-            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
-        }
-        else {
-            console.log('chr mode 2:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
-            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
-        }
-        if (this.M === 0) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-        else if (this.M === 1) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 2) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 3) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-    };
-    return MMC1;
-})();
-var PPU = (function () {
-    function PPU(memory, vmemory, cpu) {
-        this.vmemory = vmemory;
-        this.cpu = cpu;
-        /**
-         *
-            Address range	Size	Description
-            $0000-$0FFF	$1000	Pattern table 0
-            $1000-$1FFF	$1000	Pattern Table 1
-            $2000-$23FF	$0400	Nametable 0
-            $2400-$27FF	$0400	Nametable 1
-            $2800-$2BFF	$0400	Nametable 2
-            $2C00-$2FFF	$0400	Nametable 3
-            $3000-$3EFF	$0F00	Mirrors of $2000-$2EFF
-            $3F00-$3F1F	$0020	Palette RAM indexes
-            $3F20-$3FFF	$00E0	Mirrors of $3F00-$3F1F
-    
-         */
-        /**
-        *The PPU uses the current VRAM address for both reading and writing PPU memory thru $2007, and for
-        * fetching nametable data to draw the background. As it's drawing the background, it updates the
-        * address to point to the nametable data currently being drawn. Bits 10-11 hold the base address of
-        * the nametable minus $2000. Bits 12-14 are the Y offset of a scanline within a tile.
-           The 15 bit registers t and v are composed this way during rendering:
-           yyy NN YYYYY XXXXX
-           ||| || ||||| +++++-- coarse X scroll
-           ||| || +++++-------- coarse Y scroll
-           ||| ++-------------- nametable select
-           +++----------------- fine Y scroll
-        */
-        this._v = 0; // Current VRAM address (15 bits)
-        this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
-        this.x = 0; // Fine X scroll (3 bits)
-        this.w = 0; // First or second write toggle (1 bit)
-        this.daddrWrite = 0;
-        this.addrSpritePatternTable = 0;
-        this.addrScreenPatternTable = 0;
-        this.flgVblank = false;
-        this.nmi_output = false;
-        this.spriteHeight = 8;
-        this._imageGrayscale = false;
-        this._showBgInLeftmost8Pixels = false;
-        this._showSpritesInLeftmost8Pixels = false;
-        this._showBg = false;
-        this._showSprites = false;
-        this._emphasizeRed = false;
-        this._emphasizeGreen = false;
-        this._emphasizeBlue = false;
-        this.imageGrayscale = false;
-        this.showBgInLeftmost8Pixels = false;
-        this.showSpritesInLeftmost8Pixels = false;
-        this.showBg = false;
-        this.showSprites = false;
-        this.emphasizeRed = false;
-        this.emphasizeGreen = false;
-        this.emphasizeBlue = false;
-        this.sy = PPU.syFirstVisible;
-        this.sx = PPU.sxMin;
-        this.dataAddr = 0;
-        this.iFrame = 0;
-        this.icycle = 0;
-        this.colors = [
-            0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
-            0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
-            0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
-            0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
-            0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
-            0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
-            0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
-            0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
-        ];
-        if (vmemory.size() !== 0x4000)
-            throw 'insufficient Vmemory size';
-        memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
-        memory.shadowGetter(0x2000, 0x3fff, this.ppuRegistersGetter.bind(this));
-        vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
-        vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
-        vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
-        vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
-    }
-    Object.defineProperty(PPU.prototype, "v", {
-        get: function () {
-            return this._v;
-        },
-        set: function (value) {
-            this._v = value;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    PPU.prototype.setCtx = function (ctx) {
-        this.ctx = ctx;
-        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
-        this.buf = new ArrayBuffer(this.imageData.data.length);
-        this.buf8 = new Uint8ClampedArray(this.buf);
-        this.data = new Uint32Array(this.buf);
-    };
-    PPU.prototype.nameTableSetter = function (addr, value) {
-        return this.vmemory.setByte(addr - 0x1000, value);
-    };
-    PPU.prototype.nameTableGetter = function (addr) {
-        return this.vmemory.getByte(addr - 0x1000);
-    };
-    PPU.prototype.paletteSetter = function (addr, value) {
-        return this.vmemory.setByte(0x3000 + (addr - 0x3f20) % 0x20, value);
-    };
-    PPU.prototype.paletteGetter = function (addr) {
-        return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
-    };
-    PPU.prototype.ppuRegistersGetter = function (addr) {
-        addr = (addr - 0x2000) % 8;
-        switch (addr) {
-            case 0x2:
-                {
-                    /*
-                    7  bit  0
-                    ---- ----
-                    VSO. ....
-                    |||| ||||
-                    |||+-++++- Least significant bits previously written into a PPU register
-                    |||        (due to register not being updated for this address)
-                    ||+------- Sprite overflow. The intent was for this flag to be set
-                    ||         whenever more than eight sprites appear on a scanline, but a
-                    ||         hardware bug causes the actual behavior to be more complicated
-                    ||         and generate false positives as well as false negatives; see
-                    ||         PPU sprite evaluation. This flag is set during sprite
-                    ||         evaluation and cleared at dot 1 (the second dot) of the
-                    ||         pre-render line.
-                    |+-------- Sprite 0 Hit.  Set when a nonzero pixel of sprite 0 overlaps
-                    |          a nonzero background pixel; cleared at dot 1 of the pre-render
-                    |          line.  Used for raster timing.
-                    +--------- Vertical blank has started (0: not in vblank; 1: in vblank).
-                               Set at dot 1 of line 241 (the line *after* the post-render
-                               line); cleared after reading $2002 and at dot 1 of the
-                               pre-render line.
-                    Notes
-                    Reading the status register will clear D7 mentioned above and also the address latch used by PPUSCROLL and PPUADDR. It does not clear the sprite 0 hit or overflow bit.
-                    Once the sprite 0 hit flag is set, it will not be cleared until the end of the next vertical blank. If attempting to use this flag for raster timing, it is important to ensure that the sprite 0 hit check happens outside of vertical blank, otherwise the CPU will "leak" through and the check will fail. The easiest way to do this is to place an earlier check for D6 = 0, which will wait for the pre-render scanline to begin.
-                    If using sprite 0 hit to make a bottom scroll bar below a vertically scrolling or freely scrolling playfield, be careful to ensure that the tile in the playfield behind sprite 0 is opaque.
-                    Sprite 0 hit is not detected at x=255, nor is it detected at x=0 through 7 if the background or sprites are hidden in this area.
-                    See: PPU rendering for more information on the timing of setting and clearing the flags.
-                    Some Vs. System PPUs return a constant value in D4-D0 that the game checks.
-                    Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
-                  */
-                    this.w = 0;
-                    var res = this.flgVblank ? (1 << 7) : 0;
-                    //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
-                    this.flgVblank = false;
-                    this.cpu.nmiLine = 1;
-                    return res;
-                }
-            case 0x7:
-                {
-                    var res = this.vmemory.getByte(this.v & 0x3fff);
-                    this.v += this.daddrWrite;
-                    this.v &= 0x3fff;
-                    return res;
-                }
-            default:
-                console.error('unimplemented read from addr ' + addr);
-                return 0;
-        }
-    };
-    PPU.prototype.ppuRegistersSetter = function (addr, value) {
-        value &= 0xff;
-        addr = (addr - 0x2000) % 8;
-        switch (addr) {
-            case 0x0:
-                this.t = (this.v & 0x73ff) | ((value & 3) << 10);
-                this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
-                this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
-                this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
-                this.spriteHeight = value & 0x20 ? 16 : 8;
-                this.nmi_output = !!(value & 0x80);
-                break;
-            case 0x1:
-                var x = this.showBg;
-                this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
-                this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels = !!(value & 0x02);
-                this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
-                this.showBg = this._showBg = !!(value & 0x08);
-                this.showSprites = this._showSprites = !!(value & 0x10);
-                this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
-                this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
-                this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
-                //if (x != this.showBg)
-                //    console.log('show:', x, '->', this.showBg);
-                break;
-            case 0x5:
-                if (this.w === 0) {
-                    this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
-                    this.x = value & 7;
-                }
-                else {
-                    this.t = (this.t & 0x7c1f) | (((value >> 3) & 0x1f) << 5);
-                    this.t = (this.t & 0x0fff) | (value & 7) << 10;
-                }
-                this.w = 1 - this.w;
-                break;
-            // Used to set the address of PPU Memory to be accessed via 0x2007
-            // The first write to this register will set 8 lower address bits.
-            // The second write will set 6 upper bits.The address will increment
-            // either by 1 or by 32 after each access to $2007.
-            case 0x6:
-                if (this.w === 0) {
-                    this.t = (this.t & 0x00ff) | ((value & 0x3f) << 8);
-                }
-                else {
-                    this.t = (this.t & 0xff00) + (value & 0xff);
-                    this.v = this.t;
-                }
-                this.w = 1 - this.w;
-                break;
-            case 0x7:
-                var vold = this.v;
-                this.vmemory.setByte(this.v & 0x3fff, value);
-                this.v += this.daddrWrite;
-                this.v &= 0x3fff;
-                //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
-                //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
-                break;
-        }
-    };
-    PPU.prototype.incrementX = function () {
-        this.x++;
-        if (this.x === 8) {
-            this.x = 0;
-            // Coarse X increment
-            // The coarse X component of v needs to be incremented when the next tile is reached.
-            // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
-            // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
-            if ((this.v & 0x001F) === 31) {
-                this.v &= ~0x001F; // coarse X = 0
-                this.v ^= 0x0400; // switch horizontal nametable
-            }
-            else {
-                this.v += 1; // increment coarse X
-            }
-        }
-    };
-    PPU.prototype.incrementY = function () {
-        this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
-        this.v ^= 0x0400; // switch horizontal nametable
-        // If rendering is enabled, fine Y is incremented at dot 256 of each scanline, overflowing to coarse Y, 
-        // and finally adjusted to wrap among the nametables vertically.
-        // Bits 12- 14 are fine Y.Bits 5- 9 are coarse Y.Bit 11 selects the vertical nametable.
-        if ((this.v & 0x7000) !== 0x7000)
-            this.v += 0x1000; // increment fine Y
-        else {
-            this.v &= ~0x7000; // fine Y = 0
-            var y = (this.v & 0x03E0) >> 5; // let y = coarse Y
-            if (y === 29) {
-                y = 0; // coarse Y = 0
-                this.v ^= 0x0800; // switch vertical nametable
-            }
-            else if (y === 31) {
-                y = 0; // coarse Y = 0, nametable not switched
-            }
-            else {
-                y += 1; // increment coarse Y
-            }
-            this.v = (this.v & ~0x03E0) | (y << 5); // put coarse Y back into v
-        }
-    };
-    PPU.prototype.getNameTable = function (i) {
-        var st = '';
-        for (var y = 0; y < 30; y++) {
-            for (var x = 0; x < 32; x++) {
-                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
-            }
-            st += '\n';
-        }
-        console.log(st);
-    };
-    //iFrameX = 0;
-    // zizi = 0;
-    PPU.prototype.step = function () {
-        if ((this.iFrame & 1) && !this.sx && !this.sy)
-            this.stepI();
-        this.stepI();
-        //this.zizi++;
-        //if (this.iFrameX != this.iFrame) {
-        //    console.log('zizi', this.zizi);
-        //    this.zizi = 0;
-        //    this.iFrameX = this.iFrame;
-        //}
-    };
-    PPU.prototype.stepI = function () {
-        if (this.sx === 0 && this.sy === PPU.syPostRender) {
-            //console.log('ppu vblank start', this.icycle);
-            this.imageData.data.set(this.buf8);
-            this.ctx.putImageData(this.imageData, 0, 0);
-            this.iFrame++;
-            this.dataAddr = 0;
-        }
-        else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
-            //vblank
-            var qqq = 1;
-            if (this.sx === 1 && this.sy === PPU.syPostRender + 1) {
-                this.flgVblank = true;
-            }
-            if (this.sx === qqq && this.sy === PPU.syPostRender + 1) {
-                if (this.nmi_output) {
-                    this.nmi_output = false;
-                    this.cpu.nmiLine = 0;
-                }
-            }
-            if (this.sx === qqq + 10 && this.sy === PPU.syPostRender + 1) {
-                this.cpu.nmiLine = 1;
-            }
-        }
-        else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
-            //beginning of screen
-            //console.log('ppu vblank end bg:',this.showBg );
-            this.flgVblank = false;
-            if (this.showBg || this.showSprites)
-                this.v = this.t;
-        }
-        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
-            if (this.showBg) {
-                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-                //
-                // The address to be fetched during rendering can be deduced from v in the following way:
-                //   tile address      = 0x2000 | (v & 0x0FFF)
-                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-                //
-                // The low 12 bits of the attribute address are composed in the following way:
-                //   NN 1111 YYY XXX
-                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-                //   || ++++---------- attribute offset (960 bytes)
-                //   ++--------------- nametable select
-                var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-                var attribute = this.vmemory.getByte(addrAttribute);
-                var addrTile = 0x2000 | (this.v & 0x0fff);
-                var itile = this.vmemory.getByte(addrTile);
-                var tileCol = 7 - (this.x);
-                var tileRow = this.v >> 12;
-                var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
-                var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
-                var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
-                var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
-                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
-                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                    They can still be shown using the background palette hack, explained below.*/
-                if ((ipalette & 3) === 0)
-                    ipalette = 0;
-                var addrPalette = 0x3f00 + ipalette;
-                var icolor = this.vmemory.getByte(addrPalette);
-                var color = this.colors[icolor];
-                this.data[this.dataAddr] = color;
-                this.dataAddr++;
-            }
-            this.incrementX();
-        }
-        this.sx++;
-        if (this.sx === PPU.sxMax + 1) {
-            //end of scanline
-            this.sx = 0;
-            this.sy++;
-            if (this.sy === PPU.syPreRender + 1) {
-                this.sy = PPU.syFirstVisible;
-            }
-            else {
-                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
-                    this.incrementY();
-                }
-            }
-        }
-    };
-    PPU.syFirstVisible = 0;
-    PPU.syPostRender = 240;
-    PPU.syPreRender = 261;
-    PPU.sxMin = 0;
-    PPU.sxMax = 340;
-    return PPU;
-})();
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(memory) {
-        this.memory = memory;
-    }
-    ROM.prototype.size = function () {
-        return this.memory.length;
-    };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    ROM.prototype.setByte = function (addr, value) {
-    };
-    return ROM;
-})();
 ///<reference path="Memory.ts"/>
 var Mos6502Old = (function () {
     function Mos6502Old(memory) {
@@ -12873,6 +12967,421 @@ var NesEmulator = (function () {
         this.icycle++;
     };
     return NesEmulator;
+})();
+var PPU = (function () {
+    function PPU(memory, vmemory, cpu) {
+        this.vmemory = vmemory;
+        this.cpu = cpu;
+        /**
+         *
+            Address range	Size	Description
+            $0000-$0FFF	$1000	Pattern table 0
+            $1000-$1FFF	$1000	Pattern Table 1
+            $2000-$23FF	$0400	Nametable 0
+            $2400-$27FF	$0400	Nametable 1
+            $2800-$2BFF	$0400	Nametable 2
+            $2C00-$2FFF	$0400	Nametable 3
+            $3000-$3EFF	$0F00	Mirrors of $2000-$2EFF
+            $3F00-$3F1F	$0020	Palette RAM indexes
+            $3F20-$3FFF	$00E0	Mirrors of $3F00-$3F1F
+    
+         */
+        /**
+        *The PPU uses the current VRAM address for both reading and writing PPU memory thru $2007, and for
+        * fetching nametable data to draw the background. As it's drawing the background, it updates the
+        * address to point to the nametable data currently being drawn. Bits 10-11 hold the base address of
+        * the nametable minus $2000. Bits 12-14 are the Y offset of a scanline within a tile.
+           The 15 bit registers t and v are composed this way during rendering:
+           yyy NN YYYYY XXXXX
+           ||| || ||||| +++++-- coarse X scroll
+           ||| || +++++-------- coarse Y scroll
+           ||| ++-------------- nametable select
+           +++----------------- fine Y scroll
+        */
+        this._v = 0; // Current VRAM address (15 bits)
+        this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
+        this.x = 0; // Fine X scroll (3 bits)
+        this.w = 0; // First or second write toggle (1 bit)
+        this.daddrWrite = 0;
+        this.addrSpritePatternTable = 0;
+        this.addrScreenPatternTable = 0;
+        this.flgVblank = false;
+        this.nmi_output = false;
+        this.spriteHeight = 8;
+        this._imageGrayscale = false;
+        this._showBgInLeftmost8Pixels = false;
+        this._showSpritesInLeftmost8Pixels = false;
+        this._showBg = false;
+        this._showSprites = false;
+        this._emphasizeRed = false;
+        this._emphasizeGreen = false;
+        this._emphasizeBlue = false;
+        this.imageGrayscale = false;
+        this.showBgInLeftmost8Pixels = false;
+        this.showSpritesInLeftmost8Pixels = false;
+        this.showBg = false;
+        this.showSprites = false;
+        this.emphasizeRed = false;
+        this.emphasizeGreen = false;
+        this.emphasizeBlue = false;
+        this.sy = PPU.syFirstVisible;
+        this.sx = PPU.sxMin;
+        this.dataAddr = 0;
+        this.iFrame = 0;
+        this.icycle = 0;
+        this.colors = [
+            0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
+            0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
+            0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
+            0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
+            0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
+            0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
+            0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
+            0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
+        ];
+        if (vmemory.size() !== 0x4000)
+            throw 'insufficient Vmemory size';
+        memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
+        memory.shadowGetter(0x2000, 0x3fff, this.ppuRegistersGetter.bind(this));
+        vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
+        vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
+        vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
+    }
+    Object.defineProperty(PPU.prototype, "v", {
+        get: function () {
+            return this._v;
+        },
+        set: function (value) {
+            this._v = value;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    PPU.prototype.setCtx = function (ctx) {
+        this.ctx = ctx;
+        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
+        this.buf = new ArrayBuffer(this.imageData.data.length);
+        this.buf8 = new Uint8ClampedArray(this.buf);
+        this.data = new Uint32Array(this.buf);
+    };
+    PPU.prototype.nameTableSetter = function (addr, value) {
+        return this.vmemory.setByte(addr - 0x1000, value);
+    };
+    PPU.prototype.nameTableGetter = function (addr) {
+        return this.vmemory.getByte(addr - 0x1000);
+    };
+    PPU.prototype.paletteSetter = function (addr, value) {
+        return this.vmemory.setByte(0x3000 + (addr - 0x3f20) % 0x20, value);
+    };
+    PPU.prototype.paletteGetter = function (addr) {
+        return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
+    };
+    PPU.prototype.ppuRegistersGetter = function (addr) {
+        addr = (addr - 0x2000) % 8;
+        switch (addr) {
+            case 0x2:
+                {
+                    /*
+                    7  bit  0
+                    ---- ----
+                    VSO. ....
+                    |||| ||||
+                    |||+-++++- Least significant bits previously written into a PPU register
+                    |||        (due to register not being updated for this address)
+                    ||+------- Sprite overflow. The intent was for this flag to be set
+                    ||         whenever more than eight sprites appear on a scanline, but a
+                    ||         hardware bug causes the actual behavior to be more complicated
+                    ||         and generate false positives as well as false negatives; see
+                    ||         PPU sprite evaluation. This flag is set during sprite
+                    ||         evaluation and cleared at dot 1 (the second dot) of the
+                    ||         pre-render line.
+                    |+-------- Sprite 0 Hit.  Set when a nonzero pixel of sprite 0 overlaps
+                    |          a nonzero background pixel; cleared at dot 1 of the pre-render
+                    |          line.  Used for raster timing.
+                    +--------- Vertical blank has started (0: not in vblank; 1: in vblank).
+                               Set at dot 1 of line 241 (the line *after* the post-render
+                               line); cleared after reading $2002 and at dot 1 of the
+                               pre-render line.
+                    Notes
+                    Reading the status register will clear D7 mentioned above and also the address latch used by PPUSCROLL and PPUADDR. It does not clear the sprite 0 hit or overflow bit.
+                    Once the sprite 0 hit flag is set, it will not be cleared until the end of the next vertical blank. If attempting to use this flag for raster timing, it is important to ensure that the sprite 0 hit check happens outside of vertical blank, otherwise the CPU will "leak" through and the check will fail. The easiest way to do this is to place an earlier check for D6 = 0, which will wait for the pre-render scanline to begin.
+                    If using sprite 0 hit to make a bottom scroll bar below a vertically scrolling or freely scrolling playfield, be careful to ensure that the tile in the playfield behind sprite 0 is opaque.
+                    Sprite 0 hit is not detected at x=255, nor is it detected at x=0 through 7 if the background or sprites are hidden in this area.
+                    See: PPU rendering for more information on the timing of setting and clearing the flags.
+                    Some Vs. System PPUs return a constant value in D4-D0 that the game checks.
+                    Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
+                  */
+                    this.w = 0;
+                    var res = this.flgVblank ? (1 << 7) : 0;
+                    //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
+                    this.flgVblank = false;
+                    this.cpu.nmiLine = 1;
+                    return res;
+                }
+            case 0x7:
+                {
+                    var res = this.vmemory.getByte(this.v & 0x3fff);
+                    this.v += this.daddrWrite;
+                    this.v &= 0x3fff;
+                    return res;
+                }
+            default:
+                console.error('unimplemented read from addr ' + addr);
+                return 0;
+        }
+    };
+    PPU.prototype.ppuRegistersSetter = function (addr, value) {
+        value &= 0xff;
+        addr = (addr - 0x2000) % 8;
+        switch (addr) {
+            case 0x0:
+                this.t = (this.v & 0x73ff) | ((value & 3) << 10);
+                this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
+                this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
+                this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
+                this.spriteHeight = value & 0x20 ? 16 : 8;
+                this.nmi_output = !!(value & 0x80);
+                break;
+            case 0x1:
+                var x = this.showBg;
+                this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
+                this.showBgInLeftmost8Pixels = this._showBgInLeftmost8Pixels = !!(value & 0x02);
+                this.showSpritesInLeftmost8Pixels = this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+                this.showBg = this._showBg = !!(value & 0x08);
+                this.showSprites = this._showSprites = !!(value & 0x10);
+                this.emphasizeRed = this._emphasizeRed = !!(value & 0x20);
+                this.emphasizeGreen = this._emphasizeGreen = !!(value & 0x40);
+                this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
+                //if (x != this.showBg)
+                //    console.log('show:', x, '->', this.showBg);
+                break;
+            case 0x5:
+                if (this.w === 0) {
+                    this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
+                    this.x = value & 7;
+                }
+                else {
+                    this.t = (this.t & 0x7c1f) | (((value >> 3) & 0x1f) << 5);
+                    this.t = (this.t & 0x0fff) | (value & 7) << 10;
+                }
+                this.w = 1 - this.w;
+                break;
+            // Used to set the address of PPU Memory to be accessed via 0x2007
+            // The first write to this register will set 8 lower address bits.
+            // The second write will set 6 upper bits.The address will increment
+            // either by 1 or by 32 after each access to $2007.
+            case 0x6:
+                if (this.w === 0) {
+                    this.t = (this.t & 0x00ff) | ((value & 0x3f) << 8);
+                }
+                else {
+                    this.t = (this.t & 0xff00) + (value & 0xff);
+                    this.v = this.t;
+                }
+                this.w = 1 - this.w;
+                break;
+            case 0x7:
+                var vold = this.v;
+                this.vmemory.setByte(this.v & 0x3fff, value);
+                this.v += this.daddrWrite;
+                this.v &= 0x3fff;
+                //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+                //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
+                break;
+        }
+    };
+    PPU.prototype.incrementX = function () {
+        this.x++;
+        if (this.x === 8) {
+            this.x = 0;
+            // Coarse X increment
+            // The coarse X component of v needs to be incremented when the next tile is reached.
+            // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
+            // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
+            if ((this.v & 0x001F) === 31) {
+                this.v &= ~0x001F; // coarse X = 0
+                this.v ^= 0x0400; // switch horizontal nametable
+            }
+            else {
+                this.v += 1; // increment coarse X
+            }
+        }
+    };
+    PPU.prototype.incrementY = function () {
+        this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
+        this.v ^= 0x0400; // switch horizontal nametable
+        // If rendering is enabled, fine Y is incremented at dot 256 of each scanline, overflowing to coarse Y, 
+        // and finally adjusted to wrap among the nametables vertically.
+        // Bits 12- 14 are fine Y.Bits 5- 9 are coarse Y.Bit 11 selects the vertical nametable.
+        if ((this.v & 0x7000) !== 0x7000)
+            this.v += 0x1000; // increment fine Y
+        else {
+            this.v &= ~0x7000; // fine Y = 0
+            var y = (this.v & 0x03E0) >> 5; // let y = coarse Y
+            if (y === 29) {
+                y = 0; // coarse Y = 0
+                this.v ^= 0x0800; // switch vertical nametable
+            }
+            else if (y === 31) {
+                y = 0; // coarse Y = 0, nametable not switched
+            }
+            else {
+                y += 1; // increment coarse Y
+            }
+            this.v = (this.v & ~0x03E0) | (y << 5); // put coarse Y back into v
+        }
+    };
+    PPU.prototype.getNameTable = function (i) {
+        var st = '';
+        for (var y = 0; y < 30; y++) {
+            for (var x = 0; x < 32; x++) {
+                st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
+            }
+            st += '\n';
+        }
+        console.log(st);
+    };
+    //iFrameX = 0;
+    // zizi = 0;
+    PPU.prototype.step = function () {
+        if ((this.iFrame & 1) && !this.sx && !this.sy)
+            this.stepI();
+        this.stepI();
+        //this.zizi++;
+        //if (this.iFrameX != this.iFrame) {
+        //    console.log('zizi', this.zizi);
+        //    this.zizi = 0;
+        //    this.iFrameX = this.iFrame;
+        //}
+    };
+    PPU.prototype.stepI = function () {
+        if (this.sx === 0 && this.sy === PPU.syPostRender) {
+            //console.log('ppu vblank start', this.icycle);
+            this.imageData.data.set(this.buf8);
+            this.ctx.putImageData(this.imageData, 0, 0);
+            this.iFrame++;
+            this.dataAddr = 0;
+        }
+        else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
+            //vblank
+            var qqq = 1;
+            if (this.sx === 1 && this.sy === PPU.syPostRender + 1) {
+                this.flgVblank = true;
+            }
+            if (this.sx === qqq && this.sy === PPU.syPostRender + 1) {
+                if (this.nmi_output) {
+                    this.nmi_output = false;
+                    this.cpu.nmiLine = 0;
+                }
+            }
+            if (this.sx === qqq + 10 && this.sy === PPU.syPostRender + 1) {
+                this.cpu.nmiLine = 1;
+            }
+        }
+        else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
+            //beginning of screen
+            //console.log('ppu vblank end bg:',this.showBg );
+            this.flgVblank = false;
+            if (this.showBg || this.showSprites)
+                this.v = this.t;
+        }
+        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+            if (this.showBg) {
+                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
+                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
+                //
+                // The address to be fetched during rendering can be deduced from v in the following way:
+                //   tile address      = 0x2000 | (v & 0x0FFF)
+                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+                //
+                // The low 12 bits of the attribute address are composed in the following way:
+                //   NN 1111 YYY XXX
+                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
+                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
+                //   || ++++---------- attribute offset (960 bytes)
+                //   ++--------------- nametable select
+                var addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+                var attribute = this.vmemory.getByte(addrAttribute);
+                var addrTile = 0x2000 | (this.v & 0x0fff);
+                var itile = this.vmemory.getByte(addrTile);
+                var tileCol = 7 - (this.x);
+                var tileRow = this.v >> 12;
+                var ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
+                var ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
+                var ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
+                var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                var addrPalette = 0x3f00 + ipalette;
+                var icolor = this.vmemory.getByte(addrPalette);
+                var color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+                this.dataAddr++;
+            }
+            this.incrementX();
+        }
+        this.sx++;
+        if (this.sx === PPU.sxMax + 1) {
+            //end of scanline
+            this.sx = 0;
+            this.sy++;
+            if (this.sy === PPU.syPreRender + 1) {
+                this.sy = PPU.syFirstVisible;
+            }
+            else {
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
+                    this.incrementY();
+                }
+            }
+        }
+    };
+    PPU.syFirstVisible = 0;
+    PPU.syPostRender = 240;
+    PPU.syPreRender = 261;
+    PPU.sxMin = 0;
+    PPU.sxMax = 340;
+    return PPU;
+})();
+///<reference path="Memory.ts"/>
+var RepeatedMemory = (function () {
+    function RepeatedMemory(count, memory) {
+        this.count = count;
+        this.memory = memory;
+        this.sizeI = this.memory.size() * this.count;
+    }
+    RepeatedMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    RepeatedMemory.prototype.getByte = function (addr) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.getByte(addr % this.sizeI);
+    };
+    RepeatedMemory.prototype.setByte = function (addr, value) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.setByte(addr % this.sizeI, value);
+    };
+    return RepeatedMemory;
+})();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(memory) {
+        this.memory = memory;
+    }
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    return ROM;
 })();
 ///<reference path="NesEmulator.ts"/>
 var StepTest = (function () {

@@ -2020,7 +2020,7 @@ class Most6502Base {
     rX: number = 0;
     rY: number = 0;
 
-      public nmiRequested = false;
+    public nmiRequested = false;
     public irqRequested = false;
     public nmiLine = 1;
     public nmiLinePrev = 1;
@@ -2109,6 +2109,20 @@ class Most6502Base {
         this.flgCarry = (byte >> 0) & 1;
     }
 
+    public trace(opcode){
+    
+    }
+
+    public opcodeToMnemonic(opcode:number){
+        ${(() => {
+            let res = ``;
+            for (let i= 0; i < statements.length; i++) {
+                res += `if(opcode === ${statements[i].opcode}) return '${statements[i].mnemonic}';\n`;
+            }
+            res += `return '???';\n`;
+            return res;
+        })()}
+    }
     public clk() {
 
         if (this.t === 0) {
@@ -2125,7 +2139,8 @@ class Most6502Base {
             } else {
                 this.opcode = this.memory.getByte(this.ip);
             }
-
+            this.trace(opcode);
+    
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 
