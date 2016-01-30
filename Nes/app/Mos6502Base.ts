@@ -24,10 +24,10 @@ class Most6502Base {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
-         //   console.log('nmi Requested');
+            //console.log('nmi Requested');
         }
         if (this.irqDetected) {
-          //  console.log('irq requested');
+            //console.log('irq requested');
             this.irqRequested = true;
         }
     }

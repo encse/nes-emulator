@@ -2015,6 +2015,7 @@ export class Mos6502Gen {
 class Most6502Base {
     opcode: number;
     ip: number = 0;
+    ipCur: number = 0;
     sp: number = 0;
     t: number = 0;
     b: number = 0;
@@ -2035,10 +2036,10 @@ class Most6502Base {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
-            console.log('nmi Requested');
+            //console.log('nmi Requested');
         }
         if (this.irqDetected) {
-            console.log('irq requested');
+            //console.log('irq requested');
             this.irqRequested = true;
         }
     }
@@ -2122,13 +2123,14 @@ class Most6502Base {
         if (this.t === 0) {
 
             if (this.nmiRequested || this.irqRequested) {
-                this.canSetFlgBreak = !this.nmiRequested;
-                console.log('processing irq/nmi');
+                this.canSetFlgBreak = false;
+                //console.log('processing irq/nmi');
                 this.enablePCIncrement = false;
                 this.opcode = 0;
             } else {
                 this.opcode = this.memory.getByte(this.ip);
             }
+            this.ipCur = this.ip;
             this.trace(this.opcode);
     
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
