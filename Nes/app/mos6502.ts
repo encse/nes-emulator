@@ -10,6 +10,11 @@ class Mos6502 extends Most6502Base {
     public trace(opcode: number) {
         //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
     }
+
+    public status() {
+        return {irq: this.irqLine, disass: this.disass(10)};
+    }
+
     public step() {
 
         this.clk();
@@ -33,5 +38,17 @@ class Mos6502 extends Most6502Base {
     public reset() {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
+    }
+    public disass(i) {
+        var rgst = [];
+
+        var ip = this.ipCur;
+        while (i > 0) {
+            var opcode = this.memory.getByte(ip);
+            rgst.push('$' + ip.toString(16) + ' ' + this.opcodeToMnemonic(opcode));
+            ip += this.sizeFromOpcode(opcode);
+            i--;
+        }
+        return rgst;
     }
 }

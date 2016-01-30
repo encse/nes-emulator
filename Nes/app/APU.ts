@@ -73,10 +73,11 @@
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
 
-    
+    private tsto(label) {
+      //  console.log('APU', label, this.cpu.status());
+    }
     private getter(addr: number) {
 
-      //  console.log('APU get', addr.toString(16));
 
         switch(addr) {
             case 0x4015:
@@ -84,8 +85,8 @@
                     (this.lc0 > 0 ? 1 : 0);
 
                 if (this.cpu.irqLine === 0) {
-                    console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
+                    this.tsto('get $4015');
                 }
                 return res;
         }
@@ -102,12 +103,10 @@
             // square 2 length counter > 0
             // square 1 length counter > 0
 
-        //console.log('get ', addr.toString(16));
         return 0;
     }
 
     private setter(addr: number, value: number) {
-        //console.log('APU set', addr.toString(16), value.toString(16));
         switch (addr) {
             case 0x4000:
 
@@ -191,42 +190,47 @@
                 this.frameIRQDisabled = (value >> 6) & 1;
                // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
                 this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
-                //console.log('APU this.cpu.irqline', this.cpu.irqLine);
+               
+         
                 break;
         }
-       // console.log('set ', addr.toString(16), value);
+
+        this.tsto('set $' + addr.toString(16));
+
     }
 
     public step() {
         //The divider generates an output clock rate of just under 240 Hz, and appears to
         //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is
         //clocked by the divider's output.
-        this.idividerStep++;
-
         if (this.idividerStep === 89490) {
-
+            
             this.idividerStep = 0;
             this.clockSequencer();
            
         }
+        else
+            this.idividerStep++;
 
     }
 
     private clockSequencer() {
        
+
+        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
+            if (this.cpu.irqLine) {
+                this.cpu.irqLine = 0;
+                this.tsto('end of frame');
+            }
+        }
      
-        if (this.isequencerStep === 0 || this.isequencerStep === 2) {
+        if (this.isequencerStep === 1 || this.isequencerStep === 3) {
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
         }
-
-        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
-            this.cpu.irqLine = 0;
-            console.log('APU', 'end of frame, this.cpu.irqLine', this.cpu.irqLine);
-        }
-
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
+     
     }
 }

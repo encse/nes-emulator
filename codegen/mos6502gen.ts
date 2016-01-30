@@ -1312,22 +1312,23 @@ export class Mos6502Gen {
                 .then(`this.pushByte(this.ip & 0xff)`)
                 .thenNextCycle(),
             new Cycle(5, 'push P on stack, decrement S')
-                .then(`// this.pollInterrupts()1`)
-                .then(`//var nmi = this.nmiRequested`)
-                .then(`// var irq = this.irqRequested1`)
-                .then(`// this.addrBrk = nmi ? this.addrNMI : this.addrIRQ`)
-
-                .then(`this.flgBreakCommand = 1`)
+                .then(`this.pollInterrupts()`)
+                .then(`var nmi = this.nmiRequested`)
+                .then(`this.addrBrk = nmi ? this.addrNMI : this.addrIRQ`)
+                .then(`this.irqRequested = false`)
+                .then(`this.nmiRequested = false`)
+                .then(`if (this.canSetFlgBreak) this.flgBreakCommand = 1`)
                 .then(`this.pushByte(this.rP)`)
                 .then(`this.flgBreakCommand = 0`)
                 .thenNextCycle(),
             new Cycle(6, 'fetch PCL')
-                .then(`this.ip = this.memory.getByte(this.addrIRQ)`)
+                .then(`this.ip = this.memory.getByte(this.addrBrk)`)
                 .then(`this.flgInterruptDisable = 1`)
                 .thenNextCycle(),
             new Cycle(7, 'fetch PCH')
-                .then(`this.ip += this.memory.getByte(this.addrIRQ + 1) << 8`)
+                .then(`this.ip += this.memory.getByte(this.addrBrk + 1) << 8`)
                 .then(`this.enablePCIncrement = true`)
+                .then(`this.canSetFlgBreak = true`)
                 .thenNextStatement()
         ];
     }
@@ -2073,6 +2074,7 @@ class Most6502Base {
     public addrNMI = 0xfffa;
  
     private enablePCIncrement = true;
+    private canSetFlgBreak = true;
     private addrBrk : number;
     public constructor(public memory: Memory) {
     }
@@ -2114,26 +2116,13 @@ class Most6502Base {
     
     }
 
-    public opcodeToMnemonic(opcode:number){
-        ${(() => {
-            let res = ``;
-            for (let i= 0; i < statements.length; i++) {
-                res += `if(opcode === ${statements[i].opcode}) return '${statements[i].mnemonic}';\n`;
-            }
-            res += `return '???';\n`;
-            return res;
-        })()}
-    }
+   
     public clk() {
 
         if (this.t === 0) {
- 
-            const nmiWasRequested = this.nmiRequested;
-            const irqWasRequested = this.irqRequested;
-            this.irqRequested = false;
-            this.nmiRequested = false;
 
-            if (nmiWasRequested || irqWasRequested) {
+            if (this.nmiRequested || this.irqRequested) {
+                this.canSetFlgBreak = !this.nmiRequested;
                 console.log('processing irq/nmi');
                 this.enablePCIncrement = false;
                 this.opcode = 0;
@@ -2156,12 +2145,35 @@ class Most6502Base {
     default: throw 'invalid opcode $' + this.opcode.toString(16); 
 }
 
-        if (this.t===0)
+        if (this.t===0 && this.opcode != 0x0)
             this.pollInterrupts();  
         this.detectInterrupts();
         }
 
+
+    public opcodeToMnemonic(opcode:number){
+        ${(() => {
+                let res = ``;
+                for (let i = 0; i < statements.length; i++) {
+                    res += `if(opcode === ${statements[i].opcode}) return '${statements[i].mnemonic}';\n`;
+                }
+                res += `return '???';\n`;
+                return res;
+            })()}
     }
+
+    public sizeFromOpcode(opcode:number){
+        ${(() => {
+                let res = ``;
+                for (let i = 0; i < statements.length; i++) {
+                    res += `if(opcode === ${statements[i].opcode}) return ${statements[i].size};\n`;
+                }
+                res += `return 1;\n`;
+                return res;
+            })()}
+    }
+
+}
 `;
         return res;
     }

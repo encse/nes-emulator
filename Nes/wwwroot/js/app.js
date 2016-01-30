@@ -68,15 +68,17 @@ var APU = (function () {
         memory.shadowSetter(0x4000, 0x4017, this.setter.bind(this));
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
+    APU.prototype.tsto = function (label) {
+        //  console.log('APU', label, this.cpu.status());
+    };
     APU.prototype.getter = function (addr) {
-        //  console.log('APU get', addr.toString(16));
         switch (addr) {
             case 0x4015:
                 var res = ((!this.cpu.irqLine ? 1 : 0) << 6) +
                     (this.lc0 > 0 ? 1 : 0);
                 if (this.cpu.irqLine === 0) {
-                    console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
+                    this.tsto('get $4015');
                 }
                 return res;
         }
@@ -90,11 +92,9 @@ var APU = (function () {
         // triangle length counter > 0
         // square 2 length counter > 0
         // square 1 length counter > 0
-        //console.log('get ', addr.toString(16));
         return 0;
     };
     APU.prototype.setter = function (addr, value) {
-        //console.log('APU set', addr.toString(16), value.toString(16));
         switch (addr) {
             case 0x4000:
                 //$4000 / 4 ddle nnnn   duty, loop env/ disable length, env disable, vol / env period
@@ -161,30 +161,32 @@ var APU = (function () {
                 this.frameIRQDisabled = (value >> 6) & 1;
                 // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
                 this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
-                //console.log('APU this.cpu.irqline', this.cpu.irqLine);
                 break;
         }
-        // console.log('set ', addr.toString(16), value);
+        this.tsto('set $' + addr.toString(16));
     };
     APU.prototype.step = function () {
         //The divider generates an output clock rate of just under 240 Hz, and appears to
         //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is
         //clocked by the divider's output.
-        this.idividerStep++;
         if (this.idividerStep === 89490) {
             this.idividerStep = 0;
             this.clockSequencer();
         }
+        else
+            this.idividerStep++;
     };
     APU.prototype.clockSequencer = function () {
-        if (this.isequencerStep === 0 || this.isequencerStep === 2) {
+        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
+            if (this.cpu.irqLine) {
+                this.cpu.irqLine = 0;
+                this.tsto('end of frame');
+            }
+        }
+        if (this.isequencerStep === 1 || this.isequencerStep === 3) {
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
-        }
-        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
-            this.cpu.irqLine = 0;
-            console.log('APU', 'end of frame, this.cpu.irqLine', this.cpu.irqLine);
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
     };
@@ -484,6 +486,7 @@ var Most6502Base = (function () {
     function Most6502Base(memory) {
         this.memory = memory;
         this.ip = 0;
+        this.ipCur = 0;
         this.sp = 0;
         this.t = 0;
         this.b = 0;
@@ -512,10 +515,9 @@ var Most6502Base = (function () {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
-            console.log('nmi Requested');
         }
         if (this.irqDetected) {
-            console.log('irq requested');
+            //  console.log('irq requested');
             this.irqRequested = true;
         }
     };
@@ -561,508 +563,18 @@ var Most6502Base = (function () {
     });
     Most6502Base.prototype.trace = function (opcode) {
     };
-    Most6502Base.prototype.opcodeToMnemonic = function (opcode) {
-        if (opcode === 105)
-            return 'ADC Immediate';
-        if (opcode === 101)
-            return 'ADC ZeroPage';
-        if (opcode === 117)
-            return 'ADC ZeroPageX';
-        if (opcode === 109)
-            return 'ADC Absolute';
-        if (opcode === 125)
-            return 'ADC AbsoluteX';
-        if (opcode === 121)
-            return 'ADC AbsoluteY';
-        if (opcode === 97)
-            return 'ADC IndirectX';
-        if (opcode === 113)
-            return 'ADC IndirectY';
-        if (opcode === 41)
-            return 'AND Immediate';
-        if (opcode === 37)
-            return 'AND ZeroPage';
-        if (opcode === 53)
-            return 'AND ZeroPageX';
-        if (opcode === 45)
-            return 'AND Absolute';
-        if (opcode === 61)
-            return 'AND AbsoluteX';
-        if (opcode === 57)
-            return 'AND AbsoluteY';
-        if (opcode === 33)
-            return 'AND IndirectX';
-        if (opcode === 49)
-            return 'AND IndirectY';
-        if (opcode === 10)
-            return 'ASL Accumulator';
-        if (opcode === 6)
-            return 'ASL ZeroPage';
-        if (opcode === 22)
-            return 'ASL ZeroPageX';
-        if (opcode === 14)
-            return 'ASL Absolute';
-        if (opcode === 30)
-            return 'ASL AbsoluteX';
-        if (opcode === 144)
-            return 'BCC Relative';
-        if (opcode === 176)
-            return 'BCS Relative';
-        if (opcode === 240)
-            return 'BEQ Relative';
-        if (opcode === 48)
-            return 'BMI Relative';
-        if (opcode === 208)
-            return 'BNE Relative';
-        if (opcode === 16)
-            return 'BPL Relative';
-        if (opcode === 80)
-            return 'BVC Relative';
-        if (opcode === 112)
-            return 'BVS Relative';
-        if (opcode === 36)
-            return 'BIT ZeroPage';
-        if (opcode === 44)
-            return 'BIT Absolute';
-        if (opcode === 24)
-            return 'CLC Implied';
-        if (opcode === 216)
-            return 'CLD Implied';
-        if (opcode === 88)
-            return 'CLI Implied';
-        if (opcode === 184)
-            return 'CLV Implied';
-        if (opcode === 201)
-            return 'CMP Immediate';
-        if (opcode === 197)
-            return 'CMP ZeroPage';
-        if (opcode === 213)
-            return 'CMP ZeroPageX';
-        if (opcode === 205)
-            return 'CMP Absolute';
-        if (opcode === 221)
-            return 'CMP AbsoluteX';
-        if (opcode === 217)
-            return 'CMP AbsoluteY';
-        if (opcode === 193)
-            return 'CMP IndirectX';
-        if (opcode === 209)
-            return 'CMP IndirectY';
-        if (opcode === 224)
-            return 'CPX Immediate';
-        if (opcode === 228)
-            return 'CPX ZeroPage';
-        if (opcode === 236)
-            return 'CPX Absolute';
-        if (opcode === 192)
-            return 'CPY Immediate';
-        if (opcode === 196)
-            return 'CPY ZeroPage';
-        if (opcode === 204)
-            return 'CPY Absolute';
-        if (opcode === 198)
-            return 'DEC ZeroPage';
-        if (opcode === 214)
-            return 'DEC ZeroPageX';
-        if (opcode === 206)
-            return 'DEC Absolute';
-        if (opcode === 222)
-            return 'DEC AbsoluteX';
-        if (opcode === 202)
-            return 'DEX Accumulator';
-        if (opcode === 136)
-            return 'DEY Accumulator';
-        if (opcode === 230)
-            return 'INC ZeroPage';
-        if (opcode === 246)
-            return 'INC ZeroPageX';
-        if (opcode === 238)
-            return 'INC Absolute';
-        if (opcode === 254)
-            return 'INC AbsoluteX';
-        if (opcode === 232)
-            return 'INX Accumulator';
-        if (opcode === 200)
-            return 'INY Accumulator';
-        if (opcode === 73)
-            return 'EOR Immediate';
-        if (opcode === 69)
-            return 'EOR ZeroPage';
-        if (opcode === 85)
-            return 'EOR ZeroPageX';
-        if (opcode === 77)
-            return 'EOR Absolute';
-        if (opcode === 93)
-            return 'EOR AbsoluteX';
-        if (opcode === 89)
-            return 'EOR AbsoluteY';
-        if (opcode === 65)
-            return 'EOR IndirectX';
-        if (opcode === 81)
-            return 'EOR IndirectY';
-        if (opcode === 76)
-            return 'JMP Absolute';
-        if (opcode === 108)
-            return 'JMP AbsoluteIndirect';
-        if (opcode === 169)
-            return 'LDA Immediate';
-        if (opcode === 165)
-            return 'LDA ZeroPage';
-        if (opcode === 181)
-            return 'LDA ZeroPageX';
-        if (opcode === 173)
-            return 'LDA Absolute';
-        if (opcode === 189)
-            return 'LDA AbsoluteX';
-        if (opcode === 185)
-            return 'LDA AbsoluteY';
-        if (opcode === 161)
-            return 'LDA IndirectX';
-        if (opcode === 177)
-            return 'LDA IndirectY';
-        if (opcode === 162)
-            return 'LDX Immediate';
-        if (opcode === 166)
-            return 'LDX ZeroPage';
-        if (opcode === 182)
-            return 'LDX ZeroPageY';
-        if (opcode === 174)
-            return 'LDX Absolute';
-        if (opcode === 190)
-            return 'LDX AbsoluteY';
-        if (opcode === 160)
-            return 'LDY Immediate';
-        if (opcode === 164)
-            return 'LDY ZeroPage';
-        if (opcode === 180)
-            return 'LDY ZeroPageX';
-        if (opcode === 172)
-            return 'LDY Absolute';
-        if (opcode === 188)
-            return 'LDY AbsoluteX';
-        if (opcode === 74)
-            return 'LSR Accumulator';
-        if (opcode === 70)
-            return 'LSR ZeroPage';
-        if (opcode === 86)
-            return 'LSR ZeroPageX';
-        if (opcode === 78)
-            return 'LSR Absolute';
-        if (opcode === 94)
-            return 'LSR AbsoluteX';
-        if (opcode === 234)
-            return 'NOP Implied';
-        if (opcode === 9)
-            return 'ORA Immediate';
-        if (opcode === 5)
-            return 'ORA ZeroPage';
-        if (opcode === 21)
-            return 'ORA ZeroPageX';
-        if (opcode === 13)
-            return 'ORA Absolute';
-        if (opcode === 29)
-            return 'ORA AbsoluteX';
-        if (opcode === 25)
-            return 'ORA AbsoluteY';
-        if (opcode === 1)
-            return 'ORA IndirectX';
-        if (opcode === 17)
-            return 'ORA IndirectY';
-        if (opcode === 72)
-            return 'PHA Implied';
-        if (opcode === 8)
-            return 'PHP Implied';
-        if (opcode === 104)
-            return 'PLA Implied';
-        if (opcode === 40)
-            return 'PLP Implied';
-        if (opcode === 42)
-            return 'ROL Accumulator';
-        if (opcode === 38)
-            return 'ROL ZeroPage';
-        if (opcode === 54)
-            return 'ROL ZeroPageX';
-        if (opcode === 46)
-            return 'ROL Absolute';
-        if (opcode === 62)
-            return 'ROL AbsoluteX';
-        if (opcode === 106)
-            return 'ROR Accumulator';
-        if (opcode === 102)
-            return 'ROR ZeroPage';
-        if (opcode === 118)
-            return 'ROR ZeroPageX';
-        if (opcode === 110)
-            return 'ROR Absolute';
-        if (opcode === 126)
-            return 'ROR AbsoluteX';
-        if (opcode === 0)
-            return 'BRK BRK';
-        if (opcode === 64)
-            return 'RTI RTI';
-        if (opcode === 233)
-            return 'SBC Immediate';
-        if (opcode === 229)
-            return 'SBC ZeroPage';
-        if (opcode === 245)
-            return 'SBC ZeroPageX';
-        if (opcode === 237)
-            return 'SBC Absolute';
-        if (opcode === 253)
-            return 'SBC AbsoluteX';
-        if (opcode === 249)
-            return 'SBC AbsoluteY';
-        if (opcode === 225)
-            return 'SBC IndirectX';
-        if (opcode === 241)
-            return 'SBC IndirectY';
-        if (opcode === 56)
-            return 'SEC Implied';
-        if (opcode === 248)
-            return 'SED Implied';
-        if (opcode === 120)
-            return 'SEI Implied';
-        if (opcode === 133)
-            return 'STA ZeroPage';
-        if (opcode === 149)
-            return 'STA ZeroPageX';
-        if (opcode === 141)
-            return 'STA Absolute';
-        if (opcode === 157)
-            return 'STA AbsoluteX';
-        if (opcode === 153)
-            return 'STA AbsoluteY';
-        if (opcode === 129)
-            return 'STA IndirectX';
-        if (opcode === 145)
-            return 'STA IndirectY';
-        if (opcode === 134)
-            return 'STX ZeroPage';
-        if (opcode === 150)
-            return 'STX ZeroPageY';
-        if (opcode === 142)
-            return 'STX Absolute';
-        if (opcode === 132)
-            return 'STY ZeroPage';
-        if (opcode === 148)
-            return 'STY ZeroPageX';
-        if (opcode === 140)
-            return 'STY Absolute';
-        if (opcode === 170)
-            return 'TAX Accumulator';
-        if (opcode === 168)
-            return 'TAY Accumulator';
-        if (opcode === 186)
-            return 'TSX Accumulator';
-        if (opcode === 138)
-            return 'TXA Accumulator';
-        if (opcode === 154)
-            return 'TXS Accumulator';
-        if (opcode === 152)
-            return 'TYA Accumulator';
-        if (opcode === 32)
-            return 'JSR JSR';
-        if (opcode === 96)
-            return 'RTS RTS';
-        if (opcode === 26)
-            return 'NOP Implied';
-        if (opcode === 58)
-            return 'NOP Implied';
-        if (opcode === 90)
-            return 'NOP Implied';
-        if (opcode === 122)
-            return 'NOP Implied';
-        if (opcode === 218)
-            return 'NOP Implied';
-        if (opcode === 250)
-            return 'NOP Implied';
-        if (opcode === 4)
-            return 'NOP ZeroPage';
-        if (opcode === 20)
-            return 'NOP ZeroPageX';
-        if (opcode === 52)
-            return 'NOP ZeroPageX';
-        if (opcode === 68)
-            return 'NOP ZeroPage';
-        if (opcode === 84)
-            return 'NOP ZeroPageX';
-        if (opcode === 116)
-            return 'NOP ZeroPageX';
-        if (opcode === 212)
-            return 'NOP ZeroPageX';
-        if (opcode === 244)
-            return 'NOP ZeroPageX';
-        if (opcode === 100)
-            return 'NOP ZeroPage';
-        if (opcode === 128)
-            return 'NOP Immediate';
-        if (opcode === 130)
-            return 'NOP Immediate';
-        if (opcode === 194)
-            return 'NOP Immediate';
-        if (opcode === 226)
-            return 'NOP Immediate';
-        if (opcode === 137)
-            return 'NOP Immediate';
-        if (opcode === 12)
-            return 'NOP Absolute';
-        if (opcode === 28)
-            return 'NOP AbsoluteX';
-        if (opcode === 60)
-            return 'NOP AbsoluteX';
-        if (opcode === 92)
-            return 'NOP AbsoluteX';
-        if (opcode === 124)
-            return 'NOP AbsoluteX';
-        if (opcode === 220)
-            return 'NOP AbsoluteX';
-        if (opcode === 252)
-            return 'NOP AbsoluteX';
-        if (opcode === 235)
-            return 'SBC Immediate';
-        if (opcode === 195)
-            return 'DCP IndirectX';
-        if (opcode === 199)
-            return 'DCP ZeroPage';
-        if (opcode === 207)
-            return 'DCP Absolute';
-        if (opcode === 211)
-            return 'DCP IndirectY';
-        if (opcode === 215)
-            return 'DCP ZeroPageX';
-        if (opcode === 219)
-            return 'DCP AbsoluteY';
-        if (opcode === 223)
-            return 'DCP AbsoluteX';
-        if (opcode === 227)
-            return 'ISC IndirectX';
-        if (opcode === 231)
-            return 'ISC ZeroPage';
-        if (opcode === 239)
-            return 'ISC Absolute';
-        if (opcode === 243)
-            return 'ISC IndirectY';
-        if (opcode === 247)
-            return 'ISC ZeroPageX';
-        if (opcode === 251)
-            return 'ISC AbsoluteY';
-        if (opcode === 255)
-            return 'ISC AbsoluteX';
-        if (opcode === 171)
-            return 'LAX Immediate';
-        if (opcode === 167)
-            return 'LAX ZeroPage';
-        if (opcode === 183)
-            return 'LAX ZeroPageY';
-        if (opcode === 175)
-            return 'LAX Absolute';
-        if (opcode === 191)
-            return 'LAX AbsoluteY';
-        if (opcode === 163)
-            return 'LAX IndirectX';
-        if (opcode === 179)
-            return 'LAX IndirectY';
-        if (opcode === 131)
-            return 'SAX IndirectX';
-        if (opcode === 135)
-            return 'SAX ZeroPage';
-        if (opcode === 143)
-            return 'SAX Absolute';
-        if (opcode === 151)
-            return 'SAX ZeroPageY';
-        if (opcode === 3)
-            return 'SLO IndirectX';
-        if (opcode === 7)
-            return 'SLO ZeroPage';
-        if (opcode === 15)
-            return 'SLO Absolute';
-        if (opcode === 19)
-            return 'SLO IndirectY';
-        if (opcode === 23)
-            return 'SLO ZeroPageX';
-        if (opcode === 27)
-            return 'SLO AbsoluteY';
-        if (opcode === 31)
-            return 'SLO AbsoluteX';
-        if (opcode === 35)
-            return 'RLA IndirectX';
-        if (opcode === 39)
-            return 'RLA ZeroPage';
-        if (opcode === 47)
-            return 'RLA Absolute';
-        if (opcode === 51)
-            return 'RLA IndirectY';
-        if (opcode === 55)
-            return 'RLA ZeroPageX';
-        if (opcode === 59)
-            return 'RLA AbsoluteY';
-        if (opcode === 63)
-            return 'RLA AbsoluteX';
-        if (opcode === 99)
-            return 'RRA IndirectX';
-        if (opcode === 103)
-            return 'RRA ZeroPage';
-        if (opcode === 111)
-            return 'RRA Absolute';
-        if (opcode === 115)
-            return 'RRA IndirectY';
-        if (opcode === 119)
-            return 'RRA ZeroPageX';
-        if (opcode === 123)
-            return 'RRA AbsoluteY';
-        if (opcode === 127)
-            return 'RRA AbsoluteX';
-        if (opcode === 67)
-            return 'SRE IndirectX';
-        if (opcode === 71)
-            return 'SRE ZeroPage';
-        if (opcode === 79)
-            return 'SRE Absolute';
-        if (opcode === 83)
-            return 'SRE IndirectY';
-        if (opcode === 87)
-            return 'SRE ZeroPageX';
-        if (opcode === 91)
-            return 'SRE AbsoluteY';
-        if (opcode === 95)
-            return 'SRE AbsoluteX';
-        if (opcode === 11)
-            return 'ANC Immediate';
-        if (opcode === 43)
-            return 'ANC Immediate';
-        if (opcode === 75)
-            return 'ALR Immediate';
-        if (opcode === 107)
-            return 'ARR Immediate';
-        if (opcode === 203)
-            return 'AXS Immediate';
-        if (opcode === 156)
-            return 'SYA AbsoluteX';
-        if (opcode === 158)
-            return 'SXA AbsoluteY';
-        if (opcode === 139)
-            return 'XAA Immediate';
-        if (opcode === 147)
-            return 'AXA IndirectY';
-        if (opcode === 155)
-            return 'XAS AbsoluteY';
-        if (opcode === 159)
-            return 'AXA AbsoluteY';
-        if (opcode === 187)
-            return 'LAR AbsoluteY';
-        return '???';
-    };
     Most6502Base.prototype.clk = function () {
         if (this.t === 0) {
             if (this.nmiRequested || this.irqRequested) {
-                this.canSetFlgBreak = !this.nmiRequested;
-                console.log('processing irq/nmi');
+                this.canSetFlgBreak = false;
+                //console.log('processing irq/nmi');
                 this.enablePCIncrement = false;
                 this.opcode = 0;
             }
             else {
                 this.opcode = this.memory.getByte(this.ip);
             }
+            this.ipCur = this.ip;
             this.trace(this.opcode);
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
@@ -9791,6 +9303,988 @@ var Most6502Base = (function () {
             this.pollInterrupts();
         this.detectInterrupts();
     };
+    Most6502Base.prototype.opcodeToMnemonic = function (opcode) {
+        if (opcode === 105)
+            return 'ADC Immediate';
+        if (opcode === 101)
+            return 'ADC ZeroPage';
+        if (opcode === 117)
+            return 'ADC ZeroPageX';
+        if (opcode === 109)
+            return 'ADC Absolute';
+        if (opcode === 125)
+            return 'ADC AbsoluteX';
+        if (opcode === 121)
+            return 'ADC AbsoluteY';
+        if (opcode === 97)
+            return 'ADC IndirectX';
+        if (opcode === 113)
+            return 'ADC IndirectY';
+        if (opcode === 41)
+            return 'AND Immediate';
+        if (opcode === 37)
+            return 'AND ZeroPage';
+        if (opcode === 53)
+            return 'AND ZeroPageX';
+        if (opcode === 45)
+            return 'AND Absolute';
+        if (opcode === 61)
+            return 'AND AbsoluteX';
+        if (opcode === 57)
+            return 'AND AbsoluteY';
+        if (opcode === 33)
+            return 'AND IndirectX';
+        if (opcode === 49)
+            return 'AND IndirectY';
+        if (opcode === 10)
+            return 'ASL Accumulator';
+        if (opcode === 6)
+            return 'ASL ZeroPage';
+        if (opcode === 22)
+            return 'ASL ZeroPageX';
+        if (opcode === 14)
+            return 'ASL Absolute';
+        if (opcode === 30)
+            return 'ASL AbsoluteX';
+        if (opcode === 144)
+            return 'BCC Relative';
+        if (opcode === 176)
+            return 'BCS Relative';
+        if (opcode === 240)
+            return 'BEQ Relative';
+        if (opcode === 48)
+            return 'BMI Relative';
+        if (opcode === 208)
+            return 'BNE Relative';
+        if (opcode === 16)
+            return 'BPL Relative';
+        if (opcode === 80)
+            return 'BVC Relative';
+        if (opcode === 112)
+            return 'BVS Relative';
+        if (opcode === 36)
+            return 'BIT ZeroPage';
+        if (opcode === 44)
+            return 'BIT Absolute';
+        if (opcode === 24)
+            return 'CLC Implied';
+        if (opcode === 216)
+            return 'CLD Implied';
+        if (opcode === 88)
+            return 'CLI Implied';
+        if (opcode === 184)
+            return 'CLV Implied';
+        if (opcode === 201)
+            return 'CMP Immediate';
+        if (opcode === 197)
+            return 'CMP ZeroPage';
+        if (opcode === 213)
+            return 'CMP ZeroPageX';
+        if (opcode === 205)
+            return 'CMP Absolute';
+        if (opcode === 221)
+            return 'CMP AbsoluteX';
+        if (opcode === 217)
+            return 'CMP AbsoluteY';
+        if (opcode === 193)
+            return 'CMP IndirectX';
+        if (opcode === 209)
+            return 'CMP IndirectY';
+        if (opcode === 224)
+            return 'CPX Immediate';
+        if (opcode === 228)
+            return 'CPX ZeroPage';
+        if (opcode === 236)
+            return 'CPX Absolute';
+        if (opcode === 192)
+            return 'CPY Immediate';
+        if (opcode === 196)
+            return 'CPY ZeroPage';
+        if (opcode === 204)
+            return 'CPY Absolute';
+        if (opcode === 198)
+            return 'DEC ZeroPage';
+        if (opcode === 214)
+            return 'DEC ZeroPageX';
+        if (opcode === 206)
+            return 'DEC Absolute';
+        if (opcode === 222)
+            return 'DEC AbsoluteX';
+        if (opcode === 202)
+            return 'DEX Accumulator';
+        if (opcode === 136)
+            return 'DEY Accumulator';
+        if (opcode === 230)
+            return 'INC ZeroPage';
+        if (opcode === 246)
+            return 'INC ZeroPageX';
+        if (opcode === 238)
+            return 'INC Absolute';
+        if (opcode === 254)
+            return 'INC AbsoluteX';
+        if (opcode === 232)
+            return 'INX Accumulator';
+        if (opcode === 200)
+            return 'INY Accumulator';
+        if (opcode === 73)
+            return 'EOR Immediate';
+        if (opcode === 69)
+            return 'EOR ZeroPage';
+        if (opcode === 85)
+            return 'EOR ZeroPageX';
+        if (opcode === 77)
+            return 'EOR Absolute';
+        if (opcode === 93)
+            return 'EOR AbsoluteX';
+        if (opcode === 89)
+            return 'EOR AbsoluteY';
+        if (opcode === 65)
+            return 'EOR IndirectX';
+        if (opcode === 81)
+            return 'EOR IndirectY';
+        if (opcode === 76)
+            return 'JMP Absolute';
+        if (opcode === 108)
+            return 'JMP AbsoluteIndirect';
+        if (opcode === 169)
+            return 'LDA Immediate';
+        if (opcode === 165)
+            return 'LDA ZeroPage';
+        if (opcode === 181)
+            return 'LDA ZeroPageX';
+        if (opcode === 173)
+            return 'LDA Absolute';
+        if (opcode === 189)
+            return 'LDA AbsoluteX';
+        if (opcode === 185)
+            return 'LDA AbsoluteY';
+        if (opcode === 161)
+            return 'LDA IndirectX';
+        if (opcode === 177)
+            return 'LDA IndirectY';
+        if (opcode === 162)
+            return 'LDX Immediate';
+        if (opcode === 166)
+            return 'LDX ZeroPage';
+        if (opcode === 182)
+            return 'LDX ZeroPageY';
+        if (opcode === 174)
+            return 'LDX Absolute';
+        if (opcode === 190)
+            return 'LDX AbsoluteY';
+        if (opcode === 160)
+            return 'LDY Immediate';
+        if (opcode === 164)
+            return 'LDY ZeroPage';
+        if (opcode === 180)
+            return 'LDY ZeroPageX';
+        if (opcode === 172)
+            return 'LDY Absolute';
+        if (opcode === 188)
+            return 'LDY AbsoluteX';
+        if (opcode === 74)
+            return 'LSR Accumulator';
+        if (opcode === 70)
+            return 'LSR ZeroPage';
+        if (opcode === 86)
+            return 'LSR ZeroPageX';
+        if (opcode === 78)
+            return 'LSR Absolute';
+        if (opcode === 94)
+            return 'LSR AbsoluteX';
+        if (opcode === 234)
+            return 'NOP Implied';
+        if (opcode === 9)
+            return 'ORA Immediate';
+        if (opcode === 5)
+            return 'ORA ZeroPage';
+        if (opcode === 21)
+            return 'ORA ZeroPageX';
+        if (opcode === 13)
+            return 'ORA Absolute';
+        if (opcode === 29)
+            return 'ORA AbsoluteX';
+        if (opcode === 25)
+            return 'ORA AbsoluteY';
+        if (opcode === 1)
+            return 'ORA IndirectX';
+        if (opcode === 17)
+            return 'ORA IndirectY';
+        if (opcode === 72)
+            return 'PHA Implied';
+        if (opcode === 8)
+            return 'PHP Implied';
+        if (opcode === 104)
+            return 'PLA Implied';
+        if (opcode === 40)
+            return 'PLP Implied';
+        if (opcode === 42)
+            return 'ROL Accumulator';
+        if (opcode === 38)
+            return 'ROL ZeroPage';
+        if (opcode === 54)
+            return 'ROL ZeroPageX';
+        if (opcode === 46)
+            return 'ROL Absolute';
+        if (opcode === 62)
+            return 'ROL AbsoluteX';
+        if (opcode === 106)
+            return 'ROR Accumulator';
+        if (opcode === 102)
+            return 'ROR ZeroPage';
+        if (opcode === 118)
+            return 'ROR ZeroPageX';
+        if (opcode === 110)
+            return 'ROR Absolute';
+        if (opcode === 126)
+            return 'ROR AbsoluteX';
+        if (opcode === 0)
+            return 'BRK BRK';
+        if (opcode === 64)
+            return 'RTI RTI';
+        if (opcode === 233)
+            return 'SBC Immediate';
+        if (opcode === 229)
+            return 'SBC ZeroPage';
+        if (opcode === 245)
+            return 'SBC ZeroPageX';
+        if (opcode === 237)
+            return 'SBC Absolute';
+        if (opcode === 253)
+            return 'SBC AbsoluteX';
+        if (opcode === 249)
+            return 'SBC AbsoluteY';
+        if (opcode === 225)
+            return 'SBC IndirectX';
+        if (opcode === 241)
+            return 'SBC IndirectY';
+        if (opcode === 56)
+            return 'SEC Implied';
+        if (opcode === 248)
+            return 'SED Implied';
+        if (opcode === 120)
+            return 'SEI Implied';
+        if (opcode === 133)
+            return 'STA ZeroPage';
+        if (opcode === 149)
+            return 'STA ZeroPageX';
+        if (opcode === 141)
+            return 'STA Absolute';
+        if (opcode === 157)
+            return 'STA AbsoluteX';
+        if (opcode === 153)
+            return 'STA AbsoluteY';
+        if (opcode === 129)
+            return 'STA IndirectX';
+        if (opcode === 145)
+            return 'STA IndirectY';
+        if (opcode === 134)
+            return 'STX ZeroPage';
+        if (opcode === 150)
+            return 'STX ZeroPageY';
+        if (opcode === 142)
+            return 'STX Absolute';
+        if (opcode === 132)
+            return 'STY ZeroPage';
+        if (opcode === 148)
+            return 'STY ZeroPageX';
+        if (opcode === 140)
+            return 'STY Absolute';
+        if (opcode === 170)
+            return 'TAX Accumulator';
+        if (opcode === 168)
+            return 'TAY Accumulator';
+        if (opcode === 186)
+            return 'TSX Accumulator';
+        if (opcode === 138)
+            return 'TXA Accumulator';
+        if (opcode === 154)
+            return 'TXS Accumulator';
+        if (opcode === 152)
+            return 'TYA Accumulator';
+        if (opcode === 32)
+            return 'JSR JSR';
+        if (opcode === 96)
+            return 'RTS RTS';
+        if (opcode === 26)
+            return 'NOP Implied';
+        if (opcode === 58)
+            return 'NOP Implied';
+        if (opcode === 90)
+            return 'NOP Implied';
+        if (opcode === 122)
+            return 'NOP Implied';
+        if (opcode === 218)
+            return 'NOP Implied';
+        if (opcode === 250)
+            return 'NOP Implied';
+        if (opcode === 4)
+            return 'NOP ZeroPage';
+        if (opcode === 20)
+            return 'NOP ZeroPageX';
+        if (opcode === 52)
+            return 'NOP ZeroPageX';
+        if (opcode === 68)
+            return 'NOP ZeroPage';
+        if (opcode === 84)
+            return 'NOP ZeroPageX';
+        if (opcode === 116)
+            return 'NOP ZeroPageX';
+        if (opcode === 212)
+            return 'NOP ZeroPageX';
+        if (opcode === 244)
+            return 'NOP ZeroPageX';
+        if (opcode === 100)
+            return 'NOP ZeroPage';
+        if (opcode === 128)
+            return 'NOP Immediate';
+        if (opcode === 130)
+            return 'NOP Immediate';
+        if (opcode === 194)
+            return 'NOP Immediate';
+        if (opcode === 226)
+            return 'NOP Immediate';
+        if (opcode === 137)
+            return 'NOP Immediate';
+        if (opcode === 12)
+            return 'NOP Absolute';
+        if (opcode === 28)
+            return 'NOP AbsoluteX';
+        if (opcode === 60)
+            return 'NOP AbsoluteX';
+        if (opcode === 92)
+            return 'NOP AbsoluteX';
+        if (opcode === 124)
+            return 'NOP AbsoluteX';
+        if (opcode === 220)
+            return 'NOP AbsoluteX';
+        if (opcode === 252)
+            return 'NOP AbsoluteX';
+        if (opcode === 235)
+            return 'SBC Immediate';
+        if (opcode === 195)
+            return 'DCP IndirectX';
+        if (opcode === 199)
+            return 'DCP ZeroPage';
+        if (opcode === 207)
+            return 'DCP Absolute';
+        if (opcode === 211)
+            return 'DCP IndirectY';
+        if (opcode === 215)
+            return 'DCP ZeroPageX';
+        if (opcode === 219)
+            return 'DCP AbsoluteY';
+        if (opcode === 223)
+            return 'DCP AbsoluteX';
+        if (opcode === 227)
+            return 'ISC IndirectX';
+        if (opcode === 231)
+            return 'ISC ZeroPage';
+        if (opcode === 239)
+            return 'ISC Absolute';
+        if (opcode === 243)
+            return 'ISC IndirectY';
+        if (opcode === 247)
+            return 'ISC ZeroPageX';
+        if (opcode === 251)
+            return 'ISC AbsoluteY';
+        if (opcode === 255)
+            return 'ISC AbsoluteX';
+        if (opcode === 171)
+            return 'LAX Immediate';
+        if (opcode === 167)
+            return 'LAX ZeroPage';
+        if (opcode === 183)
+            return 'LAX ZeroPageY';
+        if (opcode === 175)
+            return 'LAX Absolute';
+        if (opcode === 191)
+            return 'LAX AbsoluteY';
+        if (opcode === 163)
+            return 'LAX IndirectX';
+        if (opcode === 179)
+            return 'LAX IndirectY';
+        if (opcode === 131)
+            return 'SAX IndirectX';
+        if (opcode === 135)
+            return 'SAX ZeroPage';
+        if (opcode === 143)
+            return 'SAX Absolute';
+        if (opcode === 151)
+            return 'SAX ZeroPageY';
+        if (opcode === 3)
+            return 'SLO IndirectX';
+        if (opcode === 7)
+            return 'SLO ZeroPage';
+        if (opcode === 15)
+            return 'SLO Absolute';
+        if (opcode === 19)
+            return 'SLO IndirectY';
+        if (opcode === 23)
+            return 'SLO ZeroPageX';
+        if (opcode === 27)
+            return 'SLO AbsoluteY';
+        if (opcode === 31)
+            return 'SLO AbsoluteX';
+        if (opcode === 35)
+            return 'RLA IndirectX';
+        if (opcode === 39)
+            return 'RLA ZeroPage';
+        if (opcode === 47)
+            return 'RLA Absolute';
+        if (opcode === 51)
+            return 'RLA IndirectY';
+        if (opcode === 55)
+            return 'RLA ZeroPageX';
+        if (opcode === 59)
+            return 'RLA AbsoluteY';
+        if (opcode === 63)
+            return 'RLA AbsoluteX';
+        if (opcode === 99)
+            return 'RRA IndirectX';
+        if (opcode === 103)
+            return 'RRA ZeroPage';
+        if (opcode === 111)
+            return 'RRA Absolute';
+        if (opcode === 115)
+            return 'RRA IndirectY';
+        if (opcode === 119)
+            return 'RRA ZeroPageX';
+        if (opcode === 123)
+            return 'RRA AbsoluteY';
+        if (opcode === 127)
+            return 'RRA AbsoluteX';
+        if (opcode === 67)
+            return 'SRE IndirectX';
+        if (opcode === 71)
+            return 'SRE ZeroPage';
+        if (opcode === 79)
+            return 'SRE Absolute';
+        if (opcode === 83)
+            return 'SRE IndirectY';
+        if (opcode === 87)
+            return 'SRE ZeroPageX';
+        if (opcode === 91)
+            return 'SRE AbsoluteY';
+        if (opcode === 95)
+            return 'SRE AbsoluteX';
+        if (opcode === 11)
+            return 'ANC Immediate';
+        if (opcode === 43)
+            return 'ANC Immediate';
+        if (opcode === 75)
+            return 'ALR Immediate';
+        if (opcode === 107)
+            return 'ARR Immediate';
+        if (opcode === 203)
+            return 'AXS Immediate';
+        if (opcode === 156)
+            return 'SYA AbsoluteX';
+        if (opcode === 158)
+            return 'SXA AbsoluteY';
+        if (opcode === 139)
+            return 'XAA Immediate';
+        if (opcode === 147)
+            return 'AXA IndirectY';
+        if (opcode === 155)
+            return 'XAS AbsoluteY';
+        if (opcode === 159)
+            return 'AXA AbsoluteY';
+        if (opcode === 187)
+            return 'LAR AbsoluteY';
+        return '???';
+    };
+    Most6502Base.prototype.sizeFromOpcode = function (opcode) {
+        if (opcode === 105)
+            return 2;
+        if (opcode === 101)
+            return 2;
+        if (opcode === 117)
+            return 2;
+        if (opcode === 109)
+            return 3;
+        if (opcode === 125)
+            return 3;
+        if (opcode === 121)
+            return 3;
+        if (opcode === 97)
+            return 2;
+        if (opcode === 113)
+            return 2;
+        if (opcode === 41)
+            return 2;
+        if (opcode === 37)
+            return 2;
+        if (opcode === 53)
+            return 2;
+        if (opcode === 45)
+            return 3;
+        if (opcode === 61)
+            return 3;
+        if (opcode === 57)
+            return 3;
+        if (opcode === 33)
+            return 2;
+        if (opcode === 49)
+            return 2;
+        if (opcode === 10)
+            return 1;
+        if (opcode === 6)
+            return 2;
+        if (opcode === 22)
+            return 2;
+        if (opcode === 14)
+            return 3;
+        if (opcode === 30)
+            return 3;
+        if (opcode === 144)
+            return 2;
+        if (opcode === 176)
+            return 2;
+        if (opcode === 240)
+            return 2;
+        if (opcode === 48)
+            return 2;
+        if (opcode === 208)
+            return 2;
+        if (opcode === 16)
+            return 2;
+        if (opcode === 80)
+            return 2;
+        if (opcode === 112)
+            return 2;
+        if (opcode === 36)
+            return 2;
+        if (opcode === 44)
+            return 3;
+        if (opcode === 24)
+            return 1;
+        if (opcode === 216)
+            return 1;
+        if (opcode === 88)
+            return 1;
+        if (opcode === 184)
+            return 1;
+        if (opcode === 201)
+            return 2;
+        if (opcode === 197)
+            return 2;
+        if (opcode === 213)
+            return 2;
+        if (opcode === 205)
+            return 3;
+        if (opcode === 221)
+            return 3;
+        if (opcode === 217)
+            return 3;
+        if (opcode === 193)
+            return 2;
+        if (opcode === 209)
+            return 2;
+        if (opcode === 224)
+            return 2;
+        if (opcode === 228)
+            return 2;
+        if (opcode === 236)
+            return 3;
+        if (opcode === 192)
+            return 2;
+        if (opcode === 196)
+            return 2;
+        if (opcode === 204)
+            return 3;
+        if (opcode === 198)
+            return 2;
+        if (opcode === 214)
+            return 2;
+        if (opcode === 206)
+            return 3;
+        if (opcode === 222)
+            return 3;
+        if (opcode === 202)
+            return 1;
+        if (opcode === 136)
+            return 1;
+        if (opcode === 230)
+            return 2;
+        if (opcode === 246)
+            return 2;
+        if (opcode === 238)
+            return 3;
+        if (opcode === 254)
+            return 3;
+        if (opcode === 232)
+            return 1;
+        if (opcode === 200)
+            return 1;
+        if (opcode === 73)
+            return 2;
+        if (opcode === 69)
+            return 2;
+        if (opcode === 85)
+            return 2;
+        if (opcode === 77)
+            return 3;
+        if (opcode === 93)
+            return 3;
+        if (opcode === 89)
+            return 3;
+        if (opcode === 65)
+            return 2;
+        if (opcode === 81)
+            return 2;
+        if (opcode === 76)
+            return 3;
+        if (opcode === 108)
+            return 3;
+        if (opcode === 169)
+            return 2;
+        if (opcode === 165)
+            return 2;
+        if (opcode === 181)
+            return 2;
+        if (opcode === 173)
+            return 3;
+        if (opcode === 189)
+            return 3;
+        if (opcode === 185)
+            return 3;
+        if (opcode === 161)
+            return 2;
+        if (opcode === 177)
+            return 2;
+        if (opcode === 162)
+            return 2;
+        if (opcode === 166)
+            return 2;
+        if (opcode === 182)
+            return 2;
+        if (opcode === 174)
+            return 3;
+        if (opcode === 190)
+            return 3;
+        if (opcode === 160)
+            return 2;
+        if (opcode === 164)
+            return 2;
+        if (opcode === 180)
+            return 2;
+        if (opcode === 172)
+            return 3;
+        if (opcode === 188)
+            return 3;
+        if (opcode === 74)
+            return 1;
+        if (opcode === 70)
+            return 2;
+        if (opcode === 86)
+            return 2;
+        if (opcode === 78)
+            return 3;
+        if (opcode === 94)
+            return 3;
+        if (opcode === 234)
+            return 1;
+        if (opcode === 9)
+            return 2;
+        if (opcode === 5)
+            return 2;
+        if (opcode === 21)
+            return 2;
+        if (opcode === 13)
+            return 3;
+        if (opcode === 29)
+            return 3;
+        if (opcode === 25)
+            return 3;
+        if (opcode === 1)
+            return 2;
+        if (opcode === 17)
+            return 2;
+        if (opcode === 72)
+            return 1;
+        if (opcode === 8)
+            return 1;
+        if (opcode === 104)
+            return 1;
+        if (opcode === 40)
+            return 1;
+        if (opcode === 42)
+            return 1;
+        if (opcode === 38)
+            return 2;
+        if (opcode === 54)
+            return 2;
+        if (opcode === 46)
+            return 3;
+        if (opcode === 62)
+            return 3;
+        if (opcode === 106)
+            return 1;
+        if (opcode === 102)
+            return 2;
+        if (opcode === 118)
+            return 2;
+        if (opcode === 110)
+            return 3;
+        if (opcode === 126)
+            return 3;
+        if (opcode === 0)
+            return 2;
+        if (opcode === 64)
+            return 1;
+        if (opcode === 233)
+            return 2;
+        if (opcode === 229)
+            return 2;
+        if (opcode === 245)
+            return 2;
+        if (opcode === 237)
+            return 3;
+        if (opcode === 253)
+            return 3;
+        if (opcode === 249)
+            return 3;
+        if (opcode === 225)
+            return 2;
+        if (opcode === 241)
+            return 2;
+        if (opcode === 56)
+            return 1;
+        if (opcode === 248)
+            return 1;
+        if (opcode === 120)
+            return 1;
+        if (opcode === 133)
+            return 2;
+        if (opcode === 149)
+            return 2;
+        if (opcode === 141)
+            return 3;
+        if (opcode === 157)
+            return 3;
+        if (opcode === 153)
+            return 3;
+        if (opcode === 129)
+            return 2;
+        if (opcode === 145)
+            return 2;
+        if (opcode === 134)
+            return 2;
+        if (opcode === 150)
+            return 2;
+        if (opcode === 142)
+            return 3;
+        if (opcode === 132)
+            return 2;
+        if (opcode === 148)
+            return 2;
+        if (opcode === 140)
+            return 3;
+        if (opcode === 170)
+            return 1;
+        if (opcode === 168)
+            return 1;
+        if (opcode === 186)
+            return 1;
+        if (opcode === 138)
+            return 1;
+        if (opcode === 154)
+            return 1;
+        if (opcode === 152)
+            return 1;
+        if (opcode === 32)
+            return 3;
+        if (opcode === 96)
+            return 2;
+        if (opcode === 26)
+            return 1;
+        if (opcode === 58)
+            return 1;
+        if (opcode === 90)
+            return 1;
+        if (opcode === 122)
+            return 1;
+        if (opcode === 218)
+            return 1;
+        if (opcode === 250)
+            return 1;
+        if (opcode === 4)
+            return 2;
+        if (opcode === 20)
+            return 2;
+        if (opcode === 52)
+            return 2;
+        if (opcode === 68)
+            return 2;
+        if (opcode === 84)
+            return 2;
+        if (opcode === 116)
+            return 2;
+        if (opcode === 212)
+            return 2;
+        if (opcode === 244)
+            return 2;
+        if (opcode === 100)
+            return 2;
+        if (opcode === 128)
+            return 2;
+        if (opcode === 130)
+            return 2;
+        if (opcode === 194)
+            return 2;
+        if (opcode === 226)
+            return 2;
+        if (opcode === 137)
+            return 2;
+        if (opcode === 12)
+            return 3;
+        if (opcode === 28)
+            return 3;
+        if (opcode === 60)
+            return 3;
+        if (opcode === 92)
+            return 3;
+        if (opcode === 124)
+            return 3;
+        if (opcode === 220)
+            return 3;
+        if (opcode === 252)
+            return 3;
+        if (opcode === 235)
+            return 2;
+        if (opcode === 195)
+            return 2;
+        if (opcode === 199)
+            return 2;
+        if (opcode === 207)
+            return 3;
+        if (opcode === 211)
+            return 2;
+        if (opcode === 215)
+            return 2;
+        if (opcode === 219)
+            return 3;
+        if (opcode === 223)
+            return 3;
+        if (opcode === 227)
+            return 2;
+        if (opcode === 231)
+            return 2;
+        if (opcode === 239)
+            return 3;
+        if (opcode === 243)
+            return 2;
+        if (opcode === 247)
+            return 2;
+        if (opcode === 251)
+            return 3;
+        if (opcode === 255)
+            return 3;
+        if (opcode === 171)
+            return 2;
+        if (opcode === 167)
+            return 2;
+        if (opcode === 183)
+            return 2;
+        if (opcode === 175)
+            return 3;
+        if (opcode === 191)
+            return 3;
+        if (opcode === 163)
+            return 2;
+        if (opcode === 179)
+            return 2;
+        if (opcode === 131)
+            return 2;
+        if (opcode === 135)
+            return 2;
+        if (opcode === 143)
+            return 3;
+        if (opcode === 151)
+            return 2;
+        if (opcode === 3)
+            return 2;
+        if (opcode === 7)
+            return 2;
+        if (opcode === 15)
+            return 3;
+        if (opcode === 19)
+            return 2;
+        if (opcode === 23)
+            return 2;
+        if (opcode === 27)
+            return 3;
+        if (opcode === 31)
+            return 3;
+        if (opcode === 35)
+            return 2;
+        if (opcode === 39)
+            return 2;
+        if (opcode === 47)
+            return 3;
+        if (opcode === 51)
+            return 2;
+        if (opcode === 55)
+            return 2;
+        if (opcode === 59)
+            return 3;
+        if (opcode === 63)
+            return 3;
+        if (opcode === 99)
+            return 2;
+        if (opcode === 103)
+            return 2;
+        if (opcode === 111)
+            return 3;
+        if (opcode === 115)
+            return 2;
+        if (opcode === 119)
+            return 2;
+        if (opcode === 123)
+            return 3;
+        if (opcode === 127)
+            return 3;
+        if (opcode === 67)
+            return 2;
+        if (opcode === 71)
+            return 2;
+        if (opcode === 79)
+            return 3;
+        if (opcode === 83)
+            return 2;
+        if (opcode === 87)
+            return 2;
+        if (opcode === 91)
+            return 3;
+        if (opcode === 95)
+            return 3;
+        if (opcode === 11)
+            return 2;
+        if (opcode === 43)
+            return 2;
+        if (opcode === 75)
+            return 2;
+        if (opcode === 107)
+            return 2;
+        if (opcode === 203)
+            return 2;
+        if (opcode === 156)
+            return 3;
+        if (opcode === 158)
+            return 3;
+        if (opcode === 139)
+            return 2;
+        if (opcode === 147)
+            return 2;
+        if (opcode === 155)
+            return 3;
+        if (opcode === 159)
+            return 3;
+        if (opcode === 187)
+            return 3;
+        return 1;
+    };
     return Most6502Base;
 })();
 ///<reference path="Memory.ts"/>
@@ -9809,6 +10303,9 @@ var Mos6502 = (function (_super) {
     Mos6502.prototype.trace = function (opcode) {
         //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
     };
+    Mos6502.prototype.status = function () {
+        return { irq: this.irqLine, disass: this.disass(10) };
+    };
     Mos6502.prototype.step = function () {
         this.clk();
     };
@@ -9826,6 +10323,17 @@ var Mos6502 = (function (_super) {
     Mos6502.prototype.reset = function () {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
+    };
+    Mos6502.prototype.disass = function (i) {
+        var rgst = [];
+        var ip = this.ipCur;
+        while (i > 0) {
+            var opcode = this.memory.getByte(ip);
+            rgst.push('$' + ip.toString(16) + ' ' + this.opcodeToMnemonic(opcode));
+            ip += this.sizeFromOpcode(opcode);
+            i--;
+        }
+        return rgst;
     };
     return Mos6502;
 })(Most6502Base);
@@ -12871,11 +13379,11 @@ var NesEmulator = (function () {
         this.ppu.setCtx(ctx);
     };
     NesEmulator.prototype.step = function () {
-        this.apu.step();
         if (this.icycle % 4 === 0)
             this.ppu.step();
         if (this.icycle % 12 === 0)
             this.cpu.step();
+        this.apu.step();
         this.icycle++;
     };
     return NesEmulator;
