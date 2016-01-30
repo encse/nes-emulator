@@ -329,11 +329,7 @@ var Statement = (function () {
                 case StatementKind.ALR:
                 case StatementKind.ARR:
                 case StatementKind.AXS:
-                case StatementKind.SYA:
-                case StatementKind.SXA:
                 case StatementKind.XAA:
-                case StatementKind.AXA:
-                case StatementKind.XAS:
                 case StatementKind.LAR:
                     return MemoryAccessPattern.Read;
                 case StatementKind.ASL:
@@ -350,6 +346,10 @@ var Statement = (function () {
                 case StatementKind.STA:
                 case StatementKind.STY:
                 case StatementKind.SAX:
+                case StatementKind.AXA:
+                case StatementKind.XAS:
+                case StatementKind.SYA:
+                case StatementKind.SXA:
                     return MemoryAccessPattern.Write;
                 case StatementKind.ISC:
                 case StatementKind.SLO:
@@ -818,7 +818,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(4, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(5, 'write the new value to effective address')
@@ -887,7 +886,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(6, 'write the new value to effective address')
@@ -982,7 +980,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(6, 'write the new value to effective address')
@@ -1103,7 +1100,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(6, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(7, 'write the new value to effective address')
@@ -1382,7 +1378,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(7, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(8, 'write the new value to effective address')
@@ -1485,7 +1480,6 @@ var Mos6502Gen = (function () {
                         .then("this.b = this.memory.getByte(this.addr)")
                         .thenNextCycle(),
                     new Cycle(7, 'write the value back to effective address, and do the operation on it')
-                        .then("this.memory.setByte(this.addr, this.b)")
                         .then(mc)
                         .thenNextCycle(),
                     new Cycle(8, 'write the new value to effective address')
@@ -1845,7 +1839,7 @@ var Mos6502Gen = (function () {
             }
             res += "return '???';\n";
             return res;
-        })() + "\n    }\n    public clk() {\n\n        if (this.t === 0) {\n \n            const nmiWasRequested = this.nmiRequested;\n            const irqWasRequested = this.irqRequested;\n            this.irqRequested = false;\n            this.nmiRequested = false;\n\n            if (nmiWasRequested || irqWasRequested) {\n                console.log('processing irq/nmi');\n                this.enablePCIncrement = false;\n                this.opcode = 0;\n            } else {\n                this.opcode = this.memory.getByte(this.ip);\n            }\n            this.trace(opcode);\n    \n            this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;\n        }\n\n        switch (this.opcode) {\n";
+        })() + "\n    }\n    public clk() {\n\n        if (this.t === 0) {\n \n            const nmiWasRequested = this.nmiRequested;\n            const irqWasRequested = this.irqRequested;\n            this.irqRequested = false;\n            this.nmiRequested = false;\n\n            if (nmiWasRequested || irqWasRequested) {\n                console.log('processing irq/nmi');\n                this.enablePCIncrement = false;\n                this.opcode = 0;\n            } else {\n                this.opcode = this.memory.getByte(this.ip);\n            }\n            this.trace(this.opcode);\n    \n            this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;\n        }\n\n        switch (this.opcode) {\n";
         for (var i = 0; i < statements.length; i++) {
             res += this.genStatement(statements[i]);
         }

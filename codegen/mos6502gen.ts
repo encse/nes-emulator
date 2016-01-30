@@ -264,11 +264,7 @@ class Statement {
             case StatementKind.ALR:
             case StatementKind.ARR:
             case StatementKind.AXS:
-            case StatementKind.SYA:
-            case StatementKind.SXA:
             case StatementKind.XAA:
-            case StatementKind.AXA:
-            case StatementKind.XAS:
             case StatementKind.LAR:
                 return MemoryAccessPattern.Read;
             case StatementKind.ASL: case StatementKind.LSR: case StatementKind.DEC: case StatementKind.INC:
@@ -283,6 +279,11 @@ class Statement {
             case StatementKind.STA:
             case StatementKind.STY:
             case StatementKind.SAX:
+            case StatementKind.AXA:
+            case StatementKind.XAS:
+            case StatementKind.SYA:
+            case StatementKind.SXA:
+
                 return MemoryAccessPattern.Write;
 
             case StatementKind.ISC:
@@ -817,7 +818,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(4, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -901,7 +902,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -1011,7 +1012,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(5, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -1153,7 +1154,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
                     
                     new Cycle(6, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -1466,7 +1467,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(7, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -1587,7 +1588,7 @@ export class Mos6502Gen {
                         .thenNextCycle(),
                     
                     new Cycle(7, 'write the value back to effective address, and do the operation on it')
-                        .then(`this.memory.setByte(this.addr, this.b)`)
+                        //.then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
@@ -2139,7 +2140,7 @@ class Most6502Base {
             } else {
                 this.opcode = this.memory.getByte(this.ip);
             }
-            this.trace(opcode);
+            this.trace(this.opcode);
     
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }

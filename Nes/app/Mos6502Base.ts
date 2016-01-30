@@ -8,12 +8,7 @@ class Most6502Base {
     b: number = 0;
     rA: number = 0;
     rX: number = 0;
-    _rY: number = 0;
-
-    get rY() { return this._rY; }
-    set rY(v: number) {
-        this._rY = v;
-    }
+    rY: number = 0;
 
     public nmiRequested = false;
     public irqRequested = false;
@@ -1069,7 +1064,6 @@ case 0x6: /* ASL ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -1110,7 +1104,6 @@ case 0x16: /* ASL ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -1152,7 +1145,6 @@ case 0xe: /* ASL Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -1204,7 +1196,6 @@ case 0x1e: /* ASL AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -2089,7 +2080,6 @@ case 0xc6: /* DEC ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2129,7 +2119,6 @@ case 0xd6: /* DEC ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2170,7 +2159,6 @@ case 0xce: /* DEC Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2221,7 +2209,6 @@ case 0xde: /* DEC AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2295,7 +2282,6 @@ case 0xe6: /* INC ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2335,7 +2321,6 @@ case 0xf6: /* INC ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2376,7 +2361,6 @@ case 0xee: /* INC Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -2427,7 +2411,6 @@ case 0xfe: /* INC AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -3462,7 +3445,6 @@ case 0x46: /* LSR ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -3503,7 +3485,6 @@ case 0x56: /* LSR ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -3545,7 +3526,6 @@ case 0x4e: /* LSR Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -3597,7 +3577,6 @@ case 0x5e: /* LSR AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -4059,7 +4038,6 @@ case 0x26: /* ROL ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -4101,7 +4079,6 @@ case 0x36: /* ROL ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -4144,7 +4121,6 @@ case 0x2e: /* ROL Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -4197,7 +4173,6 @@ case 0x3e: /* ROL AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -4255,7 +4230,6 @@ case 0x66: /* ROR ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -4297,7 +4271,6 @@ case 0x76: /* ROR ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -4340,7 +4313,6 @@ case 0x6e: /* ROR Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -4393,7 +4365,6 @@ case 0x7e: /* ROR AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -6208,7 +6179,6 @@ case 0xc3: /* DCP IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6243,7 +6213,6 @@ case 0xc7: /* DCP ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6285,7 +6254,6 @@ case 0xcf: /* DCP Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6341,7 +6309,6 @@ case 0xd3: /* DCP IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6382,7 +6349,6 @@ case 0xd7: /* DCP ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6434,7 +6400,6 @@ case 0xdb: /* DCP AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6486,7 +6451,6 @@ case 0xdf: /* DCP AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b - 1) & 0xff;
             this.flgCarry = this.rA >= this.b ? 1 : 0;
             this.flgZero = this.rA === this.b? 1 : 0;
@@ -6538,7 +6502,6 @@ case 0xe3: /* ISC IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6582,7 +6545,6 @@ case 0xe7: /* ISC ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6633,7 +6595,6 @@ case 0xef: /* ISC Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6698,7 +6659,6 @@ case 0xf3: /* ISC IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6748,7 +6708,6 @@ case 0xf7: /* ISC ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6809,7 +6768,6 @@ case 0xfb: /* ISC AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -6870,7 +6828,6 @@ case 0xff: /* ISC AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b + 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
             this.flgNegative = this.b & 0x80 ? 1 : 0;
@@ -7299,7 +7256,6 @@ case 0x3: /* SLO IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7338,7 +7294,6 @@ case 0x7: /* SLO ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7384,7 +7339,6 @@ case 0xf: /* SLO Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7444,7 +7398,6 @@ case 0x13: /* SLO IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7489,7 +7442,6 @@ case 0x17: /* SLO ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7545,7 +7497,6 @@ case 0x1b: /* SLO AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7601,7 +7552,6 @@ case 0x1f: /* SLO AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 0x80 ? 1 : 0;
             this.b = (this.b << 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -7657,7 +7607,6 @@ case 0x23: /* RLA IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7697,7 +7646,6 @@ case 0x27: /* RLA ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7744,7 +7692,6 @@ case 0x2f: /* RLA Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7805,7 +7752,6 @@ case 0x33: /* RLA IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7851,7 +7797,6 @@ case 0x37: /* RLA ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7908,7 +7853,6 @@ case 0x3b: /* RLA AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -7965,7 +7909,6 @@ case 0x3f: /* RLA AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b = (this.b << 1) | this.flgCarry;
             this.flgCarry = this.b & 0x100 ? 1 : 0;
             this.b &= 0xff;
@@ -8022,7 +7965,6 @@ case 0x63: /* RRA IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8067,7 +8009,6 @@ case 0x67: /* RRA ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8119,7 +8060,6 @@ case 0x6f: /* RRA Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8185,7 +8125,6 @@ case 0x73: /* RRA IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8236,7 +8175,6 @@ case 0x77: /* RRA ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8298,7 +8236,6 @@ case 0x7b: /* RRA AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8360,7 +8297,6 @@ case 0x7f: /* RRA AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.b |= this.flgCarry << 8;
             this.flgCarry = this.b & 1 ? 1 : 0;
             this.b >>= 1;
@@ -8422,7 +8358,6 @@ case 0x43: /* SRE IndirectX 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8461,7 +8396,6 @@ case 0x47: /* SRE ZeroPage 5 */ {
             break;
         }
         case 3: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8507,7 +8441,6 @@ case 0x4f: /* SRE Absolute 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8567,7 +8500,6 @@ case 0x53: /* SRE IndirectY 8 */ {
             break;
         }
         case 6: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8612,7 +8544,6 @@ case 0x57: /* SRE ZeroPageX 6 */ {
             break;
         }
         case 4: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8668,7 +8599,6 @@ case 0x5b: /* SRE AbsoluteY 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8724,7 +8654,6 @@ case 0x5f: /* SRE AbsoluteX 7 */ {
             break;
         }
         case 5: {
-            this.memory.setByte(this.addr, this.b);
             this.flgCarry = this.b & 1;
             this.b = (this.b >> 1) & 0xff;
             this.flgZero = !this.b ? 1 : 0;
@@ -8885,14 +8814,12 @@ case 0x9c: /* SYA AbsoluteX 5 */ {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
                 this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
             }
+            this.t++;
             break;
         }
         case 4: {
-            this.b = this.memory.getByte(this.addr);
+            this.memory.setByte(this.addr, this.b);
             this.t = 0;
             break;
         }
@@ -8925,14 +8852,12 @@ case 0x9e: /* SXA AbsoluteY 5 */ {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
                 this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
             }
+            this.t++;
             break;
         }
         case 4: {
-            this.b = this.memory.getByte(this.addr);
+            this.memory.setByte(this.addr, this.b);
             this.t = 0;
             break;
         }
@@ -8985,14 +8910,12 @@ case 0x93: /* AXA IndirectY 6 */ {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
                 this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
             }
+            this.t++;
             break;
         }
         case 5: {
-            this.b = this.memory.getByte(this.addr);
+            this.memory.setByte(this.addr, this.b);
             this.t = 0;
             break;
         }
@@ -9025,14 +8948,12 @@ case 0x9b: /* XAS AbsoluteY 5 */ {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
                 this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
             }
+            this.t++;
             break;
         }
         case 4: {
-            this.b = this.memory.getByte(this.addr);
+            this.memory.setByte(this.addr, this.b);
             this.t = 0;
             break;
         }
@@ -9065,14 +8986,12 @@ case 0x9f: /* AXA AbsoluteY 5 */ {
             this.b = this.memory.getByte(this.addr);
             if (this.addrC) {
                 this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
             }
+            this.t++;
             break;
         }
         case 4: {
-            this.b = this.memory.getByte(this.addr);
+            this.memory.setByte(this.addr, this.b);
             this.t = 0;
             break;
         }

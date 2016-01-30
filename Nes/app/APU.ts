@@ -76,15 +76,15 @@
     
     private getter(addr: number) {
 
-        console.log('APU get', addr.toString(16));
+      //  console.log('APU get', addr.toString(16));
 
         switch(addr) {
             case 0x4015:
-                var res = (!this.cpu.irqLine ? 1 : 0) << 6 +
+                var res = ((!this.cpu.irqLine ? 1 : 0) << 6) +
                     (this.lc0 > 0 ? 1 : 0);
 
                 if (this.cpu.irqLine === 0) {
-                    console.log('APU irqline == 1');
+                    //console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
                 }
                 return res;
@@ -107,7 +107,7 @@
     }
 
     private setter(addr: number, value: number) {
-        console.log('APU set', addr.toString(16), value.toString(16));
+        //console.log('APU set', addr.toString(16), value.toString(16));
         switch (addr) {
             case 0x4000:
 
@@ -191,7 +191,7 @@
                 this.frameIRQDisabled = (value >> 6) & 1;
                // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
                 this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
-                console.log('APU this.cpu.irqline', this.cpu.irqLine);
+                //console.log('APU this.cpu.irqline', this.cpu.irqLine);
                 break;
         }
        // console.log('set ', addr.toString(16), value);
