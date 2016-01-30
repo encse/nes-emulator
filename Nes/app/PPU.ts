@@ -355,7 +355,7 @@
                     this.cpu.nmiLine = 0;
                 }
             }
-            if (this.sx === qqq+10 && this.sy === PPU.syPostRender + 1) {
+            if (this.sx === qqq+5 && this.sy === PPU.syPostRender + 1) {
                 this.cpu.nmiLine = 1;
             }
           

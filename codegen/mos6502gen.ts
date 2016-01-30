@@ -1313,7 +1313,7 @@ export class Mos6502Gen {
                 .thenNextCycle(),
             new Cycle(5, 'push P on stack, decrement S')
                 .then(`// this.pollInterrupts()1`)
-                .then(`// var nmi = this.nmiRequested`)
+                .then(`//var nmi = this.nmiRequested`)
                 .then(`// var irq = this.irqRequested1`)
                 .then(`// this.addrBrk = nmi ? this.addrNMI : this.addrIRQ`)
 

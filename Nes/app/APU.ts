@@ -84,7 +84,7 @@
                     (this.lc0 > 0 ? 1 : 0);
 
                 if (this.cpu.irqLine === 0) {
-                    //console.log('APU irqline == 1');
+                    console.log('APU irqline == 1');
                     this.cpu.irqLine = 1;
                 }
                 return res;
@@ -214,18 +214,19 @@
 
     private clockSequencer() {
        
+     
         if (this.isequencerStep === 0 || this.isequencerStep === 2) {
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
-            
         }
-
-        this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
         if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
             this.cpu.irqLine = 0;
             console.log('APU', 'end of frame, this.cpu.irqLine', this.cpu.irqLine);
         }
+
+        this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
+
     }
 }

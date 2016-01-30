@@ -60,6 +60,7 @@ class NesEmulator {
     }
     icycle = 0;
     public step() {
+        this.apu.step();
 
         if (this.icycle % 4 === 0)
             this.ppu.step();
@@ -69,7 +70,6 @@ class NesEmulator {
             this.cpu.step();
 
      
-        this.apu.step();
         this.icycle++;
     }
 

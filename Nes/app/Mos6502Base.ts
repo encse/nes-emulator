@@ -62,6 +62,7 @@ class Most6502Base {
     public addrNMI = 0xfffa;
  
     private enablePCIncrement = true;
+    private canSetFlgBreak = true;
     private addrBrk : number;
     public constructor(public memory: Memory) {
     }
@@ -354,13 +355,9 @@ return '???';
     public clk() {
 
         if (this.t === 0) {
- 
-            const nmiWasRequested = this.nmiRequested;
-            const irqWasRequested = this.irqRequested;
-            this.irqRequested = false;
-            this.nmiRequested = false;
 
-            if (nmiWasRequested || irqWasRequested) {
+            if (this.nmiRequested || this.irqRequested) {
+                this.canSetFlgBreak = !this.nmiRequested;
                 console.log('processing irq/nmi');
                 this.enablePCIncrement = false;
                 this.opcode = 0;
@@ -4405,25 +4402,30 @@ case 0x0: /* BRK BRK 7 */ {
             break;
         }
         case 4: {
-            // this.pollInterrupts()1;
-            // var nmi = this.nmiRequested;
-            // var irq = this.irqRequested1;
-            // this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
-            this.flgBreakCommand = 1;
+            this.pollInterrupts();
+            var nmi = this.nmiRequested;
+            this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
+
+            this.irqRequested = false;
+            this.nmiRequested = false;
+
+            if (this.canSetFlgBreak)
+                this.flgBreakCommand = 1;
             this.pushByte(this.rP);
             this.flgBreakCommand = 0;
             this.t++;
             break;
         }
         case 5: {
-            this.ip = this.memory.getByte(this.addrIRQ);
+            this.ip = this.memory.getByte(this.addrBrk);
             this.flgInterruptDisable = 1;
             this.t++;
             break;
         }
         case 6: {
-            this.ip += this.memory.getByte(this.addrIRQ + 1) << 8;
+            this.ip += this.memory.getByte(this.addrBrk + 1) << 8;
             this.enablePCIncrement = true;
+            this.canSetFlgBreak = true;
             this.t = 0;
             break;
         }
@@ -9042,9 +9044,9 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
     default: throw 'invalid opcode $' + this.opcode.toString(16); 
 }
 
-        if (this.t===0)
-            this.pollInterrupts();  
-        this.detectInterrupts();
+            if (this.t === 0 && this.opcode != 0x0)
+                this.pollInterrupts();
+            this.detectInterrupts();
         }
 
     }
