@@ -956,8 +956,6 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(2, 'fetch low byte of address, increment PC')
-                        .then(`this.pollInterrupts()`)
-                        .then(`this.enableInterruptPoll = false`)
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -1061,8 +1059,6 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(2, 'fetch low byte of address, increment PC')
-                        .then(`this.pollInterrupts()`)
-                        .then(`this.enableInterruptPoll = false`)
                         .then(`this.ptrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -2154,14 +2150,14 @@ class Most6502Base {
     default: throw 'invalid opcode $' + this.opcode.toString(16); 
 }
 
-        if (this.t===0 && this.opcode != 0x0)
+        if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll)
-                this.pollInterrupts();  
+                this.pollInterrupts();
             this.enableInterruptPoll = true;
-            this.detectInterrupts();
         }
 
-
+        this.detectInterrupts();
+    }
 
     public opcodeToMnemonic(opcode:number){
         ${(() => {

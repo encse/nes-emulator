@@ -8820,10 +8820,7 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
         }
 
         this.detectInterrupts();
-
     }
-
-
 
     public opcodeToMnemonic(opcode:number){
         if(opcode === 105) return 'ADC Immediate';

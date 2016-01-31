@@ -931,8 +931,6 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(2, 'fetch low byte of address, increment PC')
-                        .then("this.pollInterrupts()")
-                        .then("this.enableInterruptPoll = false")
                         .then("this.addrLo = this.memory.getByte(this.ip)")
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -1022,8 +1020,6 @@ var Mos6502Gen = (function () {
                         .thenIncrementPC()
                         .thenNextCycle(),
                     new Cycle(2, 'fetch low byte of address, increment PC')
-                        .then("this.pollInterrupts()")
-                        .then("this.enableInterruptPoll = false")
                         .then("this.ptrLo = this.memory.getByte(this.ip)")
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -1844,7 +1840,7 @@ var Mos6502Gen = (function () {
         for (var i = 0; i < statements.length; i++) {
             res += this.genStatement(statements[i]);
         }
-        res += "\n    default: throw 'invalid opcode $' + this.opcode.toString(16); \n}\n\n        if (this.t===0 && this.opcode != 0x0)\n            if (this.enableInterruptPoll)\n                this.pollInterrupts();  \n            this.enableInterruptPoll = true;\n            this.detectInterrupts();\n        }\n\n\n\n    public opcodeToMnemonic(opcode:number){\n        " + (function () {
+        res += "\n    default: throw 'invalid opcode $' + this.opcode.toString(16); \n}\n\n        if (this.t === 0 && this.opcode !== 0x0) {\n            if (this.enableInterruptPoll)\n                this.pollInterrupts();\n            this.enableInterruptPoll = true;\n        }\n\n        this.detectInterrupts();\n    }\n\n    public opcodeToMnemonic(opcode:number){\n        " + (function () {
             var res = "";
             for (var i = 0; i < statements.length; i++) {
                 res += "if(opcode === " + statements[i].opcode + ") return '" + statements[i].mnemonic + "';\n";
