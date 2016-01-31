@@ -1664,8 +1664,11 @@ export class Mos6502Gen {
                 .then(`this.ipC = ((this.ip & 0xff) + this.b) >> 8`)
                 .thenIf({
                     cond: '((this.ip & 0xff) + this.b) >> 8',
-                    if: new McNop().then(`this.enableInterruptPoll = false`).thenNextCycle(),
-                    else: new Mc(`this.ip = (this.ip + this.b) & 0xffff`)
+                    if: new McNop()
+                        .thenNextCycle(),
+                    else: new McNop()
+                        .then(`this.enableInterruptPoll = false`)
+                        .then(`this.ip = (this.ip + this.b) & 0xffff`)
                         .thenNextStatement()
                 }),
 

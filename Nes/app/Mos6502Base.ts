@@ -987,9 +987,9 @@ case 0x90: /* BCC Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1026,9 +1026,9 @@ case 0xb0: /* BCS Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1065,9 +1065,9 @@ case 0xf0: /* BEQ Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1104,9 +1104,9 @@ case 0x30: /* BMI Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1143,9 +1143,9 @@ case 0xd0: /* BNE Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1182,9 +1182,9 @@ case 0x10: /* BPL Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1221,9 +1221,9 @@ case 0x50: /* BVC Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
@@ -1260,9 +1260,9 @@ case 0x70: /* BVS Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
-                this.enableInterruptPoll = false;
                 this.t++;
             } else {
+                this.enableInterruptPoll = false;
                 this.ip = (this.ip + this.b) & 0xffff;
                 this.t = 0;
             }
