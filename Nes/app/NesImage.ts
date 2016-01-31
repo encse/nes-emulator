@@ -53,7 +53,7 @@
              throw 'invalid NES header';
 
         this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
-        this.fPAL = !!(rawBytes[9]);
+        this.fPAL = (rawBytes[9] & 1) === 1;
 
         if ((rawBytes[9] & 0xfe) !== 0)
             throw 'invalid NES header';

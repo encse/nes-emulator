@@ -69,7 +69,7 @@ var APU = (function () {
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
     APU.prototype.tsto = function (label) {
-        //  console.log('APU', label, this.cpu.status());
+        console.log('APU', label, this.cpu.status());
     };
     APU.prototype.getter = function (addr) {
         switch (addr) {
@@ -154,13 +154,14 @@ var APU = (function () {
                 //     e e e e -   192 Hz
                 // At any time if the interrupt flag is set and the IRQ disable is clear, the
                 // CPU's IRQ line is asserted.
-                this.idividerStep = this.isequencerStep = 0;
+                this.idividerStep = this.isequencerStep = -1;
                 this.mode = (value >> 7) & 1;
                 if (this.mode === 1)
-                    this.clockSequencer();
+                    this.step();
                 this.frameIRQDisabled = (value >> 6) & 1;
-                // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
-                this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
+                // Interrupt inhibit flag. If set, the frame interrupt flag is cleared, otherwise it is unaffected.
+                if (this.frameIRQDisabled)
+                    this.cpu.irqLine = 1;
                 break;
         }
         this.tsto('set $' + addr.toString(16));
@@ -169,24 +170,23 @@ var APU = (function () {
         //The divider generates an output clock rate of just under 240 Hz, and appears to
         //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is
         //clocked by the divider's output.
-        if (this.idividerStep === 89490) {
+        this.idividerStep++;
+        if (this.idividerStep === 89490)
             this.idividerStep = 0;
+        if (this.idividerStep === 0) {
             this.clockSequencer();
         }
-        else
-            this.idividerStep++;
     };
     APU.prototype.clockSequencer = function () {
-        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
-            if (this.cpu.irqLine) {
-                this.cpu.irqLine = 0;
-                this.tsto('end of frame');
-            }
-        }
         if (this.isequencerStep === 1 || this.isequencerStep === 3) {
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
+        }
+        if (!this.mode && !this.frameIRQDisabled) {
+            if (this.cpu.irqLine && this.isequencerStep === 3)
+                this.cpu.irqLine = 0;
+            this.tsto('clockSequencer ' + this.isequencerStep);
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
     };
@@ -509,6 +509,7 @@ var Most6502Base = (function () {
         this.addrIRQ = 0xfffe;
         this.addrNMI = 0xfffa;
         this.enablePCIncrement = true;
+        this.enableInterruptPoll = true;
         this.canSetFlgBreak = true;
     }
     Most6502Base.prototype.pollInterrupts = function () {
@@ -517,7 +518,7 @@ var Most6502Base = (function () {
             this.nmiDetected = false;
         }
         if (this.irqDetected) {
-            //  console.log('irq requested');
+            //console.log('irq requested');
             this.irqRequested = true;
         }
     };
@@ -1431,6 +1432,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (!this.flgCarry) {
@@ -1446,6 +1448,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1470,6 +1473,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (this.flgCarry) {
@@ -1485,6 +1489,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1509,6 +1514,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (this.flgZero) {
@@ -1524,6 +1530,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1548,6 +1555,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (this.flgNegative) {
@@ -1563,6 +1571,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1587,6 +1596,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (!this.flgZero) {
@@ -1602,6 +1612,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1626,6 +1637,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (!this.flgNegative) {
@@ -1641,6 +1653,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1665,6 +1678,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (!this.flgOverflow) {
@@ -1680,6 +1694,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -1704,6 +1719,7 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 1: {
+                        this.pollInterrupts();
                         this.b = this.memory.getByte(this.ip);
                         this.ip++;
                         if (this.flgOverflow) {
@@ -1719,6 +1735,7 @@ var Most6502Base = (function () {
                         this.b = this.b >= 128 ? this.b - 256 : this.b;
                         this.ipC = ((this.ip & 0xff) + this.b) >> 8;
                         if (((this.ip & 0xff) + this.b) >> 8) {
+                            this.enableInterruptPoll = false;
                             this.t++;
                         }
                         else {
@@ -9299,8 +9316,11 @@ var Most6502Base = (function () {
             }
             default: throw 'invalid opcode $' + this.opcode.toString(16);
         }
-        if (this.t === 0 && this.opcode != 0x0)
-            this.pollInterrupts();
+        if (this.t === 0 && this.opcode !== 0x0) {
+            if (this.enableInterruptPoll)
+                this.pollInterrupts();
+            this.enableInterruptPoll = true;
+        }
         this.detectInterrupts();
     };
     Most6502Base.prototype.opcodeToMnemonic = function (opcode) {
@@ -13286,7 +13306,7 @@ var NesImage = (function () {
         if ((rawBytes[7] & 0x0e) !== 0)
             throw 'invalid NES header';
         this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
-        this.fPAL = !!(rawBytes[9]);
+        this.fPAL = (rawBytes[9] & 1) === 1;
         if ((rawBytes[9] & 0xfe) !== 0)
             throw 'invalid NES header';
         for (var i = 0xa; i < 0x10; i++)

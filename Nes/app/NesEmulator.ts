@@ -64,12 +64,10 @@ class NesEmulator {
         if (this.icycle % 4 === 0)
             this.ppu.step();
 
-
         if (this.icycle % 12 === 0)
             this.cpu.step();
-
         this.apu.step();
-     
+
         this.icycle++;
     }
 

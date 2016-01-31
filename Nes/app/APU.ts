@@ -74,14 +74,13 @@
     }
 
     private tsto(label) {
-      //  console.log('APU', label, this.cpu.status());
+        console.log('APU', label, this.cpu.status());
     }
     private getter(addr: number) {
 
-
         switch(addr) {
             case 0x4015:
-                var res = ((!this.cpu.irqLine ? 1 : 0) << 6) +
+                var res = ((!this.cpu.irqLine ? 1 :0) << 6) +
                     (this.lc0 > 0 ? 1 : 0);
 
                 if (this.cpu.irqLine === 0) {
@@ -182,16 +181,17 @@
                    
                 // At any time if the interrupt flag is set and the IRQ disable is clear, the
                 // CPU's IRQ line is asserted.
-                this.idividerStep = this.isequencerStep = 0;
+                this.idividerStep = this.isequencerStep = -1;
                 this.mode = (value >> 7) & 1;
-                if (this.mode === 1)
-                    this.clockSequencer();
+                if (this.mode === 1) 
+                    this.step();
 
                 this.frameIRQDisabled = (value >> 6) & 1;
-               // Interrupt inhibit flag.If set, the frame interrupt flag is cleared, otherwise it is unaffected.
-                this.cpu.irqLine = !this.mode && !this.frameIRQDisabled ? 0 : 1;
+             
+                // Interrupt inhibit flag. If set, the frame interrupt flag is cleared, otherwise it is unaffected.
+                if (this.frameIRQDisabled)
+                    this.cpu.irqLine = 1;
                
-         
                 break;
         }
 
@@ -200,37 +200,37 @@
     }
 
     public step() {
+        
         //The divider generates an output clock rate of just under 240 Hz, and appears to
         //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is
         //clocked by the divider's output.
-        if (this.idividerStep === 89490) {
-            
-            this.idividerStep = 0;
-            this.clockSequencer();
-           
-        }
-        else
-            this.idividerStep++;
 
+        this.idividerStep++;
+
+        if (this.idividerStep === 89490) 
+            this.idividerStep = 0;
+
+        if (this.idividerStep === 0) {
+            this.clockSequencer();
+        }
     }
 
     private clockSequencer() {
        
-
-        if (!this.mode && !this.frameIRQDisabled && this.isequencerStep === 3) {
-            if (this.cpu.irqLine) {
-                this.cpu.irqLine = 0;
-                this.tsto('end of frame');
-            }
-        }
-     
         if (this.isequencerStep === 1 || this.isequencerStep === 3) {
             if (!this.lc0Halt && this.lc0 > 0) {
                 this.lc0--;
             }
         }
+
+        if (!this.mode && !this.frameIRQDisabled) {
+
+            if (this.cpu.irqLine && this.isequencerStep === 3)
+                this.cpu.irqLine = 0;
+
+            this.tsto('clockSequencer ' + this.isequencerStep);
+        }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 
-     
     }
 }

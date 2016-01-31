@@ -956,6 +956,8 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(2, 'fetch low byte of address, increment PC')
+                        .then(`this.pollInterrupts()`)
+                        .then(`this.enableInterruptPoll = false`)
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -1059,6 +1061,8 @@ export class Mos6502Gen {
                         .thenNextCycle(),
 
                     new Cycle(2, 'fetch low byte of address, increment PC')
+                        .then(`this.pollInterrupts()`)
+                        .then(`this.enableInterruptPoll = false`)
                         .then(`this.ptrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
@@ -1649,6 +1653,7 @@ export class Mos6502Gen {
                 .thenNextCycle(),
 
             new Cycle(2, 'fetch operand, increment PC')
+                .then(`this.pollInterrupts()`)
                 .then(`this.b = this.memory.getByte(this.ip)`)
                 .thenIncrementPC()
                 .thenIf({
@@ -1663,8 +1668,9 @@ export class Mos6502Gen {
                 .then(`this.ipC = ((this.ip & 0xff) + this.b) >> 8`)
                 .thenIf({
                     cond: '((this.ip & 0xff) + this.b) >> 8',
-                    if: new McNextCycle(),
-                    else: new Mc(`this.ip = (this.ip + this.b) & 0xffff`).thenNextStatement()
+                    if: new McNop().then(`this.enableInterruptPoll = false`).thenNextCycle(),
+                    else: new Mc(`this.ip = (this.ip + this.b) & 0xffff`)
+                        .thenNextStatement()
                 }),
 
             new Cycle(4, 'Fix PCH.')
@@ -2075,6 +2081,7 @@ class Most6502Base {
     public addrNMI = 0xfffa;
  
     private enablePCIncrement = true;
+    private enableInterruptPoll = true;
     private canSetFlgBreak = true;
     private addrBrk : number;
     public constructor(public memory: Memory) {
@@ -2148,9 +2155,12 @@ class Most6502Base {
 }
 
         if (this.t===0 && this.opcode != 0x0)
-            this.pollInterrupts();  
-        this.detectInterrupts();
+            if (this.enableInterruptPoll)
+                this.pollInterrupts();  
+            this.enableInterruptPoll = true;
+            this.detectInterrupts();
         }
+
 
 
     public opcodeToMnemonic(opcode:number){

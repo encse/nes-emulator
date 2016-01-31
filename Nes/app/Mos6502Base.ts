@@ -63,6 +63,7 @@ class Most6502Base {
     public addrNMI = 0xfffa;
  
     private enablePCIncrement = true;
+    private enableInterruptPoll = true;
     private canSetFlgBreak = true;
     private addrBrk : number;
     public constructor(public memory: Memory) {
@@ -971,6 +972,7 @@ case 0x90: /* BCC Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (!this.flgCarry) {
@@ -985,6 +987,7 @@ case 0x90: /* BCC Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1008,6 +1011,7 @@ case 0xb0: /* BCS Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (this.flgCarry) {
@@ -1022,6 +1026,7 @@ case 0xb0: /* BCS Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1045,6 +1050,7 @@ case 0xf0: /* BEQ Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (this.flgZero) {
@@ -1059,6 +1065,7 @@ case 0xf0: /* BEQ Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1082,6 +1089,7 @@ case 0x30: /* BMI Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (this.flgNegative) {
@@ -1096,6 +1104,7 @@ case 0x30: /* BMI Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1119,6 +1128,7 @@ case 0xd0: /* BNE Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (!this.flgZero) {
@@ -1133,6 +1143,7 @@ case 0xd0: /* BNE Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1156,6 +1167,7 @@ case 0x10: /* BPL Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (!this.flgNegative) {
@@ -1170,6 +1182,7 @@ case 0x10: /* BPL Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1193,6 +1206,7 @@ case 0x50: /* BVC Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (!this.flgOverflow) {
@@ -1207,6 +1221,7 @@ case 0x50: /* BVC Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -1230,6 +1245,7 @@ case 0x70: /* BVS Relative 2pc bc  */ {
             break;
         }
         case 1: {
+            this.pollInterrupts();
             this.b = this.memory.getByte(this.ip);
             this.ip++;
             if (this.flgOverflow) {
@@ -1244,6 +1260,7 @@ case 0x70: /* BVS Relative 2pc bc  */ {
             this.b = this.b >= 128 ? this.b - 256 : this.b;
             this.ipC = ((this.ip & 0xff) + this.b) >> 8;
             if (((this.ip & 0xff) + this.b) >> 8) {
+                this.enableInterruptPoll = false;
                 this.t++;
             } else {
                 this.ip = (this.ip + this.b) & 0xffff;
@@ -8796,10 +8813,16 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
     default: throw 'invalid opcode $' + this.opcode.toString(16); 
 }
 
-        if (this.t===0 && this.opcode != 0x0)
-            this.pollInterrupts();  
-        this.detectInterrupts();
+        if (this.t === 0 && this.opcode !== 0x0) {
+            if (this.enableInterruptPoll)
+                this.pollInterrupts();
+            this.enableInterruptPoll = true;
         }
+
+        this.detectInterrupts();
+
+    }
+
 
 
     public opcodeToMnemonic(opcode:number){

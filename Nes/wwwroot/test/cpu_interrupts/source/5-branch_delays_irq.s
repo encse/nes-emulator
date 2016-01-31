@@ -1,10 +1,19 @@
-; A taken non-page-crossing branch ignores IRQ during
+; The test has an IRQ occur at each cycle within a test sequence, starting at some 
+; arbitrary point, and shows how many clocks delayed the IRQ was. T+ is how many 
+; clocks since the arbitrary starting point the IRQ was requested, and CK is how many 
+; clocks delayed it was, also relative to some arbitrary value. Only the relative values 
+; of these matter. PC is the saved PC of the next instruction that was on the stack within 
+; the IRQ handler, relative to some starting point. The example code has comments showing 
+; the offsets, so you can see where the IRQ was actually vectored. 
+;
+; The first three tests show nothing out of the ordinary, but not the fourth: 
+;  A taken non-page-crossing branch ignores IRQ during
 ; its last clock, so that next instruction executes
 ; before the IRQ. Other instructions would execute the
 ; NMI before the next instruction.
 ;
 ; The same occurs for NMI, though that's not tested here.
-;
+
 ; test_jmp
 ; T+ CK PC
 ; 00 02 04 NOP

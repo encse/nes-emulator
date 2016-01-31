@@ -262,6 +262,7 @@
     <Content Include="wwwroot\test\instr_misc\source\common\ascii.chr" />
     <Content Include="wwwroot\test\instr_misc\source\common\devcart.bin" />
     <Content Include="wwwroot\test\instr_misc\source\nes.cfg" />
+    <Content Include="wwwroot\test\dk.nes" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />
