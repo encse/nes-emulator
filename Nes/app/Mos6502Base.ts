@@ -1,24 +1,65 @@
 ///<reference path="Memory.ts"/>
 
 class Most6502Base {
-    opcode: number;
-    ip: number = 0;
-    ipCur: number = 0;
-    sp: number = 0;
-    t: number = 0;
-    b: number = 0;
-    rA: number = 0;
-    rX: number = 0;
-    rY: number = 0;
 
-    public nmiRequested = false;
-    public irqRequested = false;
+    public addrReset = 0xfffc;
+    public addrIRQ = 0xfffe;
+    public addrNMI = 0xfffa;
+
+    public opcode: number;
+    public ip: number = 0;
+    public ipCur: number = 0;
+    public sp: number = 0;
+    public t: number = 0;
+    public b: number = 0;
+    public rA: number = 0;
+    public rX: number = 0;
+    public rY: number = 0;
+    
     public nmiLine = 1;
-    public nmiLinePrev = 1;
+    private nmiLinePrev = 1;
+    private nmiRequested = false;
     private nmiDetected: boolean;
-
+   
     public irqLine = 1;
+    private irqRequested = false;
     private irqDetected: boolean;
+
+    private flgCarry: number = 0;
+    private flgZero: number = 0;
+    private flgNegative: number = 0;
+    private flgOverflow: number = 0;
+    private flgInterruptDisable: number = 1;
+    private flgDecimalMode: number = 0;
+    private flgBreakCommand: number = 0;
+
+    private addr: number;
+    private addrHi: number;
+    private addrLo: number;
+    private addrPtr: number;
+    private ptrLo: number;
+    private ptrHi: number;
+    private ipC: number;
+    private addrC: number;
+    private enablePCIncrement = true;
+    private enableInterruptPoll = true;
+    private canSetFlgBreak = true;
+    private addrBrk : number;
+
+    private bDma:number;
+    private dmaRequested = false;
+    private addrDma:number;
+    private idma = -1;
+
+    private icycle = 0;
+
+    public constructor(public memory: Memory) {
+    }
+
+    public dma(addrDma:number) {
+        this.dmaRequested = true;
+        this.addrDma = addrDma;
+    }
 
     private pollInterrupts() {
         if (this.nmiDetected) {
@@ -39,34 +80,6 @@ class Most6502Base {
         }
         this.nmiLinePrev = this.nmiLine;
         this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
-    }
-
-    private flgCarry: number = 0;
-    private flgZero: number = 0;
-    private flgNegative: number = 0;
-    private flgOverflow: number = 0;
-    private flgInterruptDisable: number = 1;
-    private flgDecimalMode: number = 0;
-    private flgBreakCommand: number = 0;
-
-    addr: number;
-    addrHi: number;
-    addrLo: number;
-    addrPtr: number;
-    ptrLo: number;
-    ptrHi: number;
-    ipC: number;
-    addrC: number;
-
-    public addrReset = 0xfffc;
-    public addrIRQ = 0xfffe;
-    public addrNMI = 0xfffa;
- 
-    private enablePCIncrement = true;
-    private enableInterruptPoll = true;
-    private canSetFlgBreak = true;
-    private addrBrk : number;
-    public constructor(public memory: Memory) {
     }
  
     private pushByte(byte: number) {
@@ -105,15 +118,6 @@ class Most6502Base {
     public trace(opcode){
     
     }
-    bDma:number;
-    dmaRequested = false;
-    addrDma:number;
-    public dma(addrDma:number) {
-        this.dmaRequested = true;
-        this.addrDma = addrDma;
-    }
-    icycle = 0;
-    idma = -1;
    
     public clk() {
         this.icycle++;
@@ -133,7 +137,6 @@ class Most6502Base {
             this.idma--;
             return;
         }
-
 
         if (this.t === 0) {
 
