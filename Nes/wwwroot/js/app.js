@@ -69,7 +69,7 @@ var APU = (function () {
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
     }
     APU.prototype.tsto = function (label) {
-        console.log('APU', label, this.cpu.status());
+        //console.log('APU', label, this.cpu.status());
     };
     APU.prototype.getter = function (addr) {
         switch (addr) {
@@ -10848,7 +10848,7 @@ var Mos6502Old = (function () {
             this.nmiDetected = false;
         }
         if (this.irqDetected && !this.flgInterruptDisable) {
-            console.log('irq requested');
+            //console.log('irq requested');
             this.irqRequested = true;
         }
     };

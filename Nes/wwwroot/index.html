@@ -24,18 +24,19 @@
 		
 		var st = '<div>';
 		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i].replace('\n', '<br/>');
+			st += ' ' + arguments[i];
 		};
 		st += '</div>';
-		$('#log').append(st);
+		$('#log').append(st.replace(/\n/g, '<br/>'));
 	}
+
 	function log_error() {
 		var st = '<div class="error">';
 		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i].replace('\n', '<br/>');
+			st += ' ' + arguments[i];
 		};
 		st += "</div>";
-		$('#log').append(st);
+		$('#log').append(st.replace(/\n/g, '<br/>'));
 	}
 
 	function loadNesEmulator(url, done) {
@@ -100,6 +101,7 @@
 
 					if (testFinished(nesEmulator)) {
 						nesEmulator.ppu.getNameTable(0);
+						log( (Date.now() - timeStart) /1000,'sec', window.fps,'fps');
 						done();
 						return;
 					}
