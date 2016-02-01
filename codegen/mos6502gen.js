@@ -762,11 +762,17 @@ var Mos6502Gen = (function () {
     };
     Mos6502Gen.prototype.SYA = function () {
         //not implemented
-        return new McNop();
+        return new McIf('this.addrC', new McNop()
+            .then("this.addrHi = this.rY & (this.addrHi + 1)")
+            .then("this.addr = (this.addrHi << 8) | this.addrLo"), new McNop())
+            .then("this.b = this.rY & ((this.addrHi) + 1)");
     };
     Mos6502Gen.prototype.SXA = function () {
         //not implemented
-        return new McNop();
+        return new McIf('this.addrC', new McNop()
+            .then("this.addrHi = this.rX & (this.addrHi + 1)")
+            .then("this.addr = (this.addrHi << 8) | this.addrLo"), new McNop())
+            .then("this.b = this.rX & ((this.addrHi) + 1)");
     };
     Mos6502Gen.prototype.XAA = function () {
         //not implemented

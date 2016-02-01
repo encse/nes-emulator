@@ -752,13 +752,24 @@ export class Mos6502Gen {
 
     private SYA(): Mc {
         //not implemented
-        return new McNop();
+        return new McIf('this.addrC',
+                new McNop()
+                .then(`this.addrHi = this.rY & (this.addrHi + 1)`)
+                .then(`this.addr = (this.addrHi << 8) | this.addrLo`),
+                new McNop())
+            .then(`this.b = this.rY & ((this.addrHi) + 1)`);
     }
 
     private SXA(): Mc {
         //not implemented
-        return new McNop();
+        return new McIf('this.addrC',
+            new McNop()
+                .then(`this.addrHi = this.rX & (this.addrHi + 1)`)
+                .then(`this.addr = (this.addrHi << 8) | this.addrLo`),
+            new McNop())
+            .then(`this.b = this.rX & ((this.addrHi) + 1)`);
     }
+
     private XAA(): Mc {
         //not implemented
         return new McNop();

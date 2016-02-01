@@ -8834,6 +8834,11 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 4: {
+                        if (this.addrC) {
+                            this.addrHi = this.rY & (this.addrHi + 1);
+                            this.addr = (this.addrHi << 8) | this.addrLo;
+                        }
+                        this.b = this.rY & ((this.addrHi) + 1);
                         this.memory.setByte(this.addr, this.b);
                         this.t = 0;
                         break;
@@ -8872,6 +8877,11 @@ var Most6502Base = (function () {
                         break;
                     }
                     case 4: {
+                        if (this.addrC) {
+                            this.addrHi = this.rX & (this.addrHi + 1);
+                            this.addr = (this.addrHi << 8) | this.addrLo;
+                        }
+                        this.b = this.rX & ((this.addrHi) + 1);
                         this.memory.setByte(this.addr, this.b);
                         this.t = 0;
                         break;
