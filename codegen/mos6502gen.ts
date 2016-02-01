@@ -128,7 +128,7 @@ class Statement {
     getCycles(gen: Mos6502Gen): Cycle[] {
         var mcPayload = gen[StatementKind[this.statementKind]]();
         var mcPostPayload = gen[StatementKind[this.statementKind] + 'Post'] ? gen[StatementKind[this.statementKind] + 'Post']() : null;
-        if (mcPostPayload && this.memoryAccessPattern != MemoryAccessPattern.ReadModifyWriteAndModifyRegister)
+        if (mcPostPayload && this.memoryAccessPattern !== MemoryAccessPattern.ReadModifyWriteAndModifyRegister)
             throw 'should not have postpayload';
 
         return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload, mcPostPayload);
@@ -226,8 +226,7 @@ class Statement {
                     return null;
             
                 case StatementKind.LAX:
-                    return Register.A | Register.X
-
+                    return Register.A | Register.X;
             }
 
         throw('missing output register for ' + this.mnemonic);
@@ -751,7 +750,6 @@ export class Mos6502Gen {
     }
 
     private SYA(): Mc {
-        //not implemented
         return new McIf('this.addrC',
                 new McNop()
                 .then(`this.addrHi = this.rY & (this.addrHi + 1)`)
@@ -761,7 +759,6 @@ export class Mos6502Gen {
     }
 
     private SXA(): Mc {
-        //not implemented
         return new McIf('this.addrC',
             new McNop()
                 .then(`this.addrHi = this.rX & (this.addrHi + 1)`)
@@ -808,7 +805,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
-                        .thenNextStatement(),
+                        .thenNextStatement()
                 ];
              
             case MemoryAccessPattern.ReadModifyWrite:
@@ -854,7 +851,7 @@ export class Mos6502Gen {
                     new Cycle(3, 'write register to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
-                        .thenNextStatement(),
+                        .thenNextStatement()
                 ];
             default:
                 throw 'not implemented';
@@ -943,7 +940,7 @@ export class Mos6502Gen {
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement()
-                ]
+                ];
             default:
                 throw 'not implemented';
         }
@@ -1199,7 +1196,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`
                         })
                         .thenNextCycle(),
 
@@ -1591,7 +1588,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`
                         })
                         .thenNextCycle(),
 
@@ -1638,7 +1635,7 @@ export class Mos6502Gen {
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
-                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`,
+                            if: `this.addr = (this.addr + (this.addrC << 8)) & 0xffff`
                         })
                         .thenNextCycle(),
 
@@ -1700,12 +1697,11 @@ export class Mos6502Gen {
         ctx.indented(() => {
             for (let icycle = 0; icycle < rgcycle.length; icycle++) {
                 var cycle = rgcycle[icycle];
-
                 ctx.writeLine(`case ${icycle}: {`);
-                ctx.indented(() => {
-                    cycle.mc.write(ctx);
-                    ctx.writeLine('break;');
-                });
+                ctx.indent();
+                cycle.mc.write(ctx);
+                ctx.writeLine('break;');
+                ctx.unindent();
                 ctx.writeLine(`}`);
             }
         });
@@ -2022,7 +2018,7 @@ export class Mos6502Gen {
             new Statement(0x93, StatementKind.AXA, AddressingMode.IndirectY, 2, new CycleCount(6)),
             new Statement(0x9b, StatementKind.XAS, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
             new Statement(0x9f, StatementKind.AXA, AddressingMode.AbsoluteY, 3, new CycleCount(5)),
-            new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
+            new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross())
 
         ];
         var res = `///<reference path="Memory.ts"/>
