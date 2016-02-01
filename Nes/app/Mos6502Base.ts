@@ -105,9 +105,35 @@ class Most6502Base {
     public trace(opcode){
     
     }
-
+    bDma:number;
+    dmaRequested = false;
+    addrDma:number;
+    public dma(addrDma:number) {
+        this.dmaRequested = true;
+        this.addrDma = addrDma;
+    }
+    icycle = 0;
+    idma = -1;
    
     public clk() {
+        this.icycle++;
+        if (this.dmaRequested) {
+            this.dmaRequested = false;
+            this.idma = 513 + (this.icycle % 2);
+            return;
+        } else if (this.idma > 0) {
+            if (this.idma === 514 || this.idma === 513) {
+                //nop
+            } else if (!(this.idma & 1)) {
+                this.bDma = this.memory.getByte(this.addrDma ++);
+                this.addrDma &= 0xffff;
+            } else {
+                this.memory.setByte(0x2004, this.bDma);
+            }
+            this.idma--;
+            return;
+        }
+
 
         if (this.t === 0) {
 
