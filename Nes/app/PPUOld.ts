@@ -1,4 +1,4 @@
-﻿class PPU {
+﻿class PPUOld {
 
 
     /**
@@ -29,18 +29,20 @@
         ||| ++-------------- nametable select
         +++----------------- fine Y scroll
      */
-    v: number = 0; // Current VRAM address (15 bits)
+    _v: number = 0; // Current VRAM address (15 bits)
+
+    get v() {
+        return this._v;
+    }
+    set v(value: number) {
+        this._v = value;
+    }
     t: number = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
     x: number = 0; // Fine X scroll (3 bits)
     w: number = 0; // First or second write toggle (1 bit)
-    nt:number; // current nametable byte;
-    at:number; // current attribute table byte;
-    bgTileLo:number; //low background tile byte
-    bgTileHi:number; //high backgrount tile byte;
-
     daddrWrite: number = 0;
-    addrSpriteBase: number = 0;
-    addrTileBase: number = 0;
+    addrSpritePatternTable: number = 0;
+    addrScreenPatternTable: number = 0;
 
    
     flgVblank = false;
@@ -48,7 +50,15 @@
 
 
     spriteHeight = 8;
-   
+    _imageGrayscale = false;
+    _showBgInLeftmost8Pixels = false;
+    _showSpritesInLeftmost8Pixels = false;
+    _showBg = false;
+    _showSprites = false;
+    _emphasizeRed = false;
+    _emphasizeGreen = false;
+    _emphasizeBlue = false;
+
     imageGrayscale = false;
     showBgInLeftmost8Pixels = false;
     showSpritesInLeftmost8Pixels = false;
@@ -180,20 +190,25 @@
         case 0x0:
             this.t = (this.v & 0x73ff) | ((value & 3) << 10);
             this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
-            this.addrSpriteBase = value & 0x08 ? 0x1000 : 0;
-            this.addrTileBase = value & 0x10 ? 0x1000 : 0;
+            this.addrSpritePatternTable = value & 0x08 ? 0x1000 : 0;
+            this.addrScreenPatternTable = value & 0x10 ? 0x1000 : 0;
             this.spriteHeight = value & 0x20 ? 16 : 8;
             this.nmi_output = !!(value & 0x80);
+
+          
             break;
         case 0x1:
-            this.imageGrayscale = !!(value & 0x01);
-            this.showBgInLeftmost8Pixels =  !!(value & 0x02);
-            this.showSpritesInLeftmost8Pixels =  !!(value & 0x04);
-            this.showBg =   !!(value & 0x08);
-            this.showSprites =  !!(value & 0x10);
-            this.emphasizeRed = !!(value & 0x20);
-            this.emphasizeGreen =  !!(value & 0x40);
-            this.emphasizeBlue =   !!(value & 0x80);
+            var x = this.showBg;
+            this.imageGrayscale = this._imageGrayscale = !!(value & 0x01);
+            this.showBgInLeftmost8Pixels =this._showBgInLeftmost8Pixels = !!(value & 0x02);
+            this.showSpritesInLeftmost8Pixels =this._showSpritesInLeftmost8Pixels = !!(value & 0x04);
+            this.showBg = this._showBg = !!(value & 0x08);
+            this.showSprites =this._showSprites = !!(value & 0x10);
+            this.emphasizeRed =this._emphasizeRed = !!(value & 0x20);
+            this.emphasizeGreen =this._emphasizeGreen = !!(value & 0x40);
+            this.emphasizeBlue = this._emphasizeBlue = !!(value & 0x80);
+            //if (x != this.showBg)
+            //    console.log('show:', x, '->', this.showBg);
 
             break;
         case 0x5:
@@ -224,56 +239,38 @@
             this.w = 1 - this.w;
             break;
         case 0x7:
+            var vold = this.v;
+          
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
+            //if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender)
+            //    console.log('x ', this.showBg ? 'bg:on' : 'bg:off', vold.toString(16), value.toString(16), String.fromCharCode(value));
             break;
         }
     }
 
-    private resetHoriV() {
+    private incrementX() {
+       
+        this.x++;
+        if (this.x === 8) {
+            this.x = 0;
+            // Coarse X increment
+            // The coarse X component of v needs to be incremented when the next tile is reached.
+            // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
+            // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
 
-        if (!this.showBg && !this.showSprites)
-            return;
-            
-       // At dot 257 of each scanline
-       // If rendering is enabled, the PPU copies all bits related to horizontal position from t to v:
-       // v: ....F.. ...EDCBA = t: ....F.. ...EDCBA
-        this.v = (this.v & 0xfbe0) | (this.t & 0x041f);
-    }
-
-    private resetVertV() {
-         if (!this.showBg && !this.showSprites)
-            return;
-
-        //During dots 280 to 304 of the pre-render scanline (end of vblank)
-        //If rendering is enabled, at the end of vblank, shortly after the horizontal bits are copied from t to v at dot 257, the PPU will repeatedly copy the vertical bits from t to v from dots 280 to 304, completing the full initialization of v from t:
-        //v: IHGF.ED CBA..... = t: IHGF.ED CBA.....
-        this.v = (this.v & 0x041f) | (this.t & 0xfbe0);
-    }
-
-    private incHoriV() {
-        if (!this.showBg && !this.showSprites)
-            return;
-     
-        // Coarse X increment
-        // The coarse X component of v needs to be incremented when the next tile is reached.
-        // Bits 0- 4 are incremented, with overflow toggling bit 10. This means that bits 0- 4 count 
-        // from 0 to 31 across a single nametable, and bit 10 selects the current nametable horizontally.
-
-        if ((this.v & 0x001F) === 31) { // if coarse X == 31
-            this.v &= ~0x001F; // coarse X = 0
-            this.v ^= 0x0400; // switch horizontal nametable
-        } else {
-            this.v += 1; // increment coarse X
+            if ((this.v & 0x001F) === 31) { // if coarse X == 31
+                this.v &= ~0x001F; // coarse X = 0
+                this.v ^= 0x0400; // switch horizontal nametable
+            } else {
+                this.v += 1; // increment coarse X
+            }
         }
     }
 
-    private incVertV() {
-
-        if (!this.showBg && !this.showSprites)
-            return;
-
+    private incrementY() {
+       
         this.v = (this.v & ~0x001F) | (this.t & 0x1f); // reset coarse X
         this.v ^= 0x0400; // switch horizontal nametable
 
@@ -304,48 +301,6 @@
             */
         }
     }
-
-    private fetchUnusedNt() {
-        if (!this.showBg && !this.showSprites)
-            return;
-
-        const addr = 0x2000 | (this.v & 0x0fff);
-        this.vmemory.getByte(addr);
-    }
-
-    private fetchNt() {
-        if (!this.showBg && !this.showSprites)
-            return;
-
-        const addr = 0x2000 | (this.v & 0x0fff);
-        this.nt = this.vmemory.getByte(addr);
-    }
-
-    private fetchAt() {
-        if (!this.showBg && !this.showSprites)
-            return;
-        const addr = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-        this.at = ((this.at << 8) | this.vmemory.getByte(addr)) & 0xffff;
-    }
-
-    private fetchBgTileLo() {
-        if (!this.showBg && !this.showSprites)
-            return;
-        const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + y);
-        this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xff00);
-       
-    }
-    
-    private fetchBgTileHi() {
-        if (!this.showBg && !this.showSprites)
-            return;
-        const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + 8 + y);
-
-        this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xff00);
-    }
-
     public getNameTable(i) {
         var st = '';
         for (var y = 0; y < 30; y++){
@@ -363,8 +318,8 @@
     //iFrameX = 0;
     // zizi = 0;
     public step() {
-        //if ((this.iFrame & 1) && !this.sx && !this.sy)
-        //    this.stepI();
+        if ((this.iFrame & 1) && !this.sx && !this.sy)
+            this.stepI();
 
         this.stepI();
 
@@ -377,146 +332,115 @@
         //}
     }
 
-
     public stepI() {
 
-        if (this.showBg && this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
-            // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-            // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-            //
-            // The address to be fetched during rendering can be deduced from v in the following way:
-            //   tile address      = 0x2000 | (v & 0x0FFF)
-            //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-            //
-            // The low 12 bits of the attribute address are composed in the following way:
-            //   NN 1111 YYY XXX
-            //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-            //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-            //   || ++++---------- attribute offset (960 bytes)
-            //   ++--------------- nametable select
 
-            var tileCol = 15 - this.x;
-
-            let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
-            let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
-            let dx = (this.v >> 1) & 1; //second bit of coarse x
-            let dy = (this.v >> 5) & 2; //second bit of coarse y << 1
-
-            let ipalette23 = (this.at >> (8 + dy + dx)) & 3;
-            let ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
-
-            /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
-                (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                They can still be shown using the background palette hack, explained below.*/
-           
-            
-            // 0 in each palette mean the default background color -> ipalette = 0
-            if ((ipalette & 3) === 0)
-                ipalette = 0;
-            
-            let icolor = this.vmemory.getByte(0x3f00 | ipalette);
-            let color = this.colors[icolor];
-            this.data[this.dataAddr] = color;
-            this.dataAddr++;
-        }
-
-        //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
-        if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
-
-             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
-                if (this.sy === 261) {
-                    if (this.sx === 1) {
-                        this.flgVblank = false;
-                        //sprite 0, overflow
-                    }
-                }
-
-                if ((this.sx & 0x07) === 2) {
-                    this.fetchNt();
-                } else if ((this.sx & 0x07) === 4) {
-                    this.fetchAt();
-                } else if ((this.sx & 0x07) === 6) {
-                    this.fetchBgTileLo();
-                } else if ((this.sx & 0x07) === 0) {
-                    this.fetchBgTileHi();
-
-                    if (this.sx === 256)
-                        this.incVertV();
-                    else
-                        this.incHoriV();
-                }
-
-                this.bgTileLo = (this.bgTileLo << 1) & 0xffff;
-                this.bgTileHi = (this.bgTileHi << 1) & 0xffff;
-
-            } else if (this.sx === 257) {
-                this.resetHoriV();
-            } else if (this.sy === 261 && this.sx >= 280 && this.sx <= 304) {
-                this.resetVertV();
-            } else if (this.sx >= 337 && this.sx <= 340) {
-                if ((this.sx & 2) === 0) {
-                    this.fetchUnusedNt();
-                }
-            } 
-        } else if (this.sy === 240) {
-            if (this.sx === 0) {
-                (<any>this.imageData.data).set(this.buf8);
-                this.ctx.putImageData(this.imageData, 0, 0);
-                this.iFrame++;
-                this.dataAddr = 0;
-            }
-        } else if (this.sy === 241) {
-            if (this.sx === 1) {
+        if (this.sx === 0 && this.sy === PPU.syPostRender) {
+            //console.log('ppu vblank start', this.icycle);
+            (<any>this.imageData.data).set(this.buf8);
+            this.ctx.putImageData(this.imageData, 0, 0);
+            this.iFrame++;
+             
+            this.dataAddr = 0;
+          
+        } else if (this.sy >= PPU.syPostRender && this.sy <= PPU.syPreRender) {
+            //vblank
+            var qqq = 1;
+            if (this.sx === 1 && this.sy === PPU.syPostRender + 1) {
                 this.flgVblank = true;
+            }
+            if (this.sx === qqq && this.sy === PPU.syPostRender + 1) {
                 if (this.nmi_output) {
                     this.nmi_output = false;
                     this.cpu.nmiLine = 0;
                 }
-            } else if (this.sx === 246) {
+            }
+            if (this.sx === qqq+5 && this.sy === PPU.syPostRender + 1) {
                 this.cpu.nmiLine = 1;
             }
+          
+        } else if (this.sy === PPU.syFirstVisible && this.sx === 0) {
+            //beginning of screen
+            //console.log('ppu vblank end bg:',this.showBg );
+            this.flgVblank = false;
+
+            if (this.showBg || this.showSprites)
+                this.v = this.t;
         }
 
-        if (this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
+        
+        if ((this.showBg || this.showSprites) && this.sx >= 0 && this.sy >= PPU.syFirstVisible && this.sx < 256 && this.sy < PPU.syPostRender) {
+
+            if (this.showBg) {
+                // The high bits of v are used for fine Y during rendering, and addressing nametable data 
+                // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
+                //
+                // The address to be fetched during rendering can be deduced from v in the following way:
+                //   tile address      = 0x2000 | (v & 0x0FFF)
+                //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+                //
+                // The low 12 bits of the attribute address are composed in the following way:
+                //   NN 1111 YYY XXX
+                //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
+                //   || |||| +++------ high 3 bits of coarse Y (y / 4)
+                //   || ++++---------- attribute offset (960 bytes)
+                //   ++--------------- nametable select
+
+                let addrAttribute = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
+                var attribute = this.vmemory.getByte(addrAttribute);
+
+                let addrTile = 0x2000 | (this.v & 0x0fff);
+                let itile = this.vmemory.getByte(addrTile);
+                var tileCol = 7 - (this.x);
+                var tileRow = this.v >> 12;
+
+                let ipalette0 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + tileRow)) >> tileCol) & 1;
+                let ipalette1 = ((this.vmemory.getByte(this.addrScreenPatternTable + itile * 16 + 8 + tileRow)) >> tileCol) & 1;
+                let ipalette23 = (attribute >> ((this.v >> 5) & 2 + (this.v >> 1) & 1)) & 3;
+                let ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                let addrPalette = 0x3f00 + ipalette;
+                let icolor = this.vmemory.getByte(addrPalette);
+                let color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+                this.dataAddr++;
+            }
+            this.incrementX();
+        }
+
+        this.sx++;
+        if (this.sx === PPU.sxMax + 1) {
+            //end of scanline
             this.sx = 0;
-            this.sy = 0;
-        } else {
-            this.sx++;
-            if (this.sx === 341) {
-                this.sx = 0;
-                this.sy++;
-            }
-            if (this.sy === 262) {
-                this.sy = 0;
+            this.sy++;
+            
+            if (this.sy === PPU.syPreRender + 1) {
+                this.sy = PPU.syFirstVisible;
+            } else {
+                if ((this.showBg || this.showSprites) && this.sy < PPU.syPostRender) {
+                    this.incrementY();
+                }
             }
         }
-
 
     }
 
     private colors = [
         0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
         0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
+
         0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
         0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
+
         0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
         0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
+
         0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
         0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
-
-
-        //0xff7C7C7C, 0xff0000FC, 0xff0000BC, 0xff4428BC, 0xff940084, 0xffA80020, 0xffA81000, 0xff881400, 
-        //0xff503000, 0xff007800, 0xff006800, 0xff005800, 0xff004058, 0xff000000, 0xff000000, 0xff000000,
-        //0xffBCBCBC, 0xff0078F8, 0xff0058F8, 0xff6844FC, 0xffD800CC, 0xffE40058, 0xffF83800, 0xffE45C10,
-        //0xffAC7C00, 0xff00B800, 0xff00A800, 0xff00A844, 0xff008888, 0xff000000, 0xff000000, 0xff000000,
-        //0xffF8F8F8, 0xff3CBCFC, 0xff6888FC, 0xff9878F8, 0xffF878F8, 0xffF85898, 0xffF87858, 0xffFCA044,
-        //0xffF8B800, 0xffB8F818, 0xff58D854, 0xff58F898, 0xff00E8D8, 0xff787878, 0xff000000, 0xff000000,
-        //0xffFCFCFC, 0xffA4E4FC, 0xffB8B8F8, 0xffD8B8F8, 0xffF8B8F8, 0xffF8A4C0, 0xffF0D0B0, 0xffFCE0A8,
-        //0xffF8D878, 0xffD8F878, 0xffB8F8B8, 0xffB8F8D8, 0xff00FCFC, 0xffF8D8F8, 0xff000000, 0xff000000
     ];
-
-
-
-
-
 }

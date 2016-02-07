@@ -268,10 +268,11 @@
     <TypeScriptCompile Include="app\APU.ts" />
     <TypeScriptCompile Include="app\Mos6502Base.ts" />
     <TypeScriptCompile Include="app\Mos6502.ts" />
+    <TypeScriptCompile Include="app\PPU.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\MMC1.ts" />
-    <TypeScriptCompile Include="app\PPU.ts" />
+    <TypeScriptCompile Include="app\PPUOld.ts" />
     <TypeScriptCompile Include="app\ROM.ts" />
     <TypeScriptCompile Include="app\RAM.ts" />
     <TypeScriptCompile Include="app\Memory.ts" />
