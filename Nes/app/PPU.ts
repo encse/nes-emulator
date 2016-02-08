@@ -1,5 +1,5 @@
 ﻿class PPU {
-
+    dolog:boolean;
 
     /**
      *
@@ -35,6 +35,8 @@
     w: number = 0; // First or second write toggle (1 bit)
     nt:number; // current nametable byte;
     at:number; // current attribute table byte;
+    p2:number; // current attribute table byte;
+    p3:number; // current attribute table byte;
     bgTileLo:number; //low background tile byte
     bgTileHi:number; //high backgrount tile byte;
 
@@ -44,6 +46,7 @@
 
    
     flgVblank = false;
+    flgSpriteZeroHit = false;
     nmi_output = false;
 
 
@@ -116,6 +119,9 @@
 
 
     private ppuRegistersGetter(addr: number) {
+        if(this.dolog)
+            console.log('ppu get', addr.toString(16));
+
         addr = (addr - 0x2000) % 8;
         switch (addr) {
         case 0x2:
@@ -153,6 +159,7 @@
             this.w = 0;
 
             let res = this.flgVblank ? (1 << 7) : 0;
+            res += this.flgSpriteZeroHit ? (1 << 6) : 0;
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.flgVblank = false;
             this.cpu.nmiLine = 1;
@@ -173,9 +180,12 @@
     }
 
     private ppuRegistersSetter(addr: number, value: number) {
+        if(this.dolog)
+            console.log('ppu set', addr.toString(16), value.toString(16));
+       
         value &= 0xff;
         addr = (addr - 0x2000) % 8;
-     
+
         switch (addr) {
         case 0x0:
             this.t = (this.v & 0x73ff) | ((value & 3) << 10);
@@ -194,7 +204,7 @@
             this.emphasizeRed = !!(value & 0x20);
             this.emphasizeGreen =  !!(value & 0x40);
             this.emphasizeBlue =   !!(value & 0x80);
-
+            //console.log('ppu showbg', this.showBg, 'sprites', this.showSprites);
             break;
         case 0x5:
             if (this.w === 0) {
@@ -325,7 +335,16 @@
         if (!this.showBg && !this.showSprites)
             return;
         const addr = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-        this.at = ((this.at << 8) | this.vmemory.getByte(addr)) & 0xffff;
+        this.at = this.vmemory.getByte(addr);
+    
+        let dx = (this.v >> 1) & 1; //second bit of coarse x
+        let dy = (this.v >> 6) & 1; //second bit of coarse y
+       
+        let p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
+
+        this.p2 = (this.p2 & 0xffff00) | (p & 2 ? 0xff : 0);
+        this.p3 = (this.p3 & 0xffff00) | (p & 1 ? 0xff : 0);
+      
     }
 
     private fetchBgTileLo() {
@@ -380,7 +399,7 @@
 
     public stepI() {
 
-        if (this.showBg && this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
+        if (this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
             //
@@ -395,30 +414,56 @@
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
 
-            var tileCol = 15 - this.x;
+            if (this.showBg) {
+                var tileCol = 15 - this.x;
 
-            let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
-            let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
-            let dx = (this.v >> 1) & 1; //second bit of coarse x
-            let dy = (this.v >> 5) & 2; //second bit of coarse y << 1
+                let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
+                let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
+                let ipalette2 = (this.p2 >> (tileCol + 2)) & 1;
+                let ipalette3 = (this.p3 >> (tileCol + 2)) & 1;
+             
+                let ipalette = (ipalette3 << 3) + (ipalette2 << 2) + (ipalette1 << 1) + ipalette0;
 
-            let ipalette23 = (this.at >> (8 + dy + dx)) & 3;
-            let ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
 
-            /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
-                (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                They can still be shown using the background palette hack, explained below.*/
-           
-            
-            // 0 in each palette mean the default background color -> ipalette = 0
-            if ((ipalette & 3) === 0)
-                ipalette = 0;
-            
-            let icolor = this.vmemory.getByte(0x3f00 | ipalette);
-            let color = this.colors[icolor];
-            this.data[this.dataAddr] = color;
+
+                // 0 in each palette mean the default background color -> ipalette = 0
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+
+                let icolor = this.vmemory.getByte(0x3f00 | ipalette);
+                let color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+            } else {
+
+                let icolor: number;
+                if (this.v >= 0x3f00 && this.v <= 0x3fff)
+                    icolor = this.vmemory.getByte(this.v);
+                else
+                    icolor = this.vmemory.getByte(0x3f00);
+                this.data[this.dataAddr] = this.colors[icolor];
+            }
+            //if (this.sx === 90 && this.sy === 93) {
+            //    console.log('dolog start');
+            //    this.dolog = true;
+            //}
+            //if (this.sx === 100 && this.sy === 93) {
+            //    console.log('dolog end');
+            //    this.dolog = false;
+            //}
+            if (this.sx === 90 && this.sy === 33)
+                this.data[this.dataAddr] = 0xff0000ff;
             this.dataAddr++;
         }
+
+        ////dummy sprite zero hit
+        //if (this.sy == 1 && this.sx == 1)
+        //    this.flgSpriteZeroHit = true;
+        //if (this.sy === 261 && this.sx == 0)
+        //    this.flgSpriteZeroHit = false;
+
 
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
@@ -448,6 +493,8 @@
 
                 this.bgTileLo = (this.bgTileLo << 1) & 0xffff;
                 this.bgTileHi = (this.bgTileHi << 1) & 0xffff;
+                this.p2 = (this.p2 << 1) & 0xffffff;
+                this.p3 = (this.p3 << 1) & 0xffffff;
 
             } else if (this.sx === 257) {
                 this.resetHoriV();
@@ -469,15 +516,16 @@
             if (this.sx === 1) {
                 this.flgVblank = true;
                 if (this.nmi_output) {
-                    this.nmi_output = false;
+                  //  this.nmi_output = false;
+                //    console.log('ppu nmi');
                     this.cpu.nmiLine = 0;
                 }
-            } else if (this.sx === 246) {
+            } else if (this.sx === 250) {
                 this.cpu.nmiLine = 1;
             }
         }
 
-        if (this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
+        if ((this.showBg || this.showSprites) && this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
             this.sx = 0;
             this.sy = 0;
         } else {
@@ -495,24 +543,22 @@
     }
 
     private colors = [
-        0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
-        0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
-        0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
-        0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
-        0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
-        0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
-        0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
-        0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
-
-
-        //0xff7C7C7C, 0xff0000FC, 0xff0000BC, 0xff4428BC, 0xff940084, 0xffA80020, 0xffA81000, 0xff881400, 
-        //0xff503000, 0xff007800, 0xff006800, 0xff005800, 0xff004058, 0xff000000, 0xff000000, 0xff000000,
-        //0xffBCBCBC, 0xff0078F8, 0xff0058F8, 0xff6844FC, 0xffD800CC, 0xffE40058, 0xffF83800, 0xffE45C10,
-        //0xffAC7C00, 0xff00B800, 0xff00A800, 0xff00A844, 0xff008888, 0xff000000, 0xff000000, 0xff000000,
-        //0xffF8F8F8, 0xff3CBCFC, 0xff6888FC, 0xff9878F8, 0xffF878F8, 0xffF85898, 0xffF87858, 0xffFCA044,
-        //0xffF8B800, 0xffB8F818, 0xff58D854, 0xff58F898, 0xff00E8D8, 0xff787878, 0xff000000, 0xff000000,
-        //0xffFCFCFC, 0xffA4E4FC, 0xffB8B8F8, 0xffD8B8F8, 0xffF8B8F8, 0xffF8A4C0, 0xffF0D0B0, 0xffFCE0A8,
-        //0xffF8D878, 0xffD8F878, 0xffB8F8B8, 0xffB8F8D8, 0xff00FCFC, 0xffF8D8F8, 0xff000000, 0xff000000
+        0xff545454, 0xff741e00, 0xff901008, 0xff880030,
+        0xff640044, 0xff30005c, 0xff000454, 0xff00183c, 
+        0xff002a20, 0xff003a08, 0xff004000, 0xff003c00, 
+        0xff3c3200, 0xff000000, 0xff000000, 0xff000000,
+        0xff989698, 0xffc44c08, 0xffec3230, 0xffe41e5c, 
+        0xffb01488, 0xff6414a0, 0xff202298, 0xff003c78, 
+        0xff005a54, 0xff007228, 0xff007c08, 0xff287600, 
+        0xff786600, 0xff000000, 0xff000000, 0xff000000,
+        0xffeceeec, 0xffec9a4c, 0xffec7c78, 0xffec62b0, 
+        0xffec54e4, 0xffb458ec, 0xff646aec, 0xff2088d4, 
+        0xff00aaa0, 0xff00c474, 0xff20d04c, 0xff6ccc38, 
+        0xffccb438, 0xff3c3c3c, 0xff000000, 0xff000000,
+        0xffeceeec, 0xffeccca8, 0xffecbcbc, 0xffecb2d4, 
+        0xffecaeec, 0xffd4aeec, 0xffb0b4ec, 0xff90c4e4, 
+        0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298, 
+        0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ];
 
 

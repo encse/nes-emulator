@@ -13486,6 +13486,7 @@ var PPU = (function () {
         this.addrSpriteBase = 0;
         this.addrTileBase = 0;
         this.flgVblank = false;
+        this.flgSpriteZeroHit = false;
         this.nmi_output = false;
         this.spriteHeight = 8;
         this.imageGrayscale = false;
@@ -13502,14 +13503,22 @@ var PPU = (function () {
         this.iFrame = 0;
         this.icycle = 0;
         this.colors = [
-            0xff545454, 0xff001e74, 0xff081090, 0xff300088, 0xff440064, 0xff5c0030, 0xff540400, 0xff3c1800,
-            0xff202a00, 0xff083a00, 0xff004000, 0xff003c00, 0xff00323c, 0xff000000, 0xff000000, 0xff000000,
-            0xff989698, 0xff084cc4, 0xff3032ec, 0xff5c1ee4, 0xff8814b0, 0xffa01464, 0xff982220, 0xff783c00,
-            0xff545a00, 0xff287200, 0xff087c00, 0xff007628, 0xff006678, 0xff000000, 0xff000000, 0xff000000,
-            0xffeceeec, 0xff4c9aec, 0xff787cec, 0xffb062ec, 0xffe454ec, 0xffec58b4, 0xffec6a64, 0xffd48820,
-            0xffa0aa00, 0xff74c400, 0xff4cd020, 0xff38cc6c, 0xff38b4cc, 0xff3c3c3c, 0xff000000, 0xff000000,
-            0xffeceeec, 0xffa8ccec, 0xffbcbcec, 0xffd4b2ec, 0xffecaeec, 0xffecaed4, 0xffecb4b0, 0xffe4c490,
-            0xffccd278, 0xffb4de78, 0xffa8e290, 0xff98e2b4, 0xffa0d6e4, 0xffa0a2a0, 0xff000000, 0xff000000
+            0xff545454, 0xff741e00, 0xff901008, 0xff880030,
+            0xff640044, 0xff30005c, 0xff000454, 0xff00183c,
+            0xff002a20, 0xff003a08, 0xff004000, 0xff003c00,
+            0xff3c3200, 0xff000000, 0xff000000, 0xff000000,
+            0xff989698, 0xffc44c08, 0xffec3230, 0xffe41e5c,
+            0xffb01488, 0xff6414a0, 0xff202298, 0xff003c78,
+            0xff005a54, 0xff007228, 0xff007c08, 0xff287600,
+            0xff786600, 0xff000000, 0xff000000, 0xff000000,
+            0xffeceeec, 0xffec9a4c, 0xffec7c78, 0xffec62b0,
+            0xffec54e4, 0xffb458ec, 0xff646aec, 0xff2088d4,
+            0xff00aaa0, 0xff00c474, 0xff20d04c, 0xff6ccc38,
+            0xffccb438, 0xff3c3c3c, 0xff000000, 0xff000000,
+            0xffeceeec, 0xffeccca8, 0xffecbcbc, 0xffecb2d4,
+            0xffecaeec, 0xffd4aeec, 0xffb0b4ec, 0xff90c4e4,
+            0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298,
+            0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
         ];
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
@@ -13540,6 +13549,8 @@ var PPU = (function () {
         return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
     };
     PPU.prototype.ppuRegistersGetter = function (addr) {
+        if (this.dolog)
+            console.log('ppu get', addr.toString(16));
         addr = (addr - 0x2000) % 8;
         switch (addr) {
             case 0x2:
@@ -13576,6 +13587,7 @@ var PPU = (function () {
                   */
                     this.w = 0;
                     var res = this.flgVblank ? (1 << 7) : 0;
+                    res += this.flgSpriteZeroHit ? (1 << 6) : 0;
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
                     this.cpu.nmiLine = 1;
@@ -13594,6 +13606,8 @@ var PPU = (function () {
         }
     };
     PPU.prototype.ppuRegistersSetter = function (addr, value) {
+        if (this.dolog)
+            console.log('ppu set', addr.toString(16), value.toString(16));
         value &= 0xff;
         addr = (addr - 0x2000) % 8;
         switch (addr) {
@@ -13614,6 +13628,7 @@ var PPU = (function () {
                 this.emphasizeRed = !!(value & 0x20);
                 this.emphasizeGreen = !!(value & 0x40);
                 this.emphasizeBlue = !!(value & 0x80);
+                //console.log('ppu showbg', this.showBg, 'sprites', this.showSprites);
                 break;
             case 0x5:
                 if (this.w === 0) {
@@ -13720,7 +13735,12 @@ var PPU = (function () {
         if (!this.showBg && !this.showSprites)
             return;
         var addr = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-        this.at = ((this.at << 8) | this.vmemory.getByte(addr)) & 0xffff;
+        this.at = this.vmemory.getByte(addr);
+        var dx = (this.v >> 1) & 1; //second bit of coarse x
+        var dy = (this.v >> 6) & 1; //second bit of coarse y
+        var p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
+        this.p2 = (this.p2 & 0xffff00) | (p & 2 ? 0xff : 0);
+        this.p3 = (this.p3 & 0xffff00) | (p & 1 ? 0xff : 0);
     };
     PPU.prototype.fetchBgTileLo = function () {
         if (!this.showBg && !this.showSprites)
@@ -13760,7 +13780,7 @@ var PPU = (function () {
         //}
     };
     PPU.prototype.stepI = function () {
-        if (this.showBg && this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
+        if (this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
             //
@@ -13774,24 +13794,48 @@ var PPU = (function () {
             //   || |||| +++------ high 3 bits of coarse Y (y / 4)
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
-            var tileCol = 15 - this.x;
-            var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
-            var ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
-            var dx = (this.v >> 1) & 1; //second bit of coarse x
-            var dy = (this.v >> 5) & 2; //second bit of coarse y << 1
-            var ipalette23 = (this.at >> (8 + dy + dx)) & 3;
-            var ipalette = (ipalette23 << 2) + (ipalette1 << 1) + ipalette0;
-            /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
-                (since the pattern values that would otherwise select those cells select the backdrop color instead).
-                They can still be shown using the background palette hack, explained below.*/
-            // 0 in each palette mean the default background color -> ipalette = 0
-            if ((ipalette & 3) === 0)
-                ipalette = 0;
-            var icolor = this.vmemory.getByte(0x3f00 | ipalette);
-            var color = this.colors[icolor];
-            this.data[this.dataAddr] = color;
+            if (this.showBg) {
+                var tileCol = 15 - this.x;
+                var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
+                var ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
+                var ipalette2 = (this.p2 >> (tileCol + 2)) & 1;
+                var ipalette3 = (this.p3 >> (tileCol + 2)) & 1;
+                var ipalette = (ipalette3 << 3) + (ipalette2 << 2) + (ipalette1 << 1) + ipalette0;
+                /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
+                    (since the pattern values that would otherwise select those cells select the backdrop color instead).
+                    They can still be shown using the background palette hack, explained below.*/
+                // 0 in each palette mean the default background color -> ipalette = 0
+                if ((ipalette & 3) === 0)
+                    ipalette = 0;
+                var icolor = this.vmemory.getByte(0x3f00 | ipalette);
+                var color = this.colors[icolor];
+                this.data[this.dataAddr] = color;
+            }
+            else {
+                var icolor;
+                if (this.v >= 0x3f00 && this.v <= 0x3fff)
+                    icolor = this.vmemory.getByte(this.v);
+                else
+                    icolor = this.vmemory.getByte(0x3f00);
+                this.data[this.dataAddr] = this.colors[icolor];
+            }
+            //if (this.sx === 90 && this.sy === 93) {
+            //    console.log('dolog start');
+            //    this.dolog = true;
+            //}
+            //if (this.sx === 100 && this.sy === 93) {
+            //    console.log('dolog end');
+            //    this.dolog = false;
+            //}
+            if (this.sx === 90 && this.sy === 33)
+                this.data[this.dataAddr] = 0xff0000ff;
             this.dataAddr++;
         }
+        ////dummy sprite zero hit
+        //if (this.sy == 1 && this.sx == 1)
+        //    this.flgSpriteZeroHit = true;
+        //if (this.sy === 261 && this.sx == 0)
+        //    this.flgSpriteZeroHit = false;
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
@@ -13818,6 +13862,8 @@ var PPU = (function () {
                 }
                 this.bgTileLo = (this.bgTileLo << 1) & 0xffff;
                 this.bgTileHi = (this.bgTileHi << 1) & 0xffff;
+                this.p2 = (this.p2 << 1) & 0xffffff;
+                this.p3 = (this.p3 << 1) & 0xffffff;
             }
             else if (this.sx === 257) {
                 this.resetHoriV();
@@ -13843,15 +13889,16 @@ var PPU = (function () {
             if (this.sx === 1) {
                 this.flgVblank = true;
                 if (this.nmi_output) {
-                    this.nmi_output = false;
+                    //  this.nmi_output = false;
+                    //    console.log('ppu nmi');
                     this.cpu.nmiLine = 0;
                 }
             }
-            else if (this.sx === 246) {
+            else if (this.sx === 250) {
                 this.cpu.nmiLine = 1;
             }
         }
-        if (this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
+        if ((this.showBg || this.showSprites) && this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
             this.sx = 0;
             this.sy = 0;
         }
