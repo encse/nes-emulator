@@ -13412,8 +13412,11 @@ var NesEmulator = (function () {
                 else if (nesImage.ROMBanks.length === 2) {
                     this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
                 }
-                if (nesImage.VRAMBanks.length > 1 || nesImage.VRAMBanks[0].size() !== 0x2000)
+                if (nesImage.VRAMBanks.length > 1)
                     throw 'unknown VRAMBanks';
+                if (nesImage.VRAMBanks.length == 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
+                    throw 'unknown VRAMBanks';
+
                 var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
                 var nameTableA = new RAM(0x400);
                 var nameTableB = new RAM(0x400);
@@ -13526,6 +13529,8 @@ var PPU = (function () {
         memory.shadowGetter(0x2000, 0x3fff, this.ppuRegistersGetter.bind(this));
         vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
         vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
+        vmemory.shadowSetter(0x3f10, 0x3f10, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f10, 0x3f10, this.paletteGetter.bind(this));
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
     }
@@ -13543,10 +13548,18 @@ var PPU = (function () {
         return this.vmemory.getByte(addr - 0x1000);
     };
     PPU.prototype.paletteSetter = function (addr, value) {
-        return this.vmemory.setByte(0x3000 + (addr - 0x3f20) % 0x20, value);
+        if(addr == 0x3f10)
+            addr = 0x3f00;
+        else 
+            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
+        return this.vmemory.setByte(addr, value);
     };
     PPU.prototype.paletteGetter = function (addr) {
-        return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
+        if(addr == 0x3f10)
+            addr = 0x3f00;
+        else 
+            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
+        return this.vmemory.getByte(addr);
     };
     PPU.prototype.ppuRegistersGetter = function (addr) {
         if (this.dolog)
