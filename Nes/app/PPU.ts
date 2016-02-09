@@ -397,7 +397,7 @@
             return;
         const y = (this.v >> 12) & 0x07;
         var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + y);
-        this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xff00);
+        this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xffff00);
        
     }
     
@@ -407,7 +407,7 @@
         const y = (this.v >> 12) & 0x07;
         var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + 8 + y);
 
-        this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xff00);
+        this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
     }
 
     public getNameTable(i) {
@@ -509,7 +509,7 @@
             //   ++--------------- nametable select
 
             if (this.showBg) {
-                var tileCol = 15 - this.x;
+                var tileCol = 16 - this.x;
 
                 let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
                 let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
@@ -563,6 +563,11 @@
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
 
              if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
+                this.bgTileLo = (this.bgTileLo << 1) & 0xffffff;
+                this.bgTileHi = (this.bgTileHi << 1) & 0xffffff;
+                this.p2 = (this.p2 << 1) & 0xffffff;
+                this.p3 = (this.p3 << 1) & 0xffffff;
+
                 if (this.sy === 261) {
                     if (this.sx === 1) {
                         this.flgVblank = false;
@@ -585,10 +590,7 @@
                         this.incHoriV();
                 }
 
-                this.bgTileLo = (this.bgTileLo << 1) & 0xffff;
-                this.bgTileHi = (this.bgTileHi << 1) & 0xffff;
-                this.p2 = (this.p2 << 1) & 0xffffff;
-                this.p3 = (this.p3 << 1) & 0xffffff;
+               
 
             } else if (this.sx === 257) {
                 this.resetHoriV();
