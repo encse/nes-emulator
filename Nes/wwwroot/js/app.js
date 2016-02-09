@@ -13414,14 +13414,13 @@ var NesEmulator = (function () {
                 }
                 if (nesImage.VRAMBanks.length > 1)
                     throw 'unknown VRAMBanks';
-                if (nesImage.VRAMBanks.length == 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
+                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
                     throw 'unknown VRAMBanks';
-
                 var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
                 var nameTableA = new RAM(0x400);
-                var nameTableB = new RAM(0x400);
-                var nameTableC = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableA : nameTableB;
-                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableA;
+                var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
                 var rest = new RAM(0x1000);
                 this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
                 break;
@@ -13534,6 +13533,47 @@ var PPU = (function () {
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
     }
+    Object.defineProperty(PPU.prototype, "y", {
+        /**
+         * yyy NN YYYYY XXXXX
+            ||| || ||||| +++++-- coarse X scroll
+            ||| || +++++-------- coarse Y scroll
+            ||| ++-------------- nametable select
+            +++----------------- fine Y scroll
+         */
+        get: function () {
+            return (this.t >> 12) & 0x7;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(PPU.prototype, "currentNameTable", {
+        get: function () {
+            return (this.t >> 10) & 0x3;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(PPU.prototype, "coarseY", {
+        get: function () {
+            return (this.t >> 5) & 31;
+        },
+        set: function (value) {
+            this.t = (this.t & 0x7c1f) | ((value & 31) << 5);
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(PPU.prototype, "coarseX", {
+        get: function () {
+            return this.t & 31;
+        },
+        set: function (value) {
+            this.t = (this.t & 0x7fe0) | ((value & 31));
+        },
+        enumerable: true,
+        configurable: true
+    });
     PPU.prototype.setCtx = function (ctx) {
         this.ctx = ctx;
         this.imageData = this.ctx.getImageData(0, 0, 256, 240);
@@ -13548,16 +13588,16 @@ var PPU = (function () {
         return this.vmemory.getByte(addr - 0x1000);
     };
     PPU.prototype.paletteSetter = function (addr, value) {
-        if(addr == 0x3f10)
+        if (addr === 0x3f10)
             addr = 0x3f00;
-        else 
+        else
             addr = 0x3f00 + (addr - 0x3f20) % 0x20;
         return this.vmemory.setByte(addr, value);
     };
     PPU.prototype.paletteGetter = function (addr) {
-        if(addr == 0x3f10)
+        if (addr === 0x3f10)
             addr = 0x3f00;
-        else 
+        else
             addr = 0x3f00 + (addr - 0x3f20) % 0x20;
         return this.vmemory.getByte(addr);
     };
@@ -13625,7 +13665,7 @@ var PPU = (function () {
         addr = (addr - 0x2000) % 8;
         switch (addr) {
             case 0x0:
-                this.t = (this.v & 0x73ff) | ((value & 3) << 10);
+                this.t = (this.t & 0x73ff) | ((value & 3) << 10); //2 nametable select bits sent to $2000
                 this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
                 this.addrSpriteBase = value & 0x08 ? 0x1000 : 0;
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
@@ -13752,8 +13792,8 @@ var PPU = (function () {
         var dx = (this.v >> 1) & 1; //second bit of coarse x
         var dy = (this.v >> 6) & 1; //second bit of coarse y
         var p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
-        this.p2 = (this.p2 & 0xffff00) | (p & 2 ? 0xff : 0);
-        this.p3 = (this.p3 & 0xffff00) | (p & 1 ? 0xff : 0);
+        this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
+        this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
     };
     PPU.prototype.fetchBgTileLo = function () {
         if (!this.showBg && !this.showSprites)
@@ -13774,6 +13814,23 @@ var PPU = (function () {
         for (var y = 0; y < 30; y++) {
             for (var x = 0; x < 32; x++) {
                 st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
+            }
+            st += '\n';
+        }
+        console.log(st);
+    };
+    PPU.prototype.getAttributeTable = function (i) {
+        var st = '';
+        for (var dy = 0; dy < 30; dy += 2) {
+            for (var dx = 0; dx < 32; dx += 2) {
+                var x = this.coarseX + dx;
+                var y = this.coarseY + dy;
+                var addr = 0x23C0 | (i << 10) | (((y >> 2) & 0x07) << 3) | ((x >> 2) & 0x07);
+                var at = this.vmemory.getByte(addr);
+                var x2 = (x >> 1) & 1; //second bit of coarse x
+                var y2 = (y >> 1) & 1; //second bit of coarse y
+                var p = (at >> ((y2 << 2) + (x2 << 1))) & 3;
+                st += p + ' ';
             }
             st += '\n';
         }

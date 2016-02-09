@@ -27,20 +27,22 @@ class NesEmulator {
                         nesImage.ROMBanks[1]);
                 }
 
-                if (nesImage.VRAMBanks.length > 1 || nesImage.VRAMBanks[0].size() !== 0x2000)
+                if (nesImage.VRAMBanks.length > 1)
+                    throw 'unknown VRAMBanks';
+                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
                     throw 'unknown VRAMBanks';
 
-                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
-                var nameTableA = new RAM(0x400);
-                var nameTableB = new RAM(0x400);
-                var nameTableC = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableA : nameTableB;
-                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableA;
-                var rest = new RAM(0x1000);
+                const patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
+                const nameTableA = new RAM(0x400);
+                const nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                const nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                const nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
+                const rest = new RAM(0x1000);
 
                 this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
                 break;
             case 1:
-                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
+                const mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
                 this.memory = mmc1.memory;
                 this.vmemory = mmc1.vmemory;
               

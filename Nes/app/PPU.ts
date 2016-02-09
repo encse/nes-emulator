@@ -79,6 +79,37 @@
 
     public iFrame = 0;
 
+
+    /**
+     * yyy NN YYYYY XXXXX
+        ||| || ||||| +++++-- coarse X scroll
+        ||| || +++++-------- coarse Y scroll
+        ||| ++-------------- nametable select
+        +++----------------- fine Y scroll
+     */
+
+    get y() {
+        return (this.t >> 12) & 0x7;
+    }
+    
+    get currentNameTable() {
+        return (this.t >> 10) & 0x3;
+    }
+
+    get coarseY() {
+        return (this.t >> 5) & 31;
+    }
+
+    set coarseY(value:number) {
+        this.t = (this.t & 0x7c1f) | ((value & 31) << 5);
+    }
+    get coarseX() {
+        return this.t & 31;
+    }
+
+    set coarseX(value:number) {
+        this.t = (this.t & 0x7fe0) | ((value & 31));
+    }
     constructor(memory: CompoundMemory, public vmemory: CompoundMemory, private cpu:Mos6502) {
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
@@ -88,6 +119,10 @@
 
         vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
         vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
+
+        vmemory.shadowSetter(0x3f10, 0x3f10, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f10, 0x3f10, this.paletteGetter.bind(this));
+
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
     }
@@ -110,11 +145,20 @@
     }
 
     private paletteSetter(addr: number, value: number) {
-        return this.vmemory.setByte(0x3000 + (addr - 0x3f20) % 0x20, value);
+        if (addr === 0x3f10)
+            addr = 0x3f00;
+        else 
+            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
+        return this.vmemory.setByte(addr, value);
     }
 
     private paletteGetter(addr: number) {
-        return this.vmemory.getByte(0x3000 + (addr - 0x3f20) % 0x20);
+        if(addr === 0x3f10)
+            addr = 0x3f00;
+        else 
+            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
+        return this.vmemory.getByte(addr);
+
     }
 
 
@@ -188,7 +232,7 @@
 
         switch (addr) {
         case 0x0:
-            this.t = (this.v & 0x73ff) | ((value & 3) << 10);
+            this.t = (this.t & 0x73ff) | ((value & 3) << 10); //2 nametable select bits sent to $2000
             this.daddrWrite = value & 0x04 ? 32 : 1; //VRAM address increment per CPU read/write of PPUDATA
             this.addrSpriteBase = value & 0x08 ? 0x1000 : 0;
             this.addrTileBase = value & 0x10 ? 0x1000 : 0;
@@ -342,8 +386,8 @@
        
         let p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
 
-        this.p2 = (this.p2 & 0xffff00) | (p & 2 ? 0xff : 0);
-        this.p3 = (this.p3 & 0xffff00) | (p & 1 ? 0xff : 0);
+        this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
+        this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
       
     }
 
@@ -372,11 +416,29 @@
                 st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i*0x400) + x + y * 32));
             }
             st += '\n';
-
         }
         console.log(st);
     }
 
+    public getAttributeTable(i) {
+        var st = '';
+        for (var dy = 0; dy < 30; dy+=2){
+            for (var dx = 0; dx < 32; dx+=2) {
+                var x = this.coarseX + dx;
+                var y = this.coarseY + dy;
+
+                const addr = 0x23C0 | (i << 10) | (((y >> 2) & 0x07) << 3) | ((x >> 2) & 0x07);
+                var at = this.vmemory.getByte(addr);
+                let x2 = (x >> 1) & 1; //second bit of coarse x
+                let y2 = (y >> 1) & 1; //second bit of coarse y
+       
+                let p = (at >> ((y2 << 2) + (x2 << 1))) & 3;
+                st += p + ' ';
+            }
+            st += '\n';
+        }
+        console.log(st);
+    }
     icycle = 0;
 
     //iFrameX = 0;
