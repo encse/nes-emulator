@@ -278,6 +278,7 @@
             this.w = 1 - this.w;
             break;
         case 0x7:
+
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
@@ -420,6 +421,37 @@
         console.log(st);
     }
 
+    public getPatternTable() {
+        const canvas:HTMLCanvasElement = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width,canvas.height);
+        const buf = new ArrayBuffer(imageData.data.length);
+        const buf8 = new Uint8ClampedArray(buf);
+        const data = new Uint32Array(buf);
+
+        for (let t = 0; t < 2; t++) {
+            for (let a = 0; a < 256; a++) {
+                for (let x = 0; x < 8; x ++) {
+                    for (let y = 0; y < 8; y++) {
+                        var irow = (a >> 4) * 8 + y;
+                        var icol = 128 * t + (a & 15) * 8 + x;
+                        
+                        var b1 = (this.vmemory.getByte(t* 0x1000 + a * 16 + y) >> (7-x)) & 1;
+                        var b2 = (this.vmemory.getByte(t* 0x1000 + a * 16 + y + 8) >> (7-x)) & 1;
+                        data[ irow * 256 + icol] = this.colors[this.vmemory.getByte(0x3f00 + (b2 << 1) + b1)] ;
+                    }
+                }
+            }
+        }
+
+        (<any>imageData.data).set(buf8);
+        ctx.putImageData(imageData, 0, 0);
+        document.body.appendChild(canvas);
+
+    
+    }
     public getAttributeTable(i) {
         var st = '';
         for (var dy = 0; dy < 30; dy+=2){
@@ -515,16 +547,16 @@
             //    console.log('dolog end');
             //    this.dolog = false;
             //}
-            if (this.sx === 90 && this.sy === 33)
-                this.data[this.dataAddr] = 0xff0000ff;
+            //if (this.sx === 90 && this.sy === 33)
+            //    this.data[this.dataAddr] = 0xff0000ff;
             this.dataAddr++;
         }
 
         ////dummy sprite zero hit
-        //if (this.sy == 1 && this.sx == 1)
-        //    this.flgSpriteZeroHit = true;
-        //if (this.sy === 261 && this.sx == 0)
-        //    this.flgSpriteZeroHit = false;
+        if (this.sy === 30 && this.sx === 1)
+            this.flgSpriteZeroHit = true;
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
 
 
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png

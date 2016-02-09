@@ -25,7 +25,7 @@
     private static magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
 
     public ROMBanks:ROM[];
-    public VRAMBanks: RAM[];
+    public VRAMBanks: ROM[];
     public RAMBanks: RAM[];
     public fVerticalMirroring:boolean;
     public fBatteryPackedRAM:boolean;
@@ -76,12 +76,12 @@
         }
 
         for (let ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x4000));
+            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
             idx += 0x4000;
         }
 
         for (let ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = RAM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
             idx += 0x2000;
         }
     }

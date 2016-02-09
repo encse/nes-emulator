@@ -13362,11 +13362,11 @@ var NesImage = (function () {
             this.RAMBanks[ibank] = new RAM(0x2000);
         }
         for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = new ROM(rawBytes.slice(idx, idx + 0x4000));
+            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
             idx += 0x4000;
         }
         for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = RAM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
             idx += 0x2000;
         }
     }
@@ -13819,6 +13819,32 @@ var PPU = (function () {
         }
         console.log(st);
     };
+    PPU.prototype.getPatternTable = function () {
+        var canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 128;
+        var ctx = canvas.getContext('2d');
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var buf = new ArrayBuffer(imageData.data.length);
+        var buf8 = new Uint8ClampedArray(buf);
+        var data = new Uint32Array(buf);
+        for (var t = 0; t < 2; t++) {
+            for (var a = 0; a < 256; a++) {
+                for (var x = 0; x < 8; x++) {
+                    for (var y = 0; y < 8; y++) {
+                        var irow = (a >> 4) * 8 + y;
+                        var icol = 128 * t + (a & 15) * 8 + x;
+                        var b1 = (this.vmemory.getByte(t * 0x1000 + a * 16 + y) >> (7 - x)) & 1;
+                        var b2 = (this.vmemory.getByte(t * 0x1000 + a * 16 + y + 8) >> (7 - x)) & 1;
+                        data[irow * 256 + icol] = this.colors[this.vmemory.getByte(0x3f00 + (b2 << 1) + b1)];
+                    }
+                }
+            }
+        }
+        imageData.data.set(buf8);
+        ctx.putImageData(imageData, 0, 0);
+        document.body.appendChild(canvas);
+    };
     PPU.prototype.getAttributeTable = function (i) {
         var st = '';
         for (var dy = 0; dy < 30; dy += 2) {
@@ -13897,15 +13923,15 @@ var PPU = (function () {
             //    console.log('dolog end');
             //    this.dolog = false;
             //}
-            if (this.sx === 90 && this.sy === 33)
-                this.data[this.dataAddr] = 0xff0000ff;
+            //if (this.sx === 90 && this.sy === 33)
+            //    this.data[this.dataAddr] = 0xff0000ff;
             this.dataAddr++;
         }
         ////dummy sprite zero hit
-        //if (this.sy == 1 && this.sx == 1)
-        //    this.flgSpriteZeroHit = true;
-        //if (this.sy === 261 && this.sx == 0)
-        //    this.flgSpriteZeroHit = false;
+        if (this.sy === 30 && this.sx === 1)
+            this.flgSpriteZeroHit = true;
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
@@ -14392,9 +14418,14 @@ var RepeatedMemory = (function () {
 })();
 ///<reference path="Memory.ts"/>
 var ROM = (function () {
-    function ROM(memory) {
-        this.memory = memory;
+    function ROM(size) {
+        this.memory = new Uint8Array(size);
     }
+    ROM.fromBytes = function (memory) {
+        var res = new ROM(0);
+        res.memory = memory;
+        return res;
+    };
     ROM.prototype.size = function () {
         return this.memory.length;
     };
