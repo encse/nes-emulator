@@ -8,7 +8,7 @@ class Mos6502 extends Most6502Base {
         super(memory);
     }
     public trace(opcode: number) {
-        //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
+      //  console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode), 'ra:', this.rA.toString(16));
     }
 
     public status() {
@@ -39,10 +39,11 @@ class Mos6502 extends Most6502Base {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
     }
-    public disass(i) {
+    public disass(i, ip:number = null) {
         var rgst = [];
 
-        var ip = this.ipCur;
+        if(!ip)
+           ip = this.ipCur;
         while (i > 0) {
             var opcode = this.memory.getByte(ip);
             rgst.push('$' + ip.toString(16) + ' ' + this.opcodeToMnemonic(opcode));

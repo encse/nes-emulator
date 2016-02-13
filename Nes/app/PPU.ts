@@ -1,5 +1,5 @@
 ﻿class PPU {
-    dolog:boolean;
+    dolog:boolean = false;
 
     /**
      *
@@ -137,7 +137,7 @@
 
     private nameTableSetter(addr: number, value: number)
     {
-        return this.vmemory.setByte(addr - 0x1000, value);
+       return this.vmemory.setByte(addr - 0x1000, value);
     }
 
     private nameTableGetter(addr: number) {
@@ -161,10 +161,9 @@
 
     }
 
-
+    lastWrittenStuff: number = 0;
+    vramReadBuffer:number = 0;
     private ppuRegistersGetter(addr: number) {
-        if(this.dolog)
-            console.log('ppu get', addr.toString(16));
 
         addr = (addr - 0x2000) % 8;
         switch (addr) {
@@ -204,6 +203,7 @@
 
             let res = this.flgVblank ? (1 << 7) : 0;
             res += this.flgSpriteZeroHit ? (1 << 6) : 0;
+            res |= (this.lastWrittenStuff & 0x63);
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.flgVblank = false;
             this.cpu.nmiLine = 1;
@@ -211,7 +211,16 @@
         }
         case 0x7:
         {
-            let res = this.vmemory.getByte(this.v & 0x3fff);
+            this.v &= 0x3fff;
+            let res;
+            if (this.v >= 0x3f00) {
+                res = this.vmemory.getByte(this.v);
+                this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
+            } else {
+                res = this.vramReadBuffer;
+                this.vramReadBuffer = this.vmemory.getByte(this.v);
+            }
+              
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
 
@@ -224,8 +233,7 @@
     }
 
     private ppuRegistersSetter(addr: number, value: number) {
-        if(this.dolog)
-            console.log('ppu set', addr.toString(16), value.toString(16));
+        this.lastWrittenStuff = value;
        
         value &= 0xff;
         addr = (addr - 0x2000) % 8;
@@ -248,7 +256,6 @@
             this.emphasizeRed = !!(value & 0x20);
             this.emphasizeGreen =  !!(value & 0x40);
             this.emphasizeBlue =   !!(value & 0x80);
-            //console.log('ppu showbg', this.showBg, 'sprites', this.showSprites);
             break;
         case 0x5:
             if (this.w === 0) {
@@ -273,7 +280,6 @@
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-               // console.log(this.v.toString(16));
             }
             this.w = 1 - this.w;
             break;

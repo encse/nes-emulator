@@ -236,6 +236,9 @@ var CompoundMemory = (function () {
         throw 'address out of bounds';
     };
     CompoundMemory.prototype.setByte = function (addr, value) {
+        //if (addr == 0x3c2) {
+        //    console.log('xxx set', value.toString(16));
+        //}
         for (var i = 0; i < this.setters.length; i++) {
             var setter = this.setters[i];
             if (setter.addrFirst <= addr && addr <= setter.addrLast) {
@@ -496,7 +499,7 @@ var Most6502Base = (function () {
         this.sp = 0;
         this.t = 0;
         this.b = 0;
-        this.rA = 0;
+        this._rA = 0;
         this.rX = 0;
         this.rY = 0;
         this.nmiLine = 1;
@@ -517,7 +520,20 @@ var Most6502Base = (function () {
         this.dmaRequested = false;
         this.idma = -1;
         this.icycle = 0;
+        this.qqqq = 0;
     }
+    Object.defineProperty(Most6502Base.prototype, "rA", {
+        get: function () { return this._rA; },
+        set: function (v) {
+            this._rA = v;
+            if (v == 57)
+                console.log('most v');
+        },
+        enumerable: true,
+        configurable: true
+    });
+    ;
+    ;
     Most6502Base.prototype.dma = function (addrDma) {
         this.dmaRequested = true;
         this.addrDma = addrDma;
@@ -595,6 +611,10 @@ var Most6502Base = (function () {
             return;
         }
         if (this.t === 0) {
+            if (this.ip == 0x8ec3) {
+                this.qqqq++;
+                console.log('qqq', this.ip, this.qqqq);
+            }
             if (this.nmiRequested || this.irqRequested) {
                 this.canSetFlgBreak = false;
                 //console.log('processing irq/nmi');
@@ -10360,7 +10380,7 @@ var Mos6502 = (function (_super) {
         this.memory = memory;
     }
     Mos6502.prototype.trace = function (opcode) {
-        //console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode));
+        //  console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode), 'ra:', this.rA.toString(16));
     };
     Mos6502.prototype.status = function () {
         return { irq: this.irqLine, disass: this.disass(10) };
@@ -10383,9 +10403,11 @@ var Mos6502 = (function (_super) {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
     };
-    Mos6502.prototype.disass = function (i) {
+    Mos6502.prototype.disass = function (i, ip) {
+        if (ip === void 0) { ip = null; }
         var rgst = [];
-        var ip = this.ipCur;
+        if (!ip)
+            ip = this.ipCur;
         while (i > 0) {
             var opcode = this.memory.getByte(ip);
             rgst.push('$' + ip.toString(16) + ' ' + this.opcodeToMnemonic(opcode));
@@ -13454,6 +13476,7 @@ var PPU = (function () {
     function PPU(memory, vmemory, cpu) {
         this.vmemory = vmemory;
         this.cpu = cpu;
+        this.dolog = false;
         /**
          *
             Address range	Size	Description
@@ -13503,6 +13526,8 @@ var PPU = (function () {
         this.sx = PPU.sxMin;
         this.dataAddr = 0;
         this.iFrame = 0;
+        this.lastWrittenStuff = 0;
+        this.vramReadBuffer = 0;
         this.icycle = 0;
         this.colors = [
             0xff545454, 0xff741e00, 0xff901008, 0xff880030,
@@ -13602,8 +13627,6 @@ var PPU = (function () {
         return this.vmemory.getByte(addr);
     };
     PPU.prototype.ppuRegistersGetter = function (addr) {
-        if (this.dolog)
-            console.log('ppu get', addr.toString(16));
         addr = (addr - 0x2000) % 8;
         switch (addr) {
             case 0x2:
@@ -13641,6 +13664,7 @@ var PPU = (function () {
                     this.w = 0;
                     var res = this.flgVblank ? (1 << 7) : 0;
                     res += this.flgSpriteZeroHit ? (1 << 6) : 0;
+                    res |= (this.lastWrittenStuff & 0x63);
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
                     this.cpu.nmiLine = 1;
@@ -13648,7 +13672,16 @@ var PPU = (function () {
                 }
             case 0x7:
                 {
-                    var res = this.vmemory.getByte(this.v & 0x3fff);
+                    this.v &= 0x3fff;
+                    var res;
+                    if (this.v >= 0x3f00) {
+                        res = this.vmemory.getByte(this.v);
+                        this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
+                    }
+                    else {
+                        res = this.vramReadBuffer;
+                        this.vramReadBuffer = this.vmemory.getByte(this.v);
+                    }
                     this.v += this.daddrWrite;
                     this.v &= 0x3fff;
                     return res;
@@ -13659,8 +13692,7 @@ var PPU = (function () {
         }
     };
     PPU.prototype.ppuRegistersSetter = function (addr, value) {
-        if (this.dolog)
-            console.log('ppu set', addr.toString(16), value.toString(16));
+        this.lastWrittenStuff = value;
         value &= 0xff;
         addr = (addr - 0x2000) % 8;
         switch (addr) {
@@ -13681,7 +13713,6 @@ var PPU = (function () {
                 this.emphasizeRed = !!(value & 0x20);
                 this.emphasizeGreen = !!(value & 0x40);
                 this.emphasizeBlue = !!(value & 0x80);
-                //console.log('ppu showbg', this.showBg, 'sprites', this.showSprites);
                 break;
             case 0x5:
                 if (this.w === 0) {
@@ -14461,6 +14492,8 @@ var StepTest = (function () {
         this.ich = 0;
         var line = this.readLine();
         nesemu.cpu.ip = parseInt(line.split(' ')[0], 16);
+        while (nesemu.cpu.ip != 0x8014)
+            nesemu.cpu.stepInstr();
         while (line) {
             var groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
             groups.shift();
@@ -14474,12 +14507,12 @@ var StepTest = (function () {
             function tsto(ip, rA, rX, rY, rP, sp) {
                 var stRP = rP.toString(2);
                 stRP = Array(Math.max(8 - stRP.length + 1, 0)).join('0') + stRP;
-                return 'ip:' + ip.toString(16) +
-                    ' rA:' + rA.toString(16) +
-                    ' rX:' + rX.toString(16) +
-                    ' rY:' + rY.toString(16) +
-                    ' rP:' + stRP +
-                    ' sp:' + sp.toString(16);
+                return 'ip:' + ip.toString(16)
+                    + ' rA:' + rA.toString(16)
+                    + ' rX:' + rX.toString(16)
+                    + ' rY:' + rY.toString(16)
+                    + ' rP:' + stRP
+                    + ' sp:' + sp.toString(16);
             }
             var expected = tsto(ip, rA, rX, rY, rP, sp);
             var actual = tsto(nesemu.cpu.ip, nesemu.cpu.rA, nesemu.cpu.rX, nesemu.cpu.rY, nesemu.cpu.rP, nesemu.cpu.sp);
@@ -14487,6 +14520,7 @@ var StepTest = (function () {
                 prevLines.forEach(function (prevLine) { return log(prevLine); });
                 log(expected);
                 log(actual);
+                log(' ');
                 break;
             }
             prevLines.push(line);

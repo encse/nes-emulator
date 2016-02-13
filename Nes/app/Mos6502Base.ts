@@ -12,7 +12,13 @@ class Most6502Base {
     public sp: number = 0;
     public t: number = 0;
     public b: number = 0;
-    public rA: number = 0;
+    public _rA: number = 0;
+    public get rA() { return this._rA; };
+    public set rA(v) {
+        this._rA = v;
+        if (v == 57)
+            console.log('most v');
+    };
     public rX: number = 0;
     public rY: number = 0;
     
@@ -119,6 +125,7 @@ class Most6502Base {
     
     }
    
+    qqqq = 0;
     public clk() {
         this.icycle++;
         if (this.dmaRequested) {
@@ -140,6 +147,10 @@ class Most6502Base {
 
         if (this.t === 0) {
 
+            if (this.ip == 0x8ec3) {
+                this.qqqq++;
+                console.log('qqq', this.ip, this.qqqq);
+            }
             if (this.nmiRequested || this.irqRequested) {
                 this.canSetFlgBreak = false;
                 //console.log('processing irq/nmi');

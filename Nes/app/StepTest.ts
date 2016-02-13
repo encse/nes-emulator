@@ -24,7 +24,8 @@ class StepTest {
         var line = this.readLine();
       
         nesemu.cpu.ip = parseInt(line.split(' ')[0], 16);
-
+        while (nesemu.cpu.ip != 0x8014)
+            nesemu.cpu.stepInstr();
         while(line) {
             const groups = line.match(/([^ ]+).*A:([^ ]+).*X:([^ ]+).*Y:([^ ]+).*P:([^ ]+).*SP:([^ ]+).*/);
             groups.shift();
@@ -36,15 +37,18 @@ class StepTest {
             const rP = regs[4];
             const sp = regs[5];
 
+        
+
             function tsto(ip: number, rA: number, rX: number, rY: number, rP: number, sp: number) {
                 let stRP = rP.toString(2);
                 stRP = Array(Math.max(8 - stRP.length + 1, 0)).join('0') + stRP;
-                return 'ip:' + ip.toString(16) +
-                    ' rA:' + rA.toString(16) +
-                    ' rX:' + rX.toString(16) +
-                    ' rY:' + rY.toString(16) +
-                    ' rP:' + stRP +
-                    ' sp:' + sp.toString(16);
+                return 'ip:' + ip.toString(16) 
+                    + ' rA:' + rA.toString(16)
+                    +' rX:' + rX.toString(16)
+                    +' rY:' + rY.toString(16)
+                    +' rP:' + stRP
+                    +' sp:' + sp.toString(16)
+                    ;
             }
 
             const expected = tsto(ip, rA, rX, rY, rP, sp);
@@ -54,6 +58,7 @@ class StepTest {
                 prevLines.forEach(prevLine => log(prevLine));
                 log(expected);
                 log(actual);
+                log(' ');
                 break;
             }
             prevLines.push(line);

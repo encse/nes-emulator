@@ -42,7 +42,9 @@ class CompoundMemory implements Memory {
     }
 
     public setByte(addr: number, value: number): void {
-
+        //if (addr == 0x3c2) {
+        //    console.log('xxx set', value.toString(16));
+        //}
         for (let i = 0; i < this.setters.length; i++) {
             const setter = this.setters[i];
             if (setter.addrFirst <= addr && addr <= setter.addrLast) {
