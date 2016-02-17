@@ -520,14 +520,11 @@ var Most6502Base = (function () {
         this.dmaRequested = false;
         this.idma = -1;
         this.icycle = 0;
-        this.qqqq = 0;
     }
     Object.defineProperty(Most6502Base.prototype, "rA", {
         get: function () { return this._rA; },
         set: function (v) {
             this._rA = v;
-            if (v == 57)
-                console.log('most v');
         },
         enumerable: true,
         configurable: true
@@ -611,10 +608,6 @@ var Most6502Base = (function () {
             return;
         }
         if (this.t === 0) {
-            if (this.ip == 0x8ec3) {
-                this.qqqq++;
-                console.log('qqq', this.ip, this.qqqq);
-            }
             if (this.nmiRequested || this.irqRequested) {
                 this.canSetFlgBreak = false;
                 //console.log('processing irq/nmi');
@@ -13472,11 +13465,21 @@ var NesEmulator = (function () {
     };
     return NesEmulator;
 })();
+var SpriteRenderingInfo = (function () {
+    function SpriteRenderingInfo() {
+    }
+    return SpriteRenderingInfo;
+})();
+var OamState;
+(function (OamState) {
+    OamState[OamState["FillSecondaryOam"] = 0] = "FillSecondaryOam";
+    OamState[OamState["CheckOverflow"] = 1] = "CheckOverflow";
+    OamState[OamState["Done"] = 2] = "Done";
+})(OamState || (OamState = {}));
 var PPU = (function () {
     function PPU(memory, vmemory, cpu) {
         this.vmemory = vmemory;
         this.cpu = cpu;
-        this.dolog = false;
         /**
          *
             Address range	Size	Description
@@ -13503,6 +13506,7 @@ var PPU = (function () {
            ||| ++-------------- nametable select
            +++----------------- fine Y scroll
         */
+        this.oamAddr = 0; // Current oam address
         this.v = 0; // Current VRAM address (15 bits)
         this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
         this.x = 0; // Fine X scroll (3 bits)
@@ -13512,6 +13516,7 @@ var PPU = (function () {
         this.addrTileBase = 0;
         this.flgVblank = false;
         this.flgSpriteZeroHit = false;
+        this.flgSpriteOverflow = false;
         this.nmi_output = false;
         this.spriteHeight = 8;
         this.imageGrayscale = false;
@@ -13526,6 +13531,7 @@ var PPU = (function () {
         this.sx = PPU.sxMin;
         this.dataAddr = 0;
         this.iFrame = 0;
+        this.ispriteNext = 0;
         this.lastWrittenStuff = 0;
         this.vramReadBuffer = 0;
         this.icycle = 0;
@@ -13557,6 +13563,11 @@ var PPU = (function () {
         vmemory.shadowGetter(0x3f10, 0x3f10, this.paletteGetter.bind(this));
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
+        this.secondaryOam = new Uint8Array(32);
+        this.oam = new Uint8Array(256);
+        this.rgspriteRenderingInfo = [];
+        for (var isprite = 0; isprite < 8; isprite++)
+            this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
     }
     Object.defineProperty(PPU.prototype, "y", {
         /**
@@ -13664,6 +13675,7 @@ var PPU = (function () {
                     this.w = 0;
                     var res = this.flgVblank ? (1 << 7) : 0;
                     res += this.flgSpriteZeroHit ? (1 << 6) : 0;
+                    res += this.flgSpriteOverflow ? (1 << 5) : 0;
                     res |= (this.lastWrittenStuff & 0x63);
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
@@ -13713,6 +13725,12 @@ var PPU = (function () {
                 this.emphasizeRed = !!(value & 0x20);
                 this.emphasizeGreen = !!(value & 0x40);
                 this.emphasizeBlue = !!(value & 0x80);
+                break;
+            case 0x3:
+                this.oamAddr = value;
+                break;
+            case 0x4:
+                this.oam[this.oamAddr++] = value;
                 break;
             case 0x5:
                 if (this.w === 0) {
@@ -13826,6 +13844,18 @@ var PPU = (function () {
         this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
         this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
     };
+    PPU.prototype.fetchSpriteTileLo = function (yTop, nt) {
+        if (!this.showBg && !this.showSprites)
+            return 0;
+        var y = this.sy - yTop; //todo;
+        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + y);
+    };
+    PPU.prototype.fetchSpriteTileHi = function (yTop, nt) {
+        if (!this.showBg && !this.showSprites)
+            return 0;
+        var y = this.sy - yTop; //todo;
+        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + 8 + y);
+    };
     PPU.prototype.fetchBgTileLo = function () {
         if (!this.showBg && !this.showSprites)
             return;
@@ -13906,6 +13936,116 @@ var PPU = (function () {
         //    this.iFrameX = this.iFrame;
         //}
     };
+    PPU.prototype.stepOam = function () {
+        //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
+        if (this.sy === 261 && this.sx === 1) {
+            this.flgSpriteOverflow = false;
+        }
+        else if (this.sy >= 0 && this.sy <= 239) {
+            if (this.sx >= 1 && this.sx <= 64) {
+                // Cycles 1- 64: Secondary OAM (32 - byte buffer for current sprites on scanline) is
+                // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
+                // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
+                // is active that makes the read always return $FF.
+                this.secondaryOam[this.sx] = 0xff;
+                if (this.sx === 64) {
+                    this.m = 0;
+                    this.n = 0;
+                    this.addrSecondaryOam = 0;
+                    this.oamState = OamState.FillSecondaryOam;
+                }
+            }
+            else if (this.sx >= 65 && this.sx <= 256) {
+                // Cycles 65- 256: Sprite evaluation
+                //  On odd cycles, data is read from (primary) OAM
+                //  On even cycles, data is written to secondary OAM (unless writes are inhibited, in which case it will read the value in secondary OAM instead)
+                //  1. Starting at n = 0, read a sprite's Y-coordinate (OAM[n][0], copying it to the next open slot in secondary OAM
+                //        (unless 8 sprites have been found, in which case the write is ignored).
+                //     1a.If Y- coordinate is in range, copy remaining bytes of sprite data (OAM[n][1] thru OAM[n][3]) into secondary OAM.
+                if (this.sx & 1) {
+                    this.oamB = this.oam[(this.n << 2) + this.m];
+                }
+                else {
+                    switch (this.oamState) {
+                        case OamState.FillSecondaryOam:
+                            if (this.m === 0) {
+                                this.secondaryOam[this.addrSecondaryOam] = this.oamB;
+                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                    this.addrSecondaryOam++;
+                                    this.m++; //start copying
+                                }
+                                else {
+                                    this.n++;
+                                }
+                            }
+                            else {
+                                this.secondaryOam[this.addrSecondaryOam++] = this.oamB;
+                                this.m++;
+                                if (this.m === 4)
+                                    _a = [this.n + 1, 0], this.n = _a[0], this.m = _a[1];
+                            }
+                            if (this.n === 64)
+                                _b = [OamState.Done, 0, 0], this.oamState = _b[0], this.n = _b[1], this.m = _b[2];
+                            else if (this.addrSecondaryOam === 32)
+                                _c = [OamState.CheckOverflow, this.n, 0], this.oamState = _c[0], this.n = _c[1], this.m = _c[2];
+                            break;
+                        case OamState.CheckOverflow:
+                            if (this.m === 0) {
+                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                    this.flgSpriteOverflow = true;
+                                    this.m++;
+                                }
+                                else {
+                                    this.n++;
+                                    this.m++; //this is the sprite overflow bug.
+                                }
+                            }
+                            else {
+                                this.m++;
+                                if (this.m === 4)
+                                    _d = [this.n + 1, 0], this.n = _d[0], this.m = _d[1];
+                            }
+                            if (this.n === 64)
+                                _e = [OamState.Done, 0, 0], this.oamState = _e[0], this.n = _e[1], this.m = _e[2];
+                            break;
+                        case OamState.Done:
+                            break;
+                    }
+                }
+            }
+            else if (this.sx >= 257 && this.sx <= 320) {
+                var isprite = (this.sx - 257) >> 3;
+                var addrOamBase = isprite << 2;
+                var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
+                this.oamAddr = 0;
+                var b0 = this.secondaryOam[addrOamBase + 0];
+                if (b0 < 0xef) {
+                    switch (this.sx & 7) {
+                        case 0:
+                            {
+                                var b1 = this.secondaryOam[addrOamBase + 1];
+                                var b2 = this.secondaryOam[addrOamBase + 2];
+                                var b3 = this.secondaryOam[addrOamBase + 3];
+                                spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1);
+                                spriteRenderingInfo.ipaletteBase = 4 + (b2 & 3);
+                                spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                                spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                                spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+                                spriteRenderingInfo.xCounter = b3;
+                                break;
+                            }
+                        case 6:
+                            {
+                                var b1 = this.secondaryOam[addrOamBase + 1];
+                                this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1);
+                                break;
+                            }
+                    }
+                }
+            }
+        }
+        var _a, _b, _c, _d, _e;
+    };
     PPU.prototype.stepI = function () {
         if (this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
@@ -13921,6 +14061,7 @@ var PPU = (function () {
             //   || |||| +++------ high 3 bits of coarse Y (y / 4)
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
+            var icolorBg;
             if (this.showBg) {
                 var tileCol = 16 - this.x;
                 var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
@@ -13934,28 +14075,31 @@ var PPU = (function () {
                 // 0 in each palette mean the default background color -> ipalette = 0
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
-                var icolor = this.vmemory.getByte(0x3f00 | ipalette);
-                var color = this.colors[icolor];
-                this.data[this.dataAddr] = color;
+                icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
             }
             else {
-                var icolor;
                 if (this.v >= 0x3f00 && this.v <= 0x3fff)
-                    icolor = this.vmemory.getByte(this.v);
+                    icolorBg = this.vmemory.getByte(this.v);
                 else
-                    icolor = this.vmemory.getByte(0x3f00);
-                this.data[this.dataAddr] = this.colors[icolor];
+                    icolorBg = this.vmemory.getByte(0x3f00);
             }
-            //if (this.sx === 90 && this.sy === 93) {
-            //    console.log('dolog start');
-            //    this.dolog = true;
-            //}
-            //if (this.sx === 100 && this.sy === 93) {
-            //    console.log('dolog end');
-            //    this.dolog = false;
-            //}
-            //if (this.sx === 90 && this.sy === 33)
-            //    this.data[this.dataAddr] = 0xff0000ff;
+            var icolorSprite = -1;
+            if (this.showSprites) {
+                for (var isprite = 0; isprite < 8; isprite++) {
+                    var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
+                    spriteRenderingInfo.xCounter--;
+                    if (icolorSprite === -1 && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                        var tileCol = 8 + spriteRenderingInfo.xCounter;
+                        var ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
+                        var ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
+                        if (ipalette0 || ipalette1) {
+                            var ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
+                            icolorSprite = this.vmemory.getByte(0x3f00 | ipalette);
+                        }
+                    }
+                }
+            }
+            this.data[this.dataAddr] = icolorSprite != -1 ? this.colors[icolorSprite] : this.colors[icolorBg];
             this.dataAddr++;
         }
         ////dummy sprite zero hit
@@ -13963,6 +14107,7 @@ var PPU = (function () {
             this.flgSpriteZeroHit = true;
         if (this.sy === 261 && this.sx === 0)
             this.flgSpriteZeroHit = false;
+        this.stepOam();
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {

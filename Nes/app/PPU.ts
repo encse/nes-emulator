@@ -1,5 +1,20 @@
-﻿class PPU {
-    dolog:boolean = false;
+﻿class SpriteRenderingInfo {
+    xCounter: number;
+    tileLo: number;
+    tileHi: number;
+    ipaletteBase:number;
+    flipHoriz:boolean;
+    flipVert: boolean;
+    behindBg: boolean;
+}
+
+enum OamState {
+    FillSecondaryOam,
+    CheckOverflow,
+    Done
+}
+
+class PPU {
 
     /**
      *
@@ -29,16 +44,17 @@
         ||| ++-------------- nametable select
         +++----------------- fine Y scroll
      */
+    oamAddr: number = 0; // Current oam address
     v: number = 0; // Current VRAM address (15 bits)
     t: number = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
     x: number = 0; // Fine X scroll (3 bits)
     w: number = 0; // First or second write toggle (1 bit)
     nt:number; // current nametable byte;
     at:number; // current attribute table byte;
-    p2:number; // current attribute table byte;
-    p3:number; // current attribute table byte;
+    p2:number; // current palette table byte;
+    p3: number; // current palette table byte;
     bgTileLo:number; //low background tile byte
-    bgTileHi:number; //high backgrount tile byte;
+    bgTileHi:number; //high background tile byte;
 
     daddrWrite: number = 0;
     addrSpriteBase: number = 0;
@@ -47,6 +63,7 @@
    
     flgVblank = false;
     flgSpriteZeroHit = false;
+    flgSpriteOverflow = false;
     nmi_output = false;
 
 
@@ -79,7 +96,10 @@
 
     public iFrame = 0;
 
-
+    private secondaryOam: Uint8Array;
+    private oam:Uint8Array;
+    private rgspriteRenderingInfo: SpriteRenderingInfo[];
+    private ispriteNext = 0;
     /**
      * yyy NN YYYYY XXXXX
         ||| || ||||| +++++-- coarse X scroll
@@ -125,6 +145,12 @@
 
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
+
+        this.secondaryOam = new Uint8Array(32);
+        this.oam = new Uint8Array(256);
+        this.rgspriteRenderingInfo = [];
+        for (let isprite = 0; isprite < 8; isprite++)
+            this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
     }
 
     public setCtx(ctx: CanvasRenderingContext2D) {
@@ -203,6 +229,7 @@
 
             let res = this.flgVblank ? (1 << 7) : 0;
             res += this.flgSpriteZeroHit ? (1 << 6) : 0;
+            res += this.flgSpriteOverflow ? (1 << 5) : 0;
             res |= (this.lastWrittenStuff & 0x63);
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.flgVblank = false;
@@ -256,6 +283,12 @@
             this.emphasizeRed = !!(value & 0x20);
             this.emphasizeGreen =  !!(value & 0x40);
             this.emphasizeBlue =   !!(value & 0x80);
+            break;
+        case 0x3:
+            this.oamAddr = value;
+            break;
+        case 0x4:
+            this.oam[this.oamAddr++] = value;
             break;
         case 0x5:
             if (this.w === 0) {
@@ -398,6 +431,20 @@
       
     }
 
+    private fetchSpriteTileLo(yTop, nt) {
+        if (!this.showBg && !this.showSprites)
+            return 0;
+        const y = this.sy - yTop; //todo;
+        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + y);
+    }
+
+    private fetchSpriteTileHi(yTop, nt) {
+        if (!this.showBg && !this.showSprites)
+            return 0;
+        const y = this.sy - yTop; //todo;
+        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + 8 + y);
+    }
+
     private fetchBgTileLo() {
         if (!this.showBg && !this.showSprites)
             return;
@@ -496,6 +543,127 @@
         //}
     }
 
+    oamB: number;
+    m: number;
+    n: number;
+    addrSecondaryOam;
+    oamState:OamState;
+
+    public stepOam() {
+
+        //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
+
+        if (this.sy === 261 && this.sx === 1) {
+            this.flgSpriteOverflow = false;
+        } else if (this.sy >= 0 && this.sy <= 239) {
+            if (this.sx >= 1 && this.sx <= 64) {
+                // Cycles 1- 64: Secondary OAM (32 - byte buffer for current sprites on scanline) is
+                // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
+                // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
+                // is active that makes the read always return $FF.
+                this.secondaryOam[this.sx] = 0xff;
+                if (this.sx === 64) {
+                    this.m = 0;
+                    this.n = 0;
+                    this.addrSecondaryOam = 0;
+                    this.oamState = OamState.FillSecondaryOam;
+                }
+            }
+            else if (this.sx >= 65 && this.sx <= 256) {
+               // Cycles 65- 256: Sprite evaluation
+               //  On odd cycles, data is read from (primary) OAM
+               //  On even cycles, data is written to secondary OAM (unless writes are inhibited, in which case it will read the value in secondary OAM instead)
+               //  1. Starting at n = 0, read a sprite's Y-coordinate (OAM[n][0], copying it to the next open slot in secondary OAM
+               //        (unless 8 sprites have been found, in which case the write is ignored).
+               //     1a.If Y- coordinate is in range, copy remaining bytes of sprite data (OAM[n][1] thru OAM[n][3]) into secondary OAM.
+
+                if (this.sx & 1) {
+                    this.oamB = this.oam[(this.n << 2) + this.m];
+                } else {
+                    switch (this.oamState) {
+                        case OamState.FillSecondaryOam:
+                            if (this.m === 0) {
+                                this.secondaryOam[this.addrSecondaryOam] = this.oamB;
+                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                    this.addrSecondaryOam++;
+                                    this.m++; //start copying
+                                } else {
+                                    this.n++;
+                                }
+                            } else { //copying
+                                this.secondaryOam[this.addrSecondaryOam++] = this.oamB;
+                                this.m++;
+                                if (this.m === 4)
+                                    [this.n, this.m] = [this.n + 1, 0];
+                            }
+
+                            if (this.n === 64)
+                                [this.oamState, this.n, this.m] = [OamState.Done, 0, 0];
+                            else if (this.addrSecondaryOam === 32) //found 8 sprites
+                                [this.oamState, this.n, this.m] = [OamState.CheckOverflow, this.n, 0];
+                            break;
+
+                        case OamState.CheckOverflow:
+                            if (this.m === 0) {
+                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                    this.flgSpriteOverflow = true;
+                                    this.m++;
+                                } else {
+                                    this.n++;
+                                    this.m++; //this is the sprite overflow bug.
+                                }
+                            } else { //dummy reads
+                                this.m++;
+                                if (this.m === 4) 
+                                    [this.n, this.m] = [this.n + 1, 0]; 
+                            }
+
+                            if (this.n === 64)
+                                [this.oamState, this.n, this.m] = [OamState.Done, 0, 0];
+                            break;
+
+                        case OamState.Done:
+                            break;
+                        }
+                }
+            }
+            else if (this.sx >= 257 && this.sx <= 320) {
+                let isprite = (this.sx - 257) >> 3;
+                var addrOamBase = isprite << 2;
+                let spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
+                this.oamAddr = 0;
+                let b0 = this.secondaryOam[addrOamBase + 0];
+                if (b0 < 0xef) {
+                    switch (this.sx & 7) {
+                        case 0:
+                        {
+                            let b1 = this.secondaryOam[addrOamBase + 1];
+                            let b2 = this.secondaryOam[addrOamBase + 2];
+                            let b3 = this.secondaryOam[addrOamBase + 3];
+
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1);
+
+                            spriteRenderingInfo.ipaletteBase = 4 + (b2 & 3);
+                            spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                            spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                            spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+
+                            spriteRenderingInfo.xCounter = b3;
+
+                            break;
+                        }
+                        case 6:
+                        {
+                            let b1 = this.secondaryOam[addrOamBase + 1];
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+        }
+    }
 
     public stepI() {
 
@@ -514,8 +682,9 @@
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
 
+            var icolorBg : number;
             if (this.showBg) {
-                var tileCol = 16 - this.x;
+                let tileCol = 16 - this.x;
 
                 let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
                 let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
@@ -533,28 +702,35 @@
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
 
-                let icolor = this.vmemory.getByte(0x3f00 | ipalette);
-                let color = this.colors[icolor];
-                this.data[this.dataAddr] = color;
+                icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
+                
             } else {
 
-                let icolor: number;
                 if (this.v >= 0x3f00 && this.v <= 0x3fff)
-                    icolor = this.vmemory.getByte(this.v);
+                    icolorBg = this.vmemory.getByte(this.v);
                 else
-                    icolor = this.vmemory.getByte(0x3f00);
-                this.data[this.dataAddr] = this.colors[icolor];
+                    icolorBg = this.vmemory.getByte(0x3f00);
             }
-            //if (this.sx === 90 && this.sy === 93) {
-            //    console.log('dolog start');
-            //    this.dolog = true;
-            //}
-            //if (this.sx === 100 && this.sy === 93) {
-            //    console.log('dolog end');
-            //    this.dolog = false;
-            //}
-            //if (this.sx === 90 && this.sy === 33)
-            //    this.data[this.dataAddr] = 0xff0000ff;
+
+            let icolorSprite = -1;
+            if (this.showSprites) {
+                for (let isprite = 0; isprite < 8; isprite++) {
+                    var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
+                    spriteRenderingInfo.xCounter--;
+
+                    if (icolorSprite === -1 && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                        let tileCol = 8 + spriteRenderingInfo.xCounter;
+                        let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
+                        let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
+                        if (ipalette0 || ipalette1) {
+                            let ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
+                            icolorSprite = this.vmemory.getByte(0x3f00 | ipalette);
+                        }
+                    }
+                }
+            }
+            this.data[this.dataAddr] = icolorSprite != -1 ? this.colors[icolorSprite] : this.colors[icolorBg];
+
             this.dataAddr++;
         }
 
@@ -564,6 +740,8 @@
         if (this.sy === 261 && this.sx === 0)
             this.flgSpriteZeroHit = false;
 
+      
+        this.stepOam();
 
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
