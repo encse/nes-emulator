@@ -13715,6 +13715,8 @@ var PPU = (function () {
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
                 this.nmi_output = !!(value & 0x80);
+                if (this.spriteHeight === 16)
+                    throw 'sprite height 16 is not supported';
                 break;
             case 0x1:
                 this.imageGrayscale = !!(value & 0x01);
@@ -13844,16 +13846,12 @@ var PPU = (function () {
         this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
         this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
     };
-    PPU.prototype.fetchSpriteTileLo = function (yTop, nt) {
-        if (!this.showBg && !this.showSprites)
-            return 0;
-        var y = this.sy - yTop; //todo;
+    PPU.prototype.fetchSpriteTileLo = function (yTop, nt, flipVert) {
+        var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
         return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + y);
     };
-    PPU.prototype.fetchSpriteTileHi = function (yTop, nt) {
-        if (!this.showBg && !this.showSprites)
-            return 0;
-        var y = this.sy - yTop; //todo;
+    PPU.prototype.fetchSpriteTileHi = function (yTop, nt, flipVert) {
+        var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
         return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + 8 + y);
     };
     PPU.prototype.fetchBgTileLo = function () {
@@ -13970,7 +13968,7 @@ var PPU = (function () {
                         case OamState.FillSecondaryOam:
                             if (this.m === 0) {
                                 this.secondaryOam[this.addrSecondaryOam] = this.oamB;
-                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
                                     this.addrSecondaryOam++;
                                     this.m++; //start copying
                                 }
@@ -14021,23 +14019,26 @@ var PPU = (function () {
                 var b0 = this.secondaryOam[addrOamBase + 0];
                 if (b0 < 0xef) {
                     switch (this.sx & 7) {
-                        case 0:
+                        case 1:
                             {
-                                var b1 = this.secondaryOam[addrOamBase + 1];
                                 var b2 = this.secondaryOam[addrOamBase + 2];
                                 var b3 = this.secondaryOam[addrOamBase + 3];
-                                spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1);
-                                spriteRenderingInfo.ipaletteBase = 4 + (b2 & 3);
+                                spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
                                 spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
                                 spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
                                 spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
                                 spriteRenderingInfo.xCounter = b3;
+                            }
+                        case 0:
+                            {
+                                var b1 = this.secondaryOam[addrOamBase + 1];
+                                spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
                                 break;
                             }
                         case 6:
                             {
                                 var b1 = this.secondaryOam[addrOamBase + 1];
-                                this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1);
+                                this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
                                 break;
                             }
                     }
@@ -14062,6 +14063,7 @@ var PPU = (function () {
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
             var icolorBg;
+            var bgTransparent = true;
             if (this.showBg) {
                 var tileCol = 16 - this.x;
                 var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
@@ -14069,10 +14071,11 @@ var PPU = (function () {
                 var ipalette2 = (this.p2 >> (tileCol + 2)) & 1;
                 var ipalette3 = (this.p3 >> (tileCol + 2)) & 1;
                 var ipalette = (ipalette3 << 3) + (ipalette2 << 2) + (ipalette1 << 1) + ipalette0;
+                bgTransparent = !ipalette0 && !ipalette1;
                 /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering
                     (since the pattern values that would otherwise select those cells select the backdrop color instead).
                     They can still be shown using the background palette hack, explained below.*/
-                // 0 in each palette mean the default background color -> ipalette = 0
+                // 0 in each palette means the default background color -> ipalette = 0
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
                 icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
@@ -14084,22 +14087,31 @@ var PPU = (function () {
                     icolorBg = this.vmemory.getByte(0x3f00);
             }
             var icolorSprite = -1;
+            var spriteTransparent = true;
+            var spriteBehindBg = true;
             if (this.showSprites) {
                 for (var isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
-                    spriteRenderingInfo.xCounter--;
-                    if (icolorSprite === -1 && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
-                        var tileCol = 8 + spriteRenderingInfo.xCounter;
+                    if (spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                        var tileCol = spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
                         var ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         var ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
+                            spriteTransparent = false;
+                            spriteBehindBg = spriteRenderingInfo.behindBg;
                             var ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
-                            icolorSprite = this.vmemory.getByte(0x3f00 | ipalette);
+                            if ((ipalette & 3) === 0)
+                                ipalette = 0;
+                            icolorSprite = this.vmemory.getByte(0x3f10 | ipalette);
                         }
                     }
+                    spriteRenderingInfo.xCounter--;
                 }
             }
-            this.data[this.dataAddr] = icolorSprite != -1 ? this.colors[icolorSprite] : this.colors[icolorBg];
+            if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
+                this.data[this.dataAddr] = this.colors[icolorSprite];
+            else
+                this.data[this.dataAddr] = this.colors[icolorBg];
             this.dataAddr++;
         }
         ////dummy sprite zero hit

@@ -273,6 +273,9 @@ class PPU {
             this.addrTileBase = value & 0x10 ? 0x1000 : 0;
             this.spriteHeight = value & 0x20 ? 16 : 8;
             this.nmi_output = !!(value & 0x80);
+
+            if (this.spriteHeight === 16)
+                throw 'sprite height 16 is not supported';
             break;
         case 0x1:
             this.imageGrayscale = !!(value & 0x01);
@@ -431,17 +434,13 @@ class PPU {
       
     }
 
-    private fetchSpriteTileLo(yTop, nt) {
-        if (!this.showBg && !this.showSprites)
-            return 0;
-        const y = this.sy - yTop; //todo;
+    private fetchSpriteTileLo(yTop, nt, flipVert) {
+        const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop ;
         return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + y);
     }
 
-    private fetchSpriteTileHi(yTop, nt) {
-        if (!this.showBg && !this.showSprites)
-            return 0;
-        const y = this.sy - yTop; //todo;
+    private fetchSpriteTileHi(yTop, nt, flipVert) {
+        const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
         return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + 8 + y);
     }
 
@@ -584,7 +583,7 @@ class PPU {
                         case OamState.FillSecondaryOam:
                             if (this.m === 0) {
                                 this.secondaryOam[this.addrSecondaryOam] = this.oamB;
-                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
+                                if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
                                     this.addrSecondaryOam++;
                                     this.m++; //start copying
                                 } else {
@@ -633,29 +632,29 @@ class PPU {
                 let spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
                 this.oamAddr = 0;
                 let b0 = this.secondaryOam[addrOamBase + 0];
+
                 if (b0 < 0xef) {
                     switch (this.sx & 7) {
-                        case 0:
+                        case 1:
                         {
-                            let b1 = this.secondaryOam[addrOamBase + 1];
                             let b2 = this.secondaryOam[addrOamBase + 2];
                             let b3 = this.secondaryOam[addrOamBase + 3];
-
-                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1);
-
-                            spriteRenderingInfo.ipaletteBase = 4 + (b2 & 3);
+                            spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
                             spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
                             spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
                             spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-
                             spriteRenderingInfo.xCounter = b3;
-
+                        }
+                        case 0:
+                        {
+                            let b1 = this.secondaryOam[addrOamBase + 1];
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
                             break;
                         }
                         case 6:
                         {
                             let b1 = this.secondaryOam[addrOamBase + 1];
-                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1);
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
                             break;
                         }
                     }
@@ -682,7 +681,8 @@ class PPU {
             //   || ++++---------- attribute offset (960 bytes)
             //   ++--------------- nametable select
 
-            var icolorBg : number;
+            var icolorBg: number;
+            var bgTransparent = true;
             if (this.showBg) {
                 let tileCol = 16 - this.x;
 
@@ -692,13 +692,14 @@ class PPU {
                 let ipalette3 = (this.p3 >> (tileCol + 2)) & 1;
              
                 let ipalette = (ipalette3 << 3) + (ipalette2 << 2) + (ipalette1 << 1) + ipalette0;
-
+                bgTransparent = !ipalette0 && !ipalette1;
+                 
                 /* Addresses $3F04/$3F08/$3F0C can contain unique data, though these values are not used by the PPU when normally rendering 
                     (since the pattern values that would otherwise select those cells select the backdrop color instead).
                     They can still be shown using the background palette hack, explained below.*/
 
 
-                // 0 in each palette mean the default background color -> ipalette = 0
+                // 0 in each palette means the default background color -> ipalette = 0
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
 
@@ -713,24 +714,35 @@ class PPU {
             }
 
             let icolorSprite = -1;
+            var spriteTransparent = true;
+            var spriteBehindBg = true;
             if (this.showSprites) {
                 for (let isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
-                    spriteRenderingInfo.xCounter--;
 
-                    if (icolorSprite === -1 && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
-                        let tileCol = 8 + spriteRenderingInfo.xCounter;
+                    if (spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                        let tileCol =  spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
                         let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
+                            spriteTransparent = false;
+                            spriteBehindBg = spriteRenderingInfo.behindBg;
+
                             let ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
-                            icolorSprite = this.vmemory.getByte(0x3f00 | ipalette);
+                            if ((ipalette & 3) === 0)
+                                ipalette = 0;
+                            icolorSprite = this.vmemory.getByte(0x3f10 | ipalette);
                         }
                     }
+
+                    spriteRenderingInfo.xCounter--;
                 }
             }
-            this.data[this.dataAddr] = icolorSprite != -1 ? this.colors[icolorSprite] : this.colors[icolorBg];
 
+            if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
+                this.data[this.dataAddr] = this.colors[icolorSprite];
+            else
+                this.data[this.dataAddr] = this.colors[icolorBg];
             this.dataAddr++;
         }
 
