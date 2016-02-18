@@ -258,6 +258,126 @@ var CompoundMemory = (function () {
     };
     return CompoundMemory;
 })();
+var ControllerKeys;
+(function (ControllerKeys) {
+    ControllerKeys[ControllerKeys["A_Key"] = 0] = "A_Key";
+    ControllerKeys[ControllerKeys["B_Key"] = 1] = "B_Key";
+    ControllerKeys[ControllerKeys["Select_Key"] = 2] = "Select_Key";
+    ControllerKeys[ControllerKeys["Start_Key"] = 3] = "Start_Key";
+    ControllerKeys[ControllerKeys["Up"] = 4] = "Up";
+    ControllerKeys[ControllerKeys["Down"] = 5] = "Down";
+    ControllerKeys[ControllerKeys["Left"] = 6] = "Left";
+    ControllerKeys[ControllerKeys["Right"] = 7] = "Right";
+})(ControllerKeys || (ControllerKeys = {}));
+;
+var Controller = (function () {
+    function Controller(canvas) {
+        this.s = 0;
+        this.i = 0;
+        this.keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
+        canvas.tabIndex = 1;
+        canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
+        canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
+    }
+    Controller.prototype.onKeyDown = function (event) {
+        switch (event.keyCode) {
+            case 40:
+                this.keyStateA[ControllerKeys.Down] = 1;
+                break;
+            case 38:
+                this.keyStateA[ControllerKeys.Up] = 1;
+                break;
+            case 37:
+                this.keyStateA[ControllerKeys.Left] = 1;
+                break;
+            case 39:
+                this.keyStateA[ControllerKeys.Right] = 1;
+                break;
+            case 13:
+                this.keyStateA[ControllerKeys.Start_Key] = 1;
+                break;
+            case 32:
+                this.keyStateA[ControllerKeys.Select_Key] = 1;
+                break;
+            case 65:
+                this.keyStateA[ControllerKeys.A_Key] = 1;
+                break;
+            case 66:
+                this.keyStateA[ControllerKeys.B_Key] = 1;
+                break;
+        }
+    };
+    Controller.prototype.onKeyUp = function (event) {
+        switch (event.keyCode) {
+            case 40:
+                this.keyStateA[ControllerKeys.Down] = 0;
+                break;
+            case 38:
+                this.keyStateA[ControllerKeys.Up] = 0;
+                break;
+            case 37:
+                this.keyStateA[ControllerKeys.Left] = 0;
+                break;
+            case 39:
+                this.keyStateA[ControllerKeys.Right] = 0;
+                break;
+            case 13:
+                this.keyStateA[ControllerKeys.Start_Key] = 0;
+                break;
+            case 32:
+                this.keyStateA[ControllerKeys.Select_Key] = 0;
+                break;
+            case 65:
+                this.keyStateA[ControllerKeys.A_Key] = 0;
+                break;
+            case 66:
+                this.keyStateA[ControllerKeys.B_Key] = 0;
+                break;
+        }
+    };
+    Object.defineProperty(Controller.prototype, "reg4016", {
+        /**
+         * Front-loading NES $4016 and $4017, and Top-loading NES $4017
+            7  bit  0
+            ---- ----
+            OOOx xxxD
+            |||| ||||
+            |||| |||+- Serial controller data
+            |||+-+++-- Always 0
+            +++------- Open bus
+        */
+        get: function () {
+            if (this.s)
+                return this.keyStateA[0];
+            else {
+                var r = this.keyStateA[this.i % 8];
+                this.i++;
+                return r;
+            }
+        },
+        set: function (value) {
+            this.s = value & 1;
+            if (!this.s)
+                this.i = 0;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Controller.prototype, "reg4017", {
+        get: function () {
+            if (this.s)
+                return 0x40 | this.keyStateB[0];
+            else if (this.i < 8)
+                return 0x40 | this.keyStateB[this.i++];
+            else
+                return 0x40 | 1;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    return Controller;
+})();
 ///<reference path="Memory.ts"/>
 var RAM = (function () {
     function RAM(size) {
@@ -13415,7 +13535,8 @@ var NesImage = (function () {
 ///<reference path="NesImage.ts"/>
 ///<reference path="Mos6502.ts"/>
 var NesEmulator = (function () {
-    function NesEmulator(nesImage, ctx) {
+    function NesEmulator(nesImage, canvas) {
+        var _this = this;
         this.icycle = 0;
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
@@ -13446,15 +13567,17 @@ var NesEmulator = (function () {
         }
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
+        this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
+        this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
+        this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
         this.cpu = new Mos6502(this.memory);
         this.apu = new APU(this.memory, this.cpu);
         // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
+        this.ppu.setCtx(canvas.getContext('2d'));
         this.cpu.reset();
+        this.controller = new Controller(canvas);
     }
-    NesEmulator.prototype.setCtx = function (ctx) {
-        this.ppu.setCtx(ctx);
-    };
     NesEmulator.prototype.step = function () {
         if (this.icycle % 4 === 0)
             this.ppu.step();
@@ -13535,7 +13658,7 @@ var PPU = (function () {
         this.lastWrittenStuff = 0;
         this.vramReadBuffer = 0;
         this.icycle = 0;
-        this.colors = [
+        this.colors = new Uint32Array([
             0xff545454, 0xff741e00, 0xff901008, 0xff880030,
             0xff640044, 0xff30005c, 0xff000454, 0xff00183c,
             0xff002a20, 0xff003a08, 0xff004000, 0xff003c00,
@@ -13552,7 +13675,7 @@ var PPU = (function () {
             0xffecaeec, 0xffd4aeec, 0xffb0b4ec, 0xff90c4e4,
             0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298,
             0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
-        ];
+        ]);
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
         memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
@@ -13924,15 +14047,15 @@ var PPU = (function () {
     //iFrameX = 0;
     // zizi = 0;
     PPU.prototype.step = function () {
-        //if ((this.iFrame & 1) && !this.sx && !this.sy)
-        //    this.stepI();
-        this.stepI();
-        //this.zizi++;
-        //if (this.iFrameX != this.iFrame) {
-        //    console.log('zizi', this.zizi);
-        //    this.zizi = 0;
-        //    this.iFrameX = this.iFrame;
-        //}
+        this.stepDraw();
+        ////dummy sprite zero hit
+        if (this.sy === 30 && this.sx === 1)
+            this.flgSpriteZeroHit = true;
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
+        this.stepOam();
+        this.stepBg();
+        this.stepS();
     };
     PPU.prototype.stepOam = function () {
         //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
@@ -14017,7 +14140,10 @@ var PPU = (function () {
                 var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
                 this.oamAddr = 0;
                 var b0 = this.secondaryOam[addrOamBase + 0];
-                if (b0 < 0xef) {
+                if (b0 >= 0xef) {
+                    spriteRenderingInfo.xCounter = 256;
+                }
+                else {
                     switch (this.sx & 7) {
                         case 1:
                             {
@@ -14047,8 +14173,8 @@ var PPU = (function () {
         }
         var _a, _b, _c, _d, _e;
     };
-    PPU.prototype.stepI = function () {
-        if (this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
+    PPU.prototype.stepDraw = function () {
+        if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
             //
@@ -14065,7 +14191,7 @@ var PPU = (function () {
             var icolorBg;
             var bgTransparent = true;
             if (this.showBg) {
-                var tileCol = 16 - this.x;
+                var tileCol = 17 - this.x;
                 var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
                 var ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
                 var ipalette2 = (this.p2 >> (tileCol + 2)) & 1;
@@ -14114,12 +14240,8 @@ var PPU = (function () {
                 this.data[this.dataAddr] = this.colors[icolorBg];
             this.dataAddr++;
         }
-        ////dummy sprite zero hit
-        if (this.sy === 30 && this.sx === 1)
-            this.flgSpriteZeroHit = true;
-        if (this.sy === 261 && this.sx === 0)
-            this.flgSpriteZeroHit = false;
-        this.stepOam();
+    };
+    PPU.prototype.stepBg = function () {
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
@@ -14182,6 +14304,8 @@ var PPU = (function () {
                 this.cpu.nmiLine = 1;
             }
         }
+    };
+    PPU.prototype.stepS = function () {
         if ((this.showBg || this.showSprites) && this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
             this.sx = 0;
             this.sy = 0;

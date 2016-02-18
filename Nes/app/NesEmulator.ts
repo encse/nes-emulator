@@ -8,8 +8,9 @@ class NesEmulator {
     public vmemory: CompoundMemory;
     public ppu: PPU;
     public apu: APU;
+    public controller: Controller;
 
-    public constructor(nesImage: NesImage, ctx:CanvasRenderingContext2D) {
+    public constructor(nesImage: NesImage, canvas:HTMLCanvasElement) {
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType)
@@ -50,17 +51,22 @@ class NesEmulator {
 
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
+
+        this.memory.shadowGetter(0x4016, 0x4016, () => { return this.controller.reg4016; });
+        this.memory.shadowSetter(0x4016, 0x4016, (_, v) => { this.controller.reg4016 = v; });
+        this.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4016; });
+
         this.cpu = new Mos6502(this.memory);
         this.apu = new APU(this.memory, this.cpu);
        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-
+        this.ppu.setCtx(canvas.getContext('2d'));
         this.cpu.reset();
+        this.controller = new Controller(canvas);
 
+       
     }
-    public setCtx(ctx:CanvasRenderingContext2D) {
-        this.ppu.setCtx(ctx);
-    }
+
     icycle = 0;
     public step() {
      

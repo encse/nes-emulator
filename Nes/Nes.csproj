@@ -281,6 +281,7 @@
     <TypeScriptCompile Include="app\APU.ts" />
     <TypeScriptCompile Include="app\Mos6502Base.ts" />
     <TypeScriptCompile Include="app\Mos6502.ts" />
+    <TypeScriptCompile Include="app\Controller.ts" />
     <TypeScriptCompile Include="app\PPU.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />

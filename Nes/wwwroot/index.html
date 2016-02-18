@@ -16,7 +16,7 @@
 <button id="btnTest">Test</button>
 <div id="log"></div>
 
-<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
 <script src="js/app.js"></script>
 <script language="javascript">
 
@@ -39,7 +39,7 @@
 		$('#log').append(st.replace(/\n/g, '<br/>'));
 	}
 
-	function loadNesEmulator(url, done) {
+	function loadNesEmulator(url, canvas, done) {
 		var xhr = new XMLHttpRequest();
 		xhr.open('GET', url, true);
 		xhr.responseType = 'arraybuffer';
@@ -50,7 +50,7 @@
 			}
 			if (this.status === 200) {
 				var blob = new Uint8Array(this.response);
-				done(new NesEmulator(new NesImage(blob)));
+				done(new NesEmulator(new NesImage(blob), canvas));
 			}
 		}
 		xhr.send();
@@ -79,60 +79,58 @@
 		return false;
 	}
 
+
+	var $spanFps;
+	var nesEmulator;
+	var iframeStart;
+	var timeStart;
+
+	function step() {
+			
+		var frameStart = nesEmulator.ppu.iFrame;
+		while (frameStart === nesEmulator.ppu.iFrame)
+			nesEmulator.step();
+
+		//if (testFinished(nesEmulator)) {
+		//	nesEmulator.ppu.getNameTable(0);
+		//	log((Date.now() - timeStart) / 1000, 'sec', window.fps, 'fps');
+		//	done();
+		//	return;
+		//}
+		//var dt = Date.now() - timeStart;
+		//if (dt > 1000) {
+		//	window.fps = (nesEmulator.ppu.iFrame - iframeStart) / dt * 1000;
+		//	$spanFps.text(Math.round(window.fps * 100) / 100);
+
+		//	iframeStart = nesEmulator.ppu.iFrame;
+		//	timeStart = Date.now();
+		//}
+		requestAnimationFrame(step);
+
+	}
+
 	function runTest(url, done) {
 		log('<h2>', url, '<span id="fps"></span> fps</h2>');
 
 		done = done || function () { }
-		var $spanFps = $('#fps');
+		$spanFps = $('#fps');
+		var canvas = document.createElement('canvas');
+		canvas.width = 256;
+		canvas.height = 240;
+		$(canvas).css('zoom', 2);
+		$('#log').append(canvas);
 
-		loadNesEmulator(url, function (nesEmulator) {
-
-			var canvas = document.createElement('canvas');
-			canvas.width = 256;
-			canvas.height = 240;
-			$(canvas).css('zoom', 3);
-			$('#log').append(canvas);
-
-			nesEmulator.setCtx(canvas.getContext('2d'));
-			var timeStart = Date.now();
-			var iframeStart = 0;
-			var step = function() {
-				//try {
-					var frameStart = nesEmulator.ppu.iFrame;
-					while(frameStart === nesEmulator.ppu.iFrame) 
-						nesEmulator.step();
-
-					if (testFinished(nesEmulator)) {
-						nesEmulator.ppu.getNameTable(0);
-						log( (Date.now() - timeStart) /1000,'sec', window.fps,'fps');
-						done();
-						return;
-					}
-					var dt = Date.now() - timeStart;
-					if(dt > 1000)
-					{
-						window.fps =  (nesEmulator.ppu.iFrame - iframeStart) / dt * 1000;
-						$spanFps.text(Math.round(window.fps * 100) / 100);
-
-						iframeStart = nesEmulator.ppu.iFrame;
-						timeStart = Date.now();
-					}
-					requestAnimationFrame(step);
-
-				// } catch (e) {
-				// 	log_error(e);
-				// }
-			//	done();
-				
-			}
-
+		loadNesEmulator(url, canvas, function (nesEmulator) {
+			window.nesEmulator = nesEmulator;
+			timeStart = Date.now();
+			iframeStart = 0;
 			requestAnimationFrame(step);
 		});
 	}
 
 	function runStepTest(url) {
 		log('<h2>', url, '</h2>');
-		loadNesEmulator(url, function (nesEmulator) {
+		loadNesEmulator(url, null, function (nesEmulator) {
 			$.get(url.replace('.nes', '.log')).then(function(logLines) {
 				new StepTest().run(nesEmulator, logLines, function (st) { log(st) });
 			});
@@ -160,8 +158,8 @@
 		var tests_blargg = [
 			//'test/dk.nes',
 			'test/smb.nes',
-			//'test/color_test/color_test.nes',
-			//'test/palette/palette.nes',
+			'test/color_test/color_test.nes',
+			'test/palette/palette.nes',
 
 			//'test/ppu/vram_access.nes',
 			//'test/ppu/vbl_clear_time.nes',

@@ -528,18 +528,18 @@ class PPU {
     //iFrameX = 0;
     // zizi = 0;
     public step() {
-        //if ((this.iFrame & 1) && !this.sx && !this.sy)
-        //    this.stepI();
+        this.stepDraw();
 
-        this.stepI();
+        ////dummy sprite zero hit
+        if (this.sy === 30 && this.sx === 1)
+            this.flgSpriteZeroHit = true;
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
 
-        //this.zizi++;
+        this.stepOam();
 
-        //if (this.iFrameX != this.iFrame) {
-        //    console.log('zizi', this.zizi);
-        //    this.zizi = 0;
-        //    this.iFrameX = this.iFrame;
-        //}
+        this.stepBg();
+        this.stepS();
     }
 
     oamB: number;
@@ -633,7 +633,10 @@ class PPU {
                 this.oamAddr = 0;
                 let b0 = this.secondaryOam[addrOamBase + 0];
 
-                if (b0 < 0xef) {
+                if (b0 >= 0xef) {
+                    spriteRenderingInfo.xCounter = 256;
+                }
+                else {
                     switch (this.sx & 7) {
                         case 1:
                         {
@@ -664,9 +667,8 @@ class PPU {
         }
     }
 
-    public stepI() {
-
-        if (this.sx >= 0 && this.sy >= 0 && this.sx < 256 && this.sy < 240) {
+    public stepDraw() {
+        if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
             // The high bits of v are used for fine Y during rendering, and addressing nametable data 
             // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
             //
@@ -684,13 +686,13 @@ class PPU {
             var icolorBg: number;
             var bgTransparent = true;
             if (this.showBg) {
-                let tileCol = 16 - this.x;
+                let tileCol = 17 - this.x;
 
                 let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
                 let ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
                 let ipalette2 = (this.p2 >> (tileCol + 2)) & 1;
                 let ipalette3 = (this.p3 >> (tileCol + 2)) & 1;
-             
+
                 let ipalette = (ipalette3 << 3) + (ipalette2 << 2) + (ipalette1 << 1) + ipalette0;
                 bgTransparent = !ipalette0 && !ipalette1;
                  
@@ -698,13 +700,12 @@ class PPU {
                     (since the pattern values that would otherwise select those cells select the backdrop color instead).
                     They can still be shown using the background palette hack, explained below.*/
 
-
                 // 0 in each palette means the default background color -> ipalette = 0
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
 
                 icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
-                
+
             } else {
 
                 if (this.v >= 0x3f00 && this.v <= 0x3fff)
@@ -721,7 +722,7 @@ class PPU {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
 
                     if (spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
-                        let tileCol =  spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
+                        let tileCol = spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
                         let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
@@ -745,20 +746,13 @@ class PPU {
                 this.data[this.dataAddr] = this.colors[icolorBg];
             this.dataAddr++;
         }
+    }
 
-        ////dummy sprite zero hit
-        if (this.sy === 30 && this.sx === 1)
-            this.flgSpriteZeroHit = true;
-        if (this.sy === 261 && this.sx === 0)
-            this.flgSpriteZeroHit = false;
-
-      
-        this.stepOam();
-
+    public stepBg() {
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
 
-             if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
+            if ((this.sx >= 1 && this.sx <= 256) || (this.sx >= 321 && this.sx <= 336)) {
                 this.bgTileLo = (this.bgTileLo << 1) & 0xffffff;
                 this.bgTileHi = (this.bgTileHi << 1) & 0xffffff;
                 this.p2 = (this.p2 << 1) & 0xffffff;
@@ -786,7 +780,7 @@ class PPU {
                         this.incHoriV();
                 }
 
-               
+
 
             } else if (this.sx === 257) {
                 this.resetHoriV();
@@ -796,7 +790,7 @@ class PPU {
                 if ((this.sx & 2) === 0) {
                     this.fetchUnusedNt();
                 }
-            } 
+            }
         } else if (this.sy === 240) {
             if (this.sx === 0) {
                 (<any>this.imageData.data).set(this.buf8);
@@ -808,15 +802,17 @@ class PPU {
             if (this.sx === 1) {
                 this.flgVblank = true;
                 if (this.nmi_output) {
-                  //  this.nmi_output = false;
-                //    console.log('ppu nmi');
+                    //  this.nmi_output = false;
+                    //    console.log('ppu nmi');
                     this.cpu.nmiLine = 0;
                 }
             } else if (this.sx === 250) {
                 this.cpu.nmiLine = 1;
             }
         }
+    }
 
+    public stepS() {
         if ((this.showBg || this.showSprites) && this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
             this.sx = 0;
             this.sy = 0;
@@ -830,11 +826,10 @@ class PPU {
                 this.sy = 0;
             }
         }
-
-
     }
+   
 
-    private colors = [
+    private colors = new Uint32Array([
         0xff545454, 0xff741e00, 0xff901008, 0xff880030,
         0xff640044, 0xff30005c, 0xff000454, 0xff00183c, 
         0xff002a20, 0xff003a08, 0xff004000, 0xff003c00, 
@@ -851,7 +846,7 @@ class PPU {
         0xffecaeec, 0xffd4aeec, 0xffb0b4ec, 0xff90c4e4, 
         0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298, 
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
-    ];
+    ]);
 
 
 
