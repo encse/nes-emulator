@@ -97,14 +97,14 @@
 		//	done();
 		//	return;
 		//}
-		//var dt = Date.now() - timeStart;
-		//if (dt > 1000) {
-		//	window.fps = (nesEmulator.ppu.iFrame - iframeStart) / dt * 1000;
-		//	$spanFps.text(Math.round(window.fps * 100) / 100);
+		var dt = Date.now() - timeStart;
+		if (dt > 1000) {
+			window.fps = (nesEmulator.ppu.iFrame - iframeStart) / dt * 1000;
+			$spanFps.text(Math.round(window.fps * 100) / 100);
 
-		//	iframeStart = nesEmulator.ppu.iFrame;
-		//	timeStart = Date.now();
-		//}
+			iframeStart = nesEmulator.ppu.iFrame;
+			timeStart = Date.now();
+		}
 		requestAnimationFrame(step);
 
 	}

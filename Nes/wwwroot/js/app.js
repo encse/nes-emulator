@@ -13579,12 +13579,13 @@ var NesEmulator = (function () {
         this.controller = new Controller(canvas);
     }
     NesEmulator.prototype.step = function () {
-        if (this.icycle % 4 === 0)
+        this.cpu.step();
+        for(var i=0;i<3;i++)
+        {
             this.ppu.step();
-        if (this.icycle % 12 === 0)
-            this.cpu.step();
-        this.apu.step();
-        this.icycle++;
+            this.apu.step();
+            this.apu.step();
+        }
     };
     return NesEmulator;
 })();
