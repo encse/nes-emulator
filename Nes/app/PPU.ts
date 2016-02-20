@@ -156,6 +156,10 @@ class PPU {
     public setCtx(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
         this.imageData = this.ctx.getImageData(0, 0, 256, 240);
+        //this.imageData = this.ctx.getImageData(0, 0, 300, 300);
+
+        //var dummy =  this.imageData.data;
+    
         this.buf = new ArrayBuffer(this.imageData.data.length);
         this.buf8 = new Uint8ClampedArray(this.buf);
         this.data = new Uint32Array(this.buf);
@@ -767,8 +771,6 @@ class PPU {
                     else
                         this.incHoriV();
                 }
-
-
 
             } else if (this.sx === 257) {
                 this.resetHoriV();

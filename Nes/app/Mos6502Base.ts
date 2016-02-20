@@ -12,11 +12,7 @@ class Most6502Base {
     public sp: number = 0;
     public t: number = 0;
     public b: number = 0;
-    public _rA: number = 0;
-    public get rA() { return this._rA; };
-    public set rA(v) {
-        this._rA = v;
-    };
+    public rA: number = 0;
     public rX: number = 0;
     public rY: number = 0;
     
@@ -57,7 +53,253 @@ class Most6502Base {
 
     private icycle = 0;
 
+    private opcodes: (()=>void)[] = [];
     public constructor(public memory: Memory) {
+        this.opcodes[105] = () => this.op0x69();
+this.opcodes[101] = () => this.op0x65();
+this.opcodes[117] = () => this.op0x75();
+this.opcodes[109] = () => this.op0x6d();
+this.opcodes[125] = () => this.op0x7d();
+this.opcodes[121] = () => this.op0x79();
+this.opcodes[97] = () => this.op0x61();
+this.opcodes[113] = () => this.op0x71();
+this.opcodes[41] = () => this.op0x29();
+this.opcodes[37] = () => this.op0x25();
+this.opcodes[53] = () => this.op0x35();
+this.opcodes[45] = () => this.op0x2d();
+this.opcodes[61] = () => this.op0x3d();
+this.opcodes[57] = () => this.op0x39();
+this.opcodes[33] = () => this.op0x21();
+this.opcodes[49] = () => this.op0x31();
+this.opcodes[10] = () => this.op0xa();
+this.opcodes[6] = () => this.op0x6();
+this.opcodes[22] = () => this.op0x16();
+this.opcodes[14] = () => this.op0xe();
+this.opcodes[30] = () => this.op0x1e();
+this.opcodes[144] = () => this.op0x90();
+this.opcodes[176] = () => this.op0xb0();
+this.opcodes[240] = () => this.op0xf0();
+this.opcodes[48] = () => this.op0x30();
+this.opcodes[208] = () => this.op0xd0();
+this.opcodes[16] = () => this.op0x10();
+this.opcodes[80] = () => this.op0x50();
+this.opcodes[112] = () => this.op0x70();
+this.opcodes[36] = () => this.op0x24();
+this.opcodes[44] = () => this.op0x2c();
+this.opcodes[24] = () => this.op0x18();
+this.opcodes[216] = () => this.op0xd8();
+this.opcodes[88] = () => this.op0x58();
+this.opcodes[184] = () => this.op0xb8();
+this.opcodes[201] = () => this.op0xc9();
+this.opcodes[197] = () => this.op0xc5();
+this.opcodes[213] = () => this.op0xd5();
+this.opcodes[205] = () => this.op0xcd();
+this.opcodes[221] = () => this.op0xdd();
+this.opcodes[217] = () => this.op0xd9();
+this.opcodes[193] = () => this.op0xc1();
+this.opcodes[209] = () => this.op0xd1();
+this.opcodes[224] = () => this.op0xe0();
+this.opcodes[228] = () => this.op0xe4();
+this.opcodes[236] = () => this.op0xec();
+this.opcodes[192] = () => this.op0xc0();
+this.opcodes[196] = () => this.op0xc4();
+this.opcodes[204] = () => this.op0xcc();
+this.opcodes[198] = () => this.op0xc6();
+this.opcodes[214] = () => this.op0xd6();
+this.opcodes[206] = () => this.op0xce();
+this.opcodes[222] = () => this.op0xde();
+this.opcodes[202] = () => this.op0xca();
+this.opcodes[136] = () => this.op0x88();
+this.opcodes[230] = () => this.op0xe6();
+this.opcodes[246] = () => this.op0xf6();
+this.opcodes[238] = () => this.op0xee();
+this.opcodes[254] = () => this.op0xfe();
+this.opcodes[232] = () => this.op0xe8();
+this.opcodes[200] = () => this.op0xc8();
+this.opcodes[73] = () => this.op0x49();
+this.opcodes[69] = () => this.op0x45();
+this.opcodes[85] = () => this.op0x55();
+this.opcodes[77] = () => this.op0x4d();
+this.opcodes[93] = () => this.op0x5d();
+this.opcodes[89] = () => this.op0x59();
+this.opcodes[65] = () => this.op0x41();
+this.opcodes[81] = () => this.op0x51();
+this.opcodes[76] = () => this.op0x4c();
+this.opcodes[108] = () => this.op0x6c();
+this.opcodes[169] = () => this.op0xa9();
+this.opcodes[165] = () => this.op0xa5();
+this.opcodes[181] = () => this.op0xb5();
+this.opcodes[173] = () => this.op0xad();
+this.opcodes[189] = () => this.op0xbd();
+this.opcodes[185] = () => this.op0xb9();
+this.opcodes[161] = () => this.op0xa1();
+this.opcodes[177] = () => this.op0xb1();
+this.opcodes[162] = () => this.op0xa2();
+this.opcodes[166] = () => this.op0xa6();
+this.opcodes[182] = () => this.op0xb6();
+this.opcodes[174] = () => this.op0xae();
+this.opcodes[190] = () => this.op0xbe();
+this.opcodes[160] = () => this.op0xa0();
+this.opcodes[164] = () => this.op0xa4();
+this.opcodes[180] = () => this.op0xb4();
+this.opcodes[172] = () => this.op0xac();
+this.opcodes[188] = () => this.op0xbc();
+this.opcodes[74] = () => this.op0x4a();
+this.opcodes[70] = () => this.op0x46();
+this.opcodes[86] = () => this.op0x56();
+this.opcodes[78] = () => this.op0x4e();
+this.opcodes[94] = () => this.op0x5e();
+this.opcodes[234] = () => this.op0xea();
+this.opcodes[9] = () => this.op0x9();
+this.opcodes[5] = () => this.op0x5();
+this.opcodes[21] = () => this.op0x15();
+this.opcodes[13] = () => this.op0xd();
+this.opcodes[29] = () => this.op0x1d();
+this.opcodes[25] = () => this.op0x19();
+this.opcodes[1] = () => this.op0x1();
+this.opcodes[17] = () => this.op0x11();
+this.opcodes[72] = () => this.op0x48();
+this.opcodes[8] = () => this.op0x8();
+this.opcodes[104] = () => this.op0x68();
+this.opcodes[40] = () => this.op0x28();
+this.opcodes[42] = () => this.op0x2a();
+this.opcodes[38] = () => this.op0x26();
+this.opcodes[54] = () => this.op0x36();
+this.opcodes[46] = () => this.op0x2e();
+this.opcodes[62] = () => this.op0x3e();
+this.opcodes[106] = () => this.op0x6a();
+this.opcodes[102] = () => this.op0x66();
+this.opcodes[118] = () => this.op0x76();
+this.opcodes[110] = () => this.op0x6e();
+this.opcodes[126] = () => this.op0x7e();
+this.opcodes[0] = () => this.op0x0();
+this.opcodes[64] = () => this.op0x40();
+this.opcodes[233] = () => this.op0xe9();
+this.opcodes[229] = () => this.op0xe5();
+this.opcodes[245] = () => this.op0xf5();
+this.opcodes[237] = () => this.op0xed();
+this.opcodes[253] = () => this.op0xfd();
+this.opcodes[249] = () => this.op0xf9();
+this.opcodes[225] = () => this.op0xe1();
+this.opcodes[241] = () => this.op0xf1();
+this.opcodes[56] = () => this.op0x38();
+this.opcodes[248] = () => this.op0xf8();
+this.opcodes[120] = () => this.op0x78();
+this.opcodes[133] = () => this.op0x85();
+this.opcodes[149] = () => this.op0x95();
+this.opcodes[141] = () => this.op0x8d();
+this.opcodes[157] = () => this.op0x9d();
+this.opcodes[153] = () => this.op0x99();
+this.opcodes[129] = () => this.op0x81();
+this.opcodes[145] = () => this.op0x91();
+this.opcodes[134] = () => this.op0x86();
+this.opcodes[150] = () => this.op0x96();
+this.opcodes[142] = () => this.op0x8e();
+this.opcodes[132] = () => this.op0x84();
+this.opcodes[148] = () => this.op0x94();
+this.opcodes[140] = () => this.op0x8c();
+this.opcodes[170] = () => this.op0xaa();
+this.opcodes[168] = () => this.op0xa8();
+this.opcodes[186] = () => this.op0xba();
+this.opcodes[138] = () => this.op0x8a();
+this.opcodes[154] = () => this.op0x9a();
+this.opcodes[152] = () => this.op0x98();
+this.opcodes[32] = () => this.op0x20();
+this.opcodes[96] = () => this.op0x60();
+this.opcodes[26] = () => this.op0x1a();
+this.opcodes[58] = () => this.op0x3a();
+this.opcodes[90] = () => this.op0x5a();
+this.opcodes[122] = () => this.op0x7a();
+this.opcodes[218] = () => this.op0xda();
+this.opcodes[250] = () => this.op0xfa();
+this.opcodes[4] = () => this.op0x4();
+this.opcodes[20] = () => this.op0x14();
+this.opcodes[52] = () => this.op0x34();
+this.opcodes[68] = () => this.op0x44();
+this.opcodes[84] = () => this.op0x54();
+this.opcodes[116] = () => this.op0x74();
+this.opcodes[212] = () => this.op0xd4();
+this.opcodes[244] = () => this.op0xf4();
+this.opcodes[100] = () => this.op0x64();
+this.opcodes[128] = () => this.op0x80();
+this.opcodes[130] = () => this.op0x82();
+this.opcodes[194] = () => this.op0xc2();
+this.opcodes[226] = () => this.op0xe2();
+this.opcodes[137] = () => this.op0x89();
+this.opcodes[12] = () => this.op0xc();
+this.opcodes[28] = () => this.op0x1c();
+this.opcodes[60] = () => this.op0x3c();
+this.opcodes[92] = () => this.op0x5c();
+this.opcodes[124] = () => this.op0x7c();
+this.opcodes[220] = () => this.op0xdc();
+this.opcodes[252] = () => this.op0xfc();
+this.opcodes[235] = () => this.op0xeb();
+this.opcodes[195] = () => this.op0xc3();
+this.opcodes[199] = () => this.op0xc7();
+this.opcodes[207] = () => this.op0xcf();
+this.opcodes[211] = () => this.op0xd3();
+this.opcodes[215] = () => this.op0xd7();
+this.opcodes[219] = () => this.op0xdb();
+this.opcodes[223] = () => this.op0xdf();
+this.opcodes[227] = () => this.op0xe3();
+this.opcodes[231] = () => this.op0xe7();
+this.opcodes[239] = () => this.op0xef();
+this.opcodes[243] = () => this.op0xf3();
+this.opcodes[247] = () => this.op0xf7();
+this.opcodes[251] = () => this.op0xfb();
+this.opcodes[255] = () => this.op0xff();
+this.opcodes[171] = () => this.op0xab();
+this.opcodes[167] = () => this.op0xa7();
+this.opcodes[183] = () => this.op0xb7();
+this.opcodes[175] = () => this.op0xaf();
+this.opcodes[191] = () => this.op0xbf();
+this.opcodes[163] = () => this.op0xa3();
+this.opcodes[179] = () => this.op0xb3();
+this.opcodes[131] = () => this.op0x83();
+this.opcodes[135] = () => this.op0x87();
+this.opcodes[143] = () => this.op0x8f();
+this.opcodes[151] = () => this.op0x97();
+this.opcodes[3] = () => this.op0x3();
+this.opcodes[7] = () => this.op0x7();
+this.opcodes[15] = () => this.op0xf();
+this.opcodes[19] = () => this.op0x13();
+this.opcodes[23] = () => this.op0x17();
+this.opcodes[27] = () => this.op0x1b();
+this.opcodes[31] = () => this.op0x1f();
+this.opcodes[35] = () => this.op0x23();
+this.opcodes[39] = () => this.op0x27();
+this.opcodes[47] = () => this.op0x2f();
+this.opcodes[51] = () => this.op0x33();
+this.opcodes[55] = () => this.op0x37();
+this.opcodes[59] = () => this.op0x3b();
+this.opcodes[63] = () => this.op0x3f();
+this.opcodes[99] = () => this.op0x63();
+this.opcodes[103] = () => this.op0x67();
+this.opcodes[111] = () => this.op0x6f();
+this.opcodes[115] = () => this.op0x73();
+this.opcodes[119] = () => this.op0x77();
+this.opcodes[123] = () => this.op0x7b();
+this.opcodes[127] = () => this.op0x7f();
+this.opcodes[67] = () => this.op0x43();
+this.opcodes[71] = () => this.op0x47();
+this.opcodes[79] = () => this.op0x4f();
+this.opcodes[83] = () => this.op0x53();
+this.opcodes[87] = () => this.op0x57();
+this.opcodes[91] = () => this.op0x5b();
+this.opcodes[95] = () => this.op0x5f();
+this.opcodes[11] = () => this.op0xb();
+this.opcodes[43] = () => this.op0x2b();
+this.opcodes[75] = () => this.op0x4b();
+this.opcodes[107] = () => this.op0x6b();
+this.opcodes[203] = () => this.op0xcb();
+this.opcodes[156] = () => this.op0x9c();
+this.opcodes[158] = () => this.op0x9e();
+this.opcodes[139] = () => this.op0x8b();
+this.opcodes[147] = () => this.op0x93();
+this.opcodes[155] = () => this.op0x9b();
+this.opcodes[159] = () => this.op0x9f();
+this.opcodes[187] = () => this.op0xbb();
+
     }
 
     public dma(addrDma:number) {
@@ -158,8 +400,18 @@ class Most6502Base {
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 
-        switch (this.opcode) {
-case 0x69: /* ADC Immediate 2 */ {
+        this.opcodes[this.opcode]();
+
+
+        if (this.t === 0 && this.opcode !== 0x0) {
+            if (this.enableInterruptPoll)
+                this.pollInterrupts();
+            this.enableInterruptPoll = true;
+        }
+
+        this.detectInterrupts();
+    }
+op0x69() /* ADC Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -182,9 +434,8 @@ case 0x69: /* ADC Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x65: /* ADC ZeroPage 3 */ {
+op0x65() /* ADC ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -212,9 +463,8 @@ case 0x65: /* ADC ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x75: /* ADC ZeroPageX 4 */ {
+op0x75() /* ADC ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -248,9 +498,8 @@ case 0x75: /* ADC ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x6d: /* ADC Absolute 4 */ {
+op0x6d() /* ADC Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -285,9 +534,8 @@ case 0x6d: /* ADC Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x7d: /* ADC AbsoluteX 4pc  */ {
+op0x7d() /* ADC AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -343,9 +591,8 @@ case 0x7d: /* ADC AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x79: /* ADC AbsoluteY 4pc  */ {
+op0x79() /* ADC AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -401,9 +648,8 @@ case 0x79: /* ADC AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x61: /* ADC IndirectX 6 */ {
+op0x61() /* ADC IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -448,9 +694,8 @@ case 0x61: /* ADC IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x71: /* ADC IndirectY 5pc  */ {
+op0x71() /* ADC IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -510,9 +755,8 @@ case 0x71: /* ADC IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x29: /* AND Immediate 2 */ {
+op0x29() /* AND Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -530,9 +774,8 @@ case 0x29: /* AND Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x25: /* AND ZeroPage 3 */ {
+op0x25() /* AND ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -555,9 +798,8 @@ case 0x25: /* AND ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x35: /* AND ZeroPageX 4 */ {
+op0x35() /* AND ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -586,9 +828,8 @@ case 0x35: /* AND ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x2d: /* AND Absolute 4 */ {
+op0x2d() /* AND Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -618,9 +859,8 @@ case 0x2d: /* AND Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x3d: /* AND AbsoluteX 4pc  */ {
+op0x3d() /* AND AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -666,9 +906,8 @@ case 0x3d: /* AND AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x39: /* AND AbsoluteY 4pc  */ {
+op0x39() /* AND AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -714,9 +953,8 @@ case 0x39: /* AND AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x21: /* AND IndirectX 6 */ {
+op0x21() /* AND IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -756,9 +994,8 @@ case 0x21: /* AND IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x31: /* AND IndirectY 5pc  */ {
+op0x31() /* AND IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -808,9 +1045,8 @@ case 0x31: /* AND IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xa: /* ASL Accumulator 2 */ {
+op0xa() /* ASL Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -829,9 +1065,8 @@ case 0xa: /* ASL Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x6: /* ASL ZeroPage 5 */ {
+op0x6() /* ASL ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -863,9 +1098,8 @@ case 0x6: /* ASL ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x16: /* ASL ZeroPageX 6 */ {
+op0x16() /* ASL ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -903,9 +1137,8 @@ case 0x16: /* ASL ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xe: /* ASL Absolute 6 */ {
+op0xe() /* ASL Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -944,9 +1177,8 @@ case 0xe: /* ASL Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x1e: /* ASL AbsoluteX 7 */ {
+op0x1e() /* ASL AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -995,9 +1227,8 @@ case 0x1e: /* ASL AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x90: /* BCC Relative 2pc bc  */ {
+op0x90() /* BCC Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1034,9 +1265,8 @@ case 0x90: /* BCC Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0xb0: /* BCS Relative 2pc bc  */ {
+op0xb0() /* BCS Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1073,9 +1303,8 @@ case 0xb0: /* BCS Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0xf0: /* BEQ Relative 2pc bc  */ {
+op0xf0() /* BEQ Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1112,9 +1341,8 @@ case 0xf0: /* BEQ Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0x30: /* BMI Relative 2pc bc  */ {
+op0x30() /* BMI Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1151,9 +1379,8 @@ case 0x30: /* BMI Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0xd0: /* BNE Relative 2pc bc  */ {
+op0xd0() /* BNE Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1190,9 +1417,8 @@ case 0xd0: /* BNE Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0x10: /* BPL Relative 2pc bc  */ {
+op0x10() /* BPL Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1229,9 +1455,8 @@ case 0x10: /* BPL Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0x50: /* BVC Relative 2pc bc  */ {
+op0x50() /* BVC Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1268,9 +1493,8 @@ case 0x50: /* BVC Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0x70: /* BVS Relative 2pc bc  */ {
+op0x70() /* BVS Relative 2pc bc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1307,9 +1531,8 @@ case 0x70: /* BVS Relative 2pc bc  */ {
             break;
         }
     }
-    break;
 }
-case 0x24: /* BIT ZeroPage 3 */ {
+op0x24() /* BIT ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1331,9 +1554,8 @@ case 0x24: /* BIT ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x2c: /* BIT Absolute 4 */ {
+op0x2c() /* BIT Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1362,9 +1584,8 @@ case 0x2c: /* BIT Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x18: /* CLC Implied 2 */ {
+op0x18() /* CLC Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1378,9 +1599,8 @@ case 0x18: /* CLC Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xd8: /* CLD Implied 2 */ {
+op0xd8() /* CLD Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1394,9 +1614,8 @@ case 0xd8: /* CLD Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x58: /* CLI Implied 2 */ {
+op0x58() /* CLI Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1410,9 +1629,8 @@ case 0x58: /* CLI Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xb8: /* CLV Implied 2 */ {
+op0xb8() /* CLV Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1426,9 +1644,8 @@ case 0xb8: /* CLV Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc9: /* CMP Immediate 2 */ {
+op0xc9() /* CMP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1445,9 +1662,8 @@ case 0xc9: /* CMP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc5: /* CMP ZeroPage 3 */ {
+op0xc5() /* CMP ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1469,9 +1685,8 @@ case 0xc5: /* CMP ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xd5: /* CMP ZeroPageX 4 */ {
+op0xd5() /* CMP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1499,9 +1714,8 @@ case 0xd5: /* CMP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xcd: /* CMP Absolute 4 */ {
+op0xcd() /* CMP Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1530,9 +1744,8 @@ case 0xcd: /* CMP Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xdd: /* CMP AbsoluteX 4pc  */ {
+op0xdd() /* CMP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1576,9 +1789,8 @@ case 0xdd: /* CMP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xd9: /* CMP AbsoluteY 4pc  */ {
+op0xd9() /* CMP AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1622,9 +1834,8 @@ case 0xd9: /* CMP AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xc1: /* CMP IndirectX 6 */ {
+op0xc1() /* CMP IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1663,9 +1874,8 @@ case 0xc1: /* CMP IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xd1: /* CMP IndirectY 5pc  */ {
+op0xd1() /* CMP IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1713,9 +1923,8 @@ case 0xd1: /* CMP IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xe0: /* CPX Immediate 2 */ {
+op0xe0() /* CPX Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1732,9 +1941,8 @@ case 0xe0: /* CPX Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xe4: /* CPX ZeroPage 3 */ {
+op0xe4() /* CPX ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1756,9 +1964,8 @@ case 0xe4: /* CPX ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xec: /* CPX Absolute 4 */ {
+op0xec() /* CPX Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1787,9 +1994,8 @@ case 0xec: /* CPX Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xc0: /* CPY Immediate 2 */ {
+op0xc0() /* CPY Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1806,9 +2012,8 @@ case 0xc0: /* CPY Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc4: /* CPY ZeroPage 3 */ {
+op0xc4() /* CPY ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1830,9 +2035,8 @@ case 0xc4: /* CPY ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xcc: /* CPY Absolute 4 */ {
+op0xcc() /* CPY Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1861,9 +2065,8 @@ case 0xcc: /* CPY Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xc6: /* DEC ZeroPage 5 */ {
+op0xc6() /* DEC ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1894,9 +2097,8 @@ case 0xc6: /* DEC ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xd6: /* DEC ZeroPageX 6 */ {
+op0xd6() /* DEC ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1933,9 +2135,8 @@ case 0xd6: /* DEC ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xce: /* DEC Absolute 6 */ {
+op0xce() /* DEC Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -1973,9 +2174,8 @@ case 0xce: /* DEC Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xde: /* DEC AbsoluteX 7 */ {
+op0xde() /* DEC AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2023,9 +2223,8 @@ case 0xde: /* DEC AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xca: /* DEX Accumulator 2 */ {
+op0xca() /* DEX Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2043,9 +2242,8 @@ case 0xca: /* DEX Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x88: /* DEY Accumulator 2 */ {
+op0x88() /* DEY Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2063,9 +2261,8 @@ case 0x88: /* DEY Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xe6: /* INC ZeroPage 5 */ {
+op0xe6() /* INC ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2096,9 +2293,8 @@ case 0xe6: /* INC ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xf6: /* INC ZeroPageX 6 */ {
+op0xf6() /* INC ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2135,9 +2331,8 @@ case 0xf6: /* INC ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xee: /* INC Absolute 6 */ {
+op0xee() /* INC Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2175,9 +2370,8 @@ case 0xee: /* INC Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xfe: /* INC AbsoluteX 7 */ {
+op0xfe() /* INC AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2225,9 +2419,8 @@ case 0xfe: /* INC AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xe8: /* INX Accumulator 2 */ {
+op0xe8() /* INX Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2245,9 +2438,8 @@ case 0xe8: /* INX Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc8: /* INY Accumulator 2 */ {
+op0xc8() /* INY Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2265,9 +2457,8 @@ case 0xc8: /* INY Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x49: /* EOR Immediate 2 */ {
+op0x49() /* EOR Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2285,9 +2476,8 @@ case 0x49: /* EOR Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x45: /* EOR ZeroPage 3 */ {
+op0x45() /* EOR ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2310,9 +2500,8 @@ case 0x45: /* EOR ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x55: /* EOR ZeroPageX 4 */ {
+op0x55() /* EOR ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2341,9 +2530,8 @@ case 0x55: /* EOR ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x4d: /* EOR Absolute 4 */ {
+op0x4d() /* EOR Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2373,9 +2561,8 @@ case 0x4d: /* EOR Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x5d: /* EOR AbsoluteX 4pc  */ {
+op0x5d() /* EOR AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2421,9 +2608,8 @@ case 0x5d: /* EOR AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x59: /* EOR AbsoluteY 4pc  */ {
+op0x59() /* EOR AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2469,9 +2655,8 @@ case 0x59: /* EOR AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x41: /* EOR IndirectX 6 */ {
+op0x41() /* EOR IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2511,9 +2696,8 @@ case 0x41: /* EOR IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x51: /* EOR IndirectY 5pc  */ {
+op0x51() /* EOR IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2563,9 +2747,8 @@ case 0x51: /* EOR IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x4c: /* JMP Absolute 3 */ {
+op0x4c() /* JMP Absolute 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2585,9 +2768,8 @@ case 0x4c: /* JMP Absolute 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x6c: /* JMP AbsoluteIndirect 5 */ {
+op0x6c() /* JMP AbsoluteIndirect 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2618,9 +2800,8 @@ case 0x6c: /* JMP AbsoluteIndirect 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xa9: /* LDA Immediate 2 */ {
+op0xa9() /* LDA Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2637,9 +2818,8 @@ case 0xa9: /* LDA Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xa5: /* LDA ZeroPage 3 */ {
+op0xa5() /* LDA ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2661,9 +2841,8 @@ case 0xa5: /* LDA ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xb5: /* LDA ZeroPageX 4 */ {
+op0xb5() /* LDA ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2691,9 +2870,8 @@ case 0xb5: /* LDA ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xad: /* LDA Absolute 4 */ {
+op0xad() /* LDA Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2722,9 +2900,8 @@ case 0xad: /* LDA Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xbd: /* LDA AbsoluteX 4pc  */ {
+op0xbd() /* LDA AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2768,9 +2945,8 @@ case 0xbd: /* LDA AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xb9: /* LDA AbsoluteY 4pc  */ {
+op0xb9() /* LDA AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2814,9 +2990,8 @@ case 0xb9: /* LDA AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xa1: /* LDA IndirectX 6 */ {
+op0xa1() /* LDA IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2855,9 +3030,8 @@ case 0xa1: /* LDA IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xb1: /* LDA IndirectY 5pc  */ {
+op0xb1() /* LDA IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2905,9 +3079,8 @@ case 0xb1: /* LDA IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xa2: /* LDX Immediate 2 */ {
+op0xa2() /* LDX Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2924,9 +3097,8 @@ case 0xa2: /* LDX Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xa6: /* LDX ZeroPage 3 */ {
+op0xa6() /* LDX ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2948,9 +3120,8 @@ case 0xa6: /* LDX ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xb6: /* LDX ZeroPageY 4 */ {
+op0xb6() /* LDX ZeroPageY 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -2978,9 +3149,8 @@ case 0xb6: /* LDX ZeroPageY 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xae: /* LDX Absolute 4 */ {
+op0xae() /* LDX Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3009,9 +3179,8 @@ case 0xae: /* LDX Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xbe: /* LDX AbsoluteY 4pc  */ {
+op0xbe() /* LDX AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3055,9 +3224,8 @@ case 0xbe: /* LDX AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xa0: /* LDY Immediate 2 */ {
+op0xa0() /* LDY Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3074,9 +3242,8 @@ case 0xa0: /* LDY Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xa4: /* LDY ZeroPage 3 */ {
+op0xa4() /* LDY ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3098,9 +3265,8 @@ case 0xa4: /* LDY ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xb4: /* LDY ZeroPageX 4 */ {
+op0xb4() /* LDY ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3128,9 +3294,8 @@ case 0xb4: /* LDY ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xac: /* LDY Absolute 4 */ {
+op0xac() /* LDY Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3159,9 +3324,8 @@ case 0xac: /* LDY Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xbc: /* LDY AbsoluteX 4pc  */ {
+op0xbc() /* LDY AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3205,9 +3369,8 @@ case 0xbc: /* LDY AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x4a: /* LSR Accumulator 2 */ {
+op0x4a() /* LSR Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3226,9 +3389,8 @@ case 0x4a: /* LSR Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x46: /* LSR ZeroPage 5 */ {
+op0x46() /* LSR ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3260,9 +3422,8 @@ case 0x46: /* LSR ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x56: /* LSR ZeroPageX 6 */ {
+op0x56() /* LSR ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3300,9 +3461,8 @@ case 0x56: /* LSR ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x4e: /* LSR Absolute 6 */ {
+op0x4e() /* LSR Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3341,9 +3501,8 @@ case 0x4e: /* LSR Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x5e: /* LSR AbsoluteX 7 */ {
+op0x5e() /* LSR AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3392,9 +3551,8 @@ case 0x5e: /* LSR AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xea: /* NOP Implied 2 */ {
+op0xea() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3407,9 +3565,8 @@ case 0xea: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x9: /* ORA Immediate 2 */ {
+op0x9() /* ORA Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3427,9 +3584,8 @@ case 0x9: /* ORA Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x5: /* ORA ZeroPage 3 */ {
+op0x5() /* ORA ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3452,9 +3608,8 @@ case 0x5: /* ORA ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x15: /* ORA ZeroPageX 4 */ {
+op0x15() /* ORA ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3483,9 +3638,8 @@ case 0x15: /* ORA ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xd: /* ORA Absolute 4 */ {
+op0xd() /* ORA Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3515,9 +3669,8 @@ case 0xd: /* ORA Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x1d: /* ORA AbsoluteX 4pc  */ {
+op0x1d() /* ORA AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3563,9 +3716,8 @@ case 0x1d: /* ORA AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x19: /* ORA AbsoluteY 4pc  */ {
+op0x19() /* ORA AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3611,9 +3763,8 @@ case 0x19: /* ORA AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x1: /* ORA IndirectX 6 */ {
+op0x1() /* ORA IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3653,9 +3804,8 @@ case 0x1: /* ORA IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x11: /* ORA IndirectY 5pc  */ {
+op0x11() /* ORA IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3705,9 +3855,8 @@ case 0x11: /* ORA IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x48: /* PHA Implied 3 */ {
+op0x48() /* PHA Implied 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3725,9 +3874,8 @@ case 0x48: /* PHA Implied 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x8: /* PHP Implied 3 */ {
+op0x8() /* PHP Implied 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3747,9 +3895,8 @@ case 0x8: /* PHP Implied 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x68: /* PLA Implied 4 */ {
+op0x68() /* PLA Implied 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3773,9 +3920,8 @@ case 0x68: /* PLA Implied 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x28: /* PLP Implied 4 */ {
+op0x28() /* PLP Implied 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3797,9 +3943,8 @@ case 0x28: /* PLP Implied 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x2a: /* ROL Accumulator 2 */ {
+op0x2a() /* ROL Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3819,9 +3964,8 @@ case 0x2a: /* ROL Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x26: /* ROL ZeroPage 5 */ {
+op0x26() /* ROL ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3854,9 +3998,8 @@ case 0x26: /* ROL ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x36: /* ROL ZeroPageX 6 */ {
+op0x36() /* ROL ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3895,9 +4038,8 @@ case 0x36: /* ROL ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x2e: /* ROL Absolute 6 */ {
+op0x2e() /* ROL Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3937,9 +4079,8 @@ case 0x2e: /* ROL Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x3e: /* ROL AbsoluteX 7 */ {
+op0x3e() /* ROL AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -3989,9 +4130,8 @@ case 0x3e: /* ROL AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x6a: /* ROR Accumulator 2 */ {
+op0x6a() /* ROR Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4011,9 +4151,8 @@ case 0x6a: /* ROR Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x66: /* ROR ZeroPage 5 */ {
+op0x66() /* ROR ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4046,9 +4185,8 @@ case 0x66: /* ROR ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x76: /* ROR ZeroPageX 6 */ {
+op0x76() /* ROR ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4087,9 +4225,8 @@ case 0x76: /* ROR ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x6e: /* ROR Absolute 6 */ {
+op0x6e() /* ROR Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4129,9 +4266,8 @@ case 0x6e: /* ROR Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x7e: /* ROR AbsoluteX 7 */ {
+op0x7e() /* ROR AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4181,9 +4317,8 @@ case 0x7e: /* ROR AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x0: /* BRK BRK 7 */ {
+op0x0() /* BRK BRK 7 */ {
     switch (this.t) {
         case 0: {
             if(this.enablePCIncrement) this.ip++;
@@ -4232,9 +4367,8 @@ case 0x0: /* BRK BRK 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x40: /* RTI RTI 6 */ {
+op0x40() /* RTI RTI 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4266,9 +4400,8 @@ case 0x40: /* RTI RTI 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xe9: /* SBC Immediate 2 */ {
+op0xe9() /* SBC Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4292,9 +4425,8 @@ case 0xe9: /* SBC Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xe5: /* SBC ZeroPage 3 */ {
+op0xe5() /* SBC ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4323,9 +4455,8 @@ case 0xe5: /* SBC ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xf5: /* SBC ZeroPageX 4 */ {
+op0xf5() /* SBC ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4360,9 +4491,8 @@ case 0xf5: /* SBC ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xed: /* SBC Absolute 4 */ {
+op0xed() /* SBC Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4398,9 +4528,8 @@ case 0xed: /* SBC Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xfd: /* SBC AbsoluteX 4pc  */ {
+op0xfd() /* SBC AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4458,9 +4587,8 @@ case 0xfd: /* SBC AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xf9: /* SBC AbsoluteY 4pc  */ {
+op0xf9() /* SBC AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4518,9 +4646,8 @@ case 0xf9: /* SBC AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xe1: /* SBC IndirectX 6 */ {
+op0xe1() /* SBC IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4566,9 +4693,8 @@ case 0xe1: /* SBC IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xf1: /* SBC IndirectY 5pc  */ {
+op0xf1() /* SBC IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4630,9 +4756,8 @@ case 0xf1: /* SBC IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x38: /* SEC Implied 2 */ {
+op0x38() /* SEC Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4646,9 +4771,8 @@ case 0x38: /* SEC Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xf8: /* SED Implied 2 */ {
+op0xf8() /* SED Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4662,9 +4786,8 @@ case 0xf8: /* SED Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x78: /* SEI Implied 2 */ {
+op0x78() /* SEI Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4678,9 +4801,8 @@ case 0x78: /* SEI Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x85: /* STA ZeroPage 3 */ {
+op0x85() /* STA ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4700,9 +4822,8 @@ case 0x85: /* STA ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x95: /* STA ZeroPageX 4 */ {
+op0x95() /* STA ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4728,9 +4849,8 @@ case 0x95: /* STA ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x8d: /* STA Absolute 4 */ {
+op0x8d() /* STA Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4757,9 +4877,8 @@ case 0x8d: /* STA Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x9d: /* STA AbsoluteX 5 */ {
+op0x9d() /* STA AbsoluteX 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4796,9 +4915,8 @@ case 0x9d: /* STA AbsoluteX 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x99: /* STA AbsoluteY 5 */ {
+op0x99() /* STA AbsoluteY 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4835,9 +4953,8 @@ case 0x99: /* STA AbsoluteY 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x81: /* STA IndirectX 6 */ {
+op0x81() /* STA IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4874,9 +4991,8 @@ case 0x81: /* STA IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x91: /* STA IndirectY 6 */ {
+op0x91() /* STA IndirectY 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4917,9 +5033,8 @@ case 0x91: /* STA IndirectY 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x86: /* STX ZeroPage 3 */ {
+op0x86() /* STX ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4939,9 +5054,8 @@ case 0x86: /* STX ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x96: /* STX ZeroPageY 4 */ {
+op0x96() /* STX ZeroPageY 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4967,9 +5081,8 @@ case 0x96: /* STX ZeroPageY 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x8e: /* STX Absolute 4 */ {
+op0x8e() /* STX Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -4996,9 +5109,8 @@ case 0x8e: /* STX Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x84: /* STY ZeroPage 3 */ {
+op0x84() /* STY ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5018,9 +5130,8 @@ case 0x84: /* STY ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x94: /* STY ZeroPageX 4 */ {
+op0x94() /* STY ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5046,9 +5157,8 @@ case 0x94: /* STY ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x8c: /* STY Absolute 4 */ {
+op0x8c() /* STY Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5075,9 +5185,8 @@ case 0x8c: /* STY Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xaa: /* TAX Accumulator 2 */ {
+op0xaa() /* TAX Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5094,9 +5203,8 @@ case 0xaa: /* TAX Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xa8: /* TAY Accumulator 2 */ {
+op0xa8() /* TAY Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5113,9 +5221,8 @@ case 0xa8: /* TAY Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xba: /* TSX Accumulator 2 */ {
+op0xba() /* TSX Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5132,9 +5239,8 @@ case 0xba: /* TSX Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x8a: /* TXA Accumulator 2 */ {
+op0x8a() /* TXA Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5151,9 +5257,8 @@ case 0x8a: /* TXA Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x9a: /* TXS Accumulator 2 */ {
+op0x9a() /* TXS Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5168,9 +5273,8 @@ case 0x9a: /* TXS Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x98: /* TYA Accumulator 2 */ {
+op0x98() /* TYA Accumulator 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5187,9 +5291,8 @@ case 0x98: /* TYA Accumulator 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x20: /* JSR JSR 6 */ {
+op0x20() /* JSR JSR 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5222,9 +5325,8 @@ case 0x20: /* JSR JSR 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x60: /* RTS RTS 6 */ {
+op0x60() /* RTS RTS 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5256,9 +5358,8 @@ case 0x60: /* RTS RTS 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x1a: /* NOP Implied 2 */ {
+op0x1a() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5271,9 +5372,8 @@ case 0x1a: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x3a: /* NOP Implied 2 */ {
+op0x3a() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5286,9 +5386,8 @@ case 0x3a: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x5a: /* NOP Implied 2 */ {
+op0x5a() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5301,9 +5400,8 @@ case 0x5a: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x7a: /* NOP Implied 2 */ {
+op0x7a() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5316,9 +5414,8 @@ case 0x7a: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xda: /* NOP Implied 2 */ {
+op0xda() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5331,9 +5428,8 @@ case 0xda: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xfa: /* NOP Implied 2 */ {
+op0xfa() /* NOP Implied 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5346,9 +5442,8 @@ case 0xfa: /* NOP Implied 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x4: /* NOP ZeroPage 3 */ {
+op0x4() /* NOP ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5367,9 +5462,8 @@ case 0x4: /* NOP ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x14: /* NOP ZeroPageX 4 */ {
+op0x14() /* NOP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5394,9 +5488,8 @@ case 0x14: /* NOP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x34: /* NOP ZeroPageX 4 */ {
+op0x34() /* NOP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5421,9 +5514,8 @@ case 0x34: /* NOP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x44: /* NOP ZeroPage 3 */ {
+op0x44() /* NOP ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5442,36 +5534,8 @@ case 0x44: /* NOP ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x54: /* NOP ZeroPageX 4 */ {
-    switch (this.t) {
-        case 0: {
-            this.ip++;
-            this.t++;
-            break;
-        }
-        case 1: {
-            this.addr = this.memory.getByte(this.ip);
-            this.ip++;
-            this.t++;
-            break;
-        }
-        case 2: {
-            this.b = this.memory.getByte(this.addr);
-            this.addr = (this.rX + this.addr) & 0xff;
-            this.t++;
-            break;
-        }
-        case 3: {
-            this.b = this.memory.getByte(this.addr);
-            this.t = 0;
-            break;
-        }
-    }
-    break;
-}
-case 0x74: /* NOP ZeroPageX 4 */ {
+op0x54() /* NOP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5496,9 +5560,8 @@ case 0x74: /* NOP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xd4: /* NOP ZeroPageX 4 */ {
+op0x74() /* NOP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5523,9 +5586,8 @@ case 0xd4: /* NOP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xf4: /* NOP ZeroPageX 4 */ {
+op0xd4() /* NOP ZeroPageX 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5550,9 +5612,34 @@ case 0xf4: /* NOP ZeroPageX 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x64: /* NOP ZeroPage 3 */ {
+op0xf4() /* NOP ZeroPageX 4 */ {
+    switch (this.t) {
+        case 0: {
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 1: {
+            this.addr = this.memory.getByte(this.ip);
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 2: {
+            this.b = this.memory.getByte(this.addr);
+            this.addr = (this.rX + this.addr) & 0xff;
+            this.t++;
+            break;
+        }
+        case 3: {
+            this.b = this.memory.getByte(this.addr);
+            this.t = 0;
+            break;
+        }
+    }
+}
+op0x64() /* NOP ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5571,9 +5658,8 @@ case 0x64: /* NOP ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x80: /* NOP Immediate 2 */ {
+op0x80() /* NOP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5587,9 +5673,8 @@ case 0x80: /* NOP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x82: /* NOP Immediate 2 */ {
+op0x82() /* NOP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5603,9 +5688,8 @@ case 0x82: /* NOP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc2: /* NOP Immediate 2 */ {
+op0xc2() /* NOP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5619,9 +5703,8 @@ case 0xc2: /* NOP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xe2: /* NOP Immediate 2 */ {
+op0xe2() /* NOP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5635,9 +5718,8 @@ case 0xe2: /* NOP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x89: /* NOP Immediate 2 */ {
+op0x89() /* NOP Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5651,9 +5733,8 @@ case 0x89: /* NOP Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc: /* NOP Absolute 4 */ {
+op0xc() /* NOP Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5679,49 +5760,8 @@ case 0xc: /* NOP Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x1c: /* NOP AbsoluteX 4pc  */ {
-    switch (this.t) {
-        case 0: {
-            this.ip++;
-            this.t++;
-            break;
-        }
-        case 1: {
-            this.addrLo = this.memory.getByte(this.ip);
-            this.ip++;
-            this.t++;
-            break;
-        }
-        case 2: {
-            this.addrHi = this.memory.getByte(this.ip);
-            this.addrC = (this.addrLo + this.rX) >> 8;
-            this.addrLo = (this.addrLo + this.rX) & 0xff;
-            this.addr = this.addrLo + (this.addrHi << 8);
-            this.ip++;
-            this.t++;
-            break;
-        }
-        case 3: {
-            this.b = this.memory.getByte(this.addr);
-            if (this.addrC) {
-                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
-                this.t++;
-            } else {
-                this.t = 0;
-            }
-            break;
-        }
-        case 4: {
-            this.b = this.memory.getByte(this.addr);
-            this.t = 0;
-            break;
-        }
-    }
-    break;
-}
-case 0x3c: /* NOP AbsoluteX 4pc  */ {
+op0x1c() /* NOP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5759,9 +5799,8 @@ case 0x3c: /* NOP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x5c: /* NOP AbsoluteX 4pc  */ {
+op0x3c() /* NOP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5799,9 +5838,8 @@ case 0x5c: /* NOP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x7c: /* NOP AbsoluteX 4pc  */ {
+op0x5c() /* NOP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5839,9 +5877,8 @@ case 0x7c: /* NOP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xdc: /* NOP AbsoluteX 4pc  */ {
+op0x7c() /* NOP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5879,9 +5916,8 @@ case 0xdc: /* NOP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xfc: /* NOP AbsoluteX 4pc  */ {
+op0xdc() /* NOP AbsoluteX 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5919,9 +5955,47 @@ case 0xfc: /* NOP AbsoluteX 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xeb: /* SBC Immediate 2 */ {
+op0xfc() /* NOP AbsoluteX 4pc  */ {
+    switch (this.t) {
+        case 0: {
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 1: {
+            this.addrLo = this.memory.getByte(this.ip);
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 2: {
+            this.addrHi = this.memory.getByte(this.ip);
+            this.addrC = (this.addrLo + this.rX) >> 8;
+            this.addrLo = (this.addrLo + this.rX) & 0xff;
+            this.addr = this.addrLo + (this.addrHi << 8);
+            this.ip++;
+            this.t++;
+            break;
+        }
+        case 3: {
+            this.b = this.memory.getByte(this.addr);
+            if (this.addrC) {
+                this.addr = (this.addr + (this.addrC << 8)) & 0xffff;
+                this.t++;
+            } else {
+                this.t = 0;
+            }
+            break;
+        }
+        case 4: {
+            this.b = this.memory.getByte(this.addr);
+            this.t = 0;
+            break;
+        }
+    }
+}
+op0xeb() /* SBC Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5945,9 +6019,8 @@ case 0xeb: /* SBC Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xc3: /* DCP IndirectX 8 */ {
+op0xc3() /* DCP IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -5996,9 +6069,8 @@ case 0xc3: /* DCP IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0xc7: /* DCP ZeroPage 5 */ {
+op0xc7() /* DCP ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6030,9 +6102,8 @@ case 0xc7: /* DCP ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xcf: /* DCP Absolute 6 */ {
+op0xcf() /* DCP Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6071,9 +6142,8 @@ case 0xcf: /* DCP Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xd3: /* DCP IndirectY 8 */ {
+op0xd3() /* DCP IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6126,9 +6196,8 @@ case 0xd3: /* DCP IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0xd7: /* DCP ZeroPageX 6 */ {
+op0xd7() /* DCP ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6166,9 +6235,8 @@ case 0xd7: /* DCP ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xdb: /* DCP AbsoluteY 7 */ {
+op0xdb() /* DCP AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6217,9 +6285,8 @@ case 0xdb: /* DCP AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xdf: /* DCP AbsoluteX 7 */ {
+op0xdf() /* DCP AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6268,9 +6335,8 @@ case 0xdf: /* DCP AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xe3: /* ISC IndirectX 8 */ {
+op0xe3() /* ISC IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6328,9 +6394,8 @@ case 0xe3: /* ISC IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0xe7: /* ISC ZeroPage 5 */ {
+op0xe7() /* ISC ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6371,9 +6436,8 @@ case 0xe7: /* ISC ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xef: /* ISC Absolute 6 */ {
+op0xef() /* ISC Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6421,9 +6485,8 @@ case 0xef: /* ISC Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xf3: /* ISC IndirectY 8 */ {
+op0xf3() /* ISC IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6485,9 +6548,8 @@ case 0xf3: /* ISC IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0xf7: /* ISC ZeroPageX 6 */ {
+op0xf7() /* ISC ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6534,9 +6596,8 @@ case 0xf7: /* ISC ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xfb: /* ISC AbsoluteY 7 */ {
+op0xfb() /* ISC AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6594,9 +6655,8 @@ case 0xfb: /* ISC AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xff: /* ISC AbsoluteX 7 */ {
+op0xff() /* ISC AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6654,9 +6714,8 @@ case 0xff: /* ISC AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xab: /* LAX Immediate 2 */ {
+op0xab() /* LAX Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6674,9 +6733,8 @@ case 0xab: /* LAX Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xa7: /* LAX ZeroPage 3 */ {
+op0xa7() /* LAX ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6699,9 +6757,8 @@ case 0xa7: /* LAX ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0xb7: /* LAX ZeroPageY 4 */ {
+op0xb7() /* LAX ZeroPageY 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6730,9 +6787,8 @@ case 0xb7: /* LAX ZeroPageY 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xaf: /* LAX Absolute 4 */ {
+op0xaf() /* LAX Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6762,9 +6818,8 @@ case 0xaf: /* LAX Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0xbf: /* LAX AbsoluteY 4pc  */ {
+op0xbf() /* LAX AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6810,9 +6865,8 @@ case 0xbf: /* LAX AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-case 0xa3: /* LAX IndirectX 6 */ {
+op0xa3() /* LAX IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6852,9 +6906,8 @@ case 0xa3: /* LAX IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0xb3: /* LAX IndirectY 5pc  */ {
+op0xb3() /* LAX IndirectY 5pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6904,9 +6957,8 @@ case 0xb3: /* LAX IndirectY 5pc  */ {
             break;
         }
     }
-    break;
 }
-case 0x83: /* SAX IndirectX 6 */ {
+op0x83() /* SAX IndirectX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6943,9 +6995,8 @@ case 0x83: /* SAX IndirectX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x87: /* SAX ZeroPage 3 */ {
+op0x87() /* SAX ZeroPage 3 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6965,9 +7016,8 @@ case 0x87: /* SAX ZeroPage 3 */ {
             break;
         }
     }
-    break;
 }
-case 0x8f: /* SAX Absolute 4 */ {
+op0x8f() /* SAX Absolute 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -6994,9 +7044,8 @@ case 0x8f: /* SAX Absolute 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x97: /* SAX ZeroPageY 4 */ {
+op0x97() /* SAX ZeroPageY 4 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7022,9 +7071,8 @@ case 0x97: /* SAX ZeroPageY 4 */ {
             break;
         }
     }
-    break;
 }
-case 0x3: /* SLO IndirectX 8 */ {
+op0x3() /* SLO IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7077,9 +7125,8 @@ case 0x3: /* SLO IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x7: /* SLO ZeroPage 5 */ {
+op0x7() /* SLO ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7115,9 +7162,8 @@ case 0x7: /* SLO ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xf: /* SLO Absolute 6 */ {
+op0xf() /* SLO Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7160,9 +7206,8 @@ case 0xf: /* SLO Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x13: /* SLO IndirectY 8 */ {
+op0x13() /* SLO IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7219,9 +7264,8 @@ case 0x13: /* SLO IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x17: /* SLO ZeroPageX 6 */ {
+op0x17() /* SLO ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7263,9 +7307,8 @@ case 0x17: /* SLO ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x1b: /* SLO AbsoluteY 7 */ {
+op0x1b() /* SLO AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7318,9 +7361,8 @@ case 0x1b: /* SLO AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x1f: /* SLO AbsoluteX 7 */ {
+op0x1f() /* SLO AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7373,9 +7415,8 @@ case 0x1f: /* SLO AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x23: /* RLA IndirectX 8 */ {
+op0x23() /* RLA IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7429,9 +7470,8 @@ case 0x23: /* RLA IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x27: /* RLA ZeroPage 5 */ {
+op0x27() /* RLA ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7468,9 +7508,8 @@ case 0x27: /* RLA ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x2f: /* RLA Absolute 6 */ {
+op0x2f() /* RLA Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7514,9 +7553,8 @@ case 0x2f: /* RLA Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x33: /* RLA IndirectY 8 */ {
+op0x33() /* RLA IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7574,9 +7612,8 @@ case 0x33: /* RLA IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x37: /* RLA ZeroPageX 6 */ {
+op0x37() /* RLA ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7619,9 +7656,8 @@ case 0x37: /* RLA ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x3b: /* RLA AbsoluteY 7 */ {
+op0x3b() /* RLA AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7675,9 +7711,8 @@ case 0x3b: /* RLA AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x3f: /* RLA AbsoluteX 7 */ {
+op0x3f() /* RLA AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7731,9 +7766,8 @@ case 0x3f: /* RLA AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x63: /* RRA IndirectX 8 */ {
+op0x63() /* RRA IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7792,9 +7826,8 @@ case 0x63: /* RRA IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x67: /* RRA ZeroPage 5 */ {
+op0x67() /* RRA ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7836,9 +7869,8 @@ case 0x67: /* RRA ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x6f: /* RRA Absolute 6 */ {
+op0x6f() /* RRA Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7887,9 +7919,8 @@ case 0x6f: /* RRA Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x73: /* RRA IndirectY 8 */ {
+op0x73() /* RRA IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -7952,9 +7983,8 @@ case 0x73: /* RRA IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x77: /* RRA ZeroPageX 6 */ {
+op0x77() /* RRA ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8002,9 +8032,8 @@ case 0x77: /* RRA ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x7b: /* RRA AbsoluteY 7 */ {
+op0x7b() /* RRA AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8063,9 +8092,8 @@ case 0x7b: /* RRA AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x7f: /* RRA AbsoluteX 7 */ {
+op0x7f() /* RRA AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8124,9 +8152,8 @@ case 0x7f: /* RRA AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x43: /* SRE IndirectX 8 */ {
+op0x43() /* SRE IndirectX 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8179,9 +8206,8 @@ case 0x43: /* SRE IndirectX 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x47: /* SRE ZeroPage 5 */ {
+op0x47() /* SRE ZeroPage 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8217,9 +8243,8 @@ case 0x47: /* SRE ZeroPage 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x4f: /* SRE Absolute 6 */ {
+op0x4f() /* SRE Absolute 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8262,9 +8287,8 @@ case 0x4f: /* SRE Absolute 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x53: /* SRE IndirectY 8 */ {
+op0x53() /* SRE IndirectY 8 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8321,9 +8345,8 @@ case 0x53: /* SRE IndirectY 8 */ {
             break;
         }
     }
-    break;
 }
-case 0x57: /* SRE ZeroPageX 6 */ {
+op0x57() /* SRE ZeroPageX 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8365,9 +8388,8 @@ case 0x57: /* SRE ZeroPageX 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x5b: /* SRE AbsoluteY 7 */ {
+op0x5b() /* SRE AbsoluteY 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8420,9 +8442,8 @@ case 0x5b: /* SRE AbsoluteY 7 */ {
             break;
         }
     }
-    break;
 }
-case 0x5f: /* SRE AbsoluteX 7 */ {
+op0x5f() /* SRE AbsoluteX 7 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8475,9 +8496,8 @@ case 0x5f: /* SRE AbsoluteX 7 */ {
             break;
         }
     }
-    break;
 }
-case 0xb: /* ANC Immediate 2 */ {
+op0xb() /* ANC Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8496,9 +8516,8 @@ case 0xb: /* ANC Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x2b: /* ANC Immediate 2 */ {
+op0x2b() /* ANC Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8517,9 +8536,8 @@ case 0x2b: /* ANC Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x4b: /* ALR Immediate 2 */ {
+op0x4b() /* ALR Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8541,9 +8559,8 @@ case 0x4b: /* ALR Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x6b: /* ARR Immediate 2 */ {
+op0x6b() /* ARR Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8568,9 +8585,8 @@ case 0x6b: /* ARR Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0xcb: /* AXS Immediate 2 */ {
+op0xcb() /* AXS Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8590,9 +8606,8 @@ case 0xcb: /* AXS Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x9c: /* SYA AbsoluteX 5 */ {
+op0x9c() /* SYA AbsoluteX 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8633,9 +8648,8 @@ case 0x9c: /* SYA AbsoluteX 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x9e: /* SXA AbsoluteY 5 */ {
+op0x9e() /* SXA AbsoluteY 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8676,9 +8690,8 @@ case 0x9e: /* SXA AbsoluteY 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x8b: /* XAA Immediate 2 */ {
+op0x8b() /* XAA Immediate 2 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8692,9 +8705,8 @@ case 0x8b: /* XAA Immediate 2 */ {
             break;
         }
     }
-    break;
 }
-case 0x93: /* AXA IndirectY 6 */ {
+op0x93() /* AXA IndirectY 6 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8734,9 +8746,8 @@ case 0x93: /* AXA IndirectY 6 */ {
             break;
         }
     }
-    break;
 }
-case 0x9b: /* XAS AbsoluteY 5 */ {
+op0x9b() /* XAS AbsoluteY 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8772,9 +8783,8 @@ case 0x9b: /* XAS AbsoluteY 5 */ {
             break;
         }
     }
-    break;
 }
-case 0x9f: /* AXA AbsoluteY 5 */ {
+op0x9f() /* AXA AbsoluteY 5 */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8810,9 +8820,8 @@ case 0x9f: /* AXA AbsoluteY 5 */ {
             break;
         }
     }
-    break;
 }
-case 0xbb: /* LAR AbsoluteY 4pc  */ {
+op0xbb() /* LAR AbsoluteY 4pc  */ {
     switch (this.t) {
         case 0: {
             this.ip++;
@@ -8850,20 +8859,7 @@ case 0xbb: /* LAR AbsoluteY 4pc  */ {
             break;
         }
     }
-    break;
 }
-
-    default: throw 'invalid opcode $' + this.opcode.toString(16); 
-}
-
-        if (this.t === 0 && this.opcode !== 0x0) {
-            if (this.enableInterruptPoll)
-                this.pollInterrupts();
-            this.enableInterruptPoll = true;
-        }
-
-        this.detectInterrupts();
-    }
 
     public opcodeToMnemonic(opcode:number){
         if(opcode === 105) return 'ADC Immediate';

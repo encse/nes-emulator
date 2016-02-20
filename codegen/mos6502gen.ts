@@ -1689,7 +1689,7 @@ export class Mos6502Gen {
     private genStatement(statement:Statement) {
         var ctx = new Ctx();
 
-        ctx.writeLine(`case 0x${statement.opcode.toString(16)}: /* ${statement.mnemonic} ${statement.cycleCount.toString()} */ {`);
+        ctx.writeLine(`op0x${statement.opcode.toString(16)}() /* ${statement.mnemonic} ${statement.cycleCount.toString()} */ {`);
         ctx.indent();
         var rgcycle = statement.getCycles(this);
     
@@ -1707,22 +1707,9 @@ export class Mos6502Gen {
         });
         ctx.writeLine('}');
         
-        ctx.writeLine('break;');
         ctx.unindent();
         ctx.writeLine('}');
-        var res = ctx.getOutput();
-        //if (rgcycle.length !== statement.cycleCount.maxCycle()) {
-        //    console.error(`${statement.mnemonic}: cycle count doesn't match. Expected ${statement.cycleCount.maxCycle()}, found ${rgcycle.length}`);
-        //    console.error(res);
-        //    throw '';
-        //}
-
-        //if (rgcycle.map(cycle=> cycle.pcIncremented).reduce((s, pcIncremented) => s + pcIncremented) !== statement.size) {
-        //    console.error(`${statement.mnemonic}: size mismatch. Expected to be ${statement.size} long`);
-        //    console.error(res);
-        //    throw '';
-       // }
-        return res;
+        return ctx.getOutput();
     }
     
     run() {
@@ -2076,7 +2063,14 @@ class Most6502Base {
 
     private icycle = 0;
 
+    private opcodes: (()=>())[];
     public constructor(public memory: Memory) {
+        `;
+        for (var stm of statements) {
+            res += `this.opcodes[${stm.opcode}] = () => this.op0x${stm.opcode.toString(16)}();
+`;
+        }
+        res+=`
     }
 
     public dma(addrDma:number) {
@@ -2177,15 +2171,10 @@ class Most6502Base {
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 
-        switch (this.opcode) {
+        this.opcodes[this.opcode]();
 `;
-        for (let i=0;i<statements.length;i++) {
-            res += this.genStatement(statements[i]);
-        }
 
         res += `
-    default: throw 'invalid opcode $' + this.opcode.toString(16); 
-}
 
         if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll)
@@ -2195,7 +2184,12 @@ class Most6502Base {
 
         this.detectInterrupts();
     }
+`;
+        for (let i=0;i<statements.length;i++) {
+            res += this.genStatement(statements[i]);
+        }
 
+        res +=`
     public opcodeToMnemonic(opcode:number){
         ${(() => {
                 let res = ``;
