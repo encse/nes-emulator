@@ -63,21 +63,18 @@ class NesEmulator {
         this.ppu.setCtx(canvas.getContext('2d'));
         this.cpu.reset();
         this.controller = new Controller(canvas);
-
-       
     }
 
-    icycle = 0;
     public step() {
-     
-        if (this.icycle % 4 === 0)
-            this.ppu.step();
 
-        if (this.icycle % 12 === 0)
-            this.cpu.step();
-        this.apu.step();
+        for (let icycle = 0; icycle < 12; icycle++) {
+            if (!(icycle & 3))
+                this.ppu.step();
 
-        this.icycle++;
+            if (icycle === 0) {
+                this.cpu.step();
+            }
+            this.apu.step();
+        }
     }
-
 }

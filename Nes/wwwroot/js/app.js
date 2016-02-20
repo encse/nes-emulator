@@ -399,213 +399,72 @@ var RAM = (function () {
     };
     return RAM;
 })();
-///<reference path="Memory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="CompoundMemory.ts"/>
-var MMC1 = (function () {
-    function MMC1(PRGBanks, VROMBanks) {
-        this.PRGBanks = PRGBanks;
-        this.VROMBanks = VROMBanks;
-        this.iWrite = 0;
-        this.rTemp = 0;
-        /**
-         * $8000-9FFF:  [...C PSMM]
-         */
-        this.r0 = 0;
-        /**
-         *  $A000-BFFF:  [...C CCCC]
-            CHR Reg 0
-         */
-        this.r1 = 0;
-        /**
-         *  $C000-DFFF:  [...C CCCC]
-         *  CHR Reg 1
-         */
-        this.r2 = 0;
-        /**
-         * $E000-FFFF:  [...W PPPP]
-         */
-        this.r3 = 0;
-        while (PRGBanks.length < 2)
-            PRGBanks.push(new RAM(0x4000));
-        while (VROMBanks.length < 2)
-            VROMBanks.push(new RAM(0x1000));
-        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
-        this.nametableA = new RAM(0x400);
-        this.nametableB = new RAM(0x400);
-        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
-        this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], this.nametable, new RAM(0x1000));
-        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+var NesImage = (function () {
+    function NesImage(rawBytes) {
+        this.trainer = null;
+        for (var i = 0; i < 4; i++)
+            if (rawBytes[i] !== NesImage.magic[i])
+                throw 'invalid NES header';
+        this.ROMBanks = new Array(rawBytes[4]);
+        this.VRAMBanks = new Array(rawBytes[5]);
+        this.fVerticalMirroring = !!(rawBytes[6] & 1);
+        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
+        var fTrainer = !!(rawBytes[6] & 4);
+        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
+        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
+        this.fVSSystem = !!(rawBytes[7] & 1);
+        if ((rawBytes[7] & 0x0e) !== 0)
+            throw 'invalid NES header';
+        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
+        this.fPAL = (rawBytes[9] & 1) === 1;
+        if ((rawBytes[9] & 0xfe) !== 0)
+            throw 'invalid NES header';
+        for (var i = 0xa; i < 0x10; i++)
+            if (rawBytes[i] !== 0)
+                throw 'invalid NES header';
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
+            throw 'invalid NES format';
+        var idx = 0x10;
+        if (fTrainer) {
+            this.trainer = rawBytes.slice(idx, idx + 0x100);
+            idx += 0x100;
+        }
+        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
+            this.RAMBanks[ibank] = new RAM(0x2000);
+        }
+        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
+            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
+            idx += 0x4000;
+        }
+        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
+            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            idx += 0x2000;
+        }
     }
-    Object.defineProperty(MMC1.prototype, "C", {
-        /** CHR Mode (0=8k mode, 1=4k mode) */
-        get: function () { return (this.r0 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "P", {
-        /** PRG Size (0=32k mode, 1=16k mode) */
-        get: function () { return (this.r0 >> 3) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "S", {
-        /**
-         * Slot select:
-         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
-         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
-         *  This bit is ignored when 'P' is clear (32k mode)
-         */
-        get: function () { return (this.r0 >> 2) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "M", {
-        /**
-         *  Mirroring control:
-         *  %00 = 1ScA
-         *  %01 = 1ScB
-         *  %10 = Vert
-         *  %11 = Horz
-         */
-        get: function () { return this.r0 & 3; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "CHR0", {
-        get: function () { return this.r1 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "CHR1", {
-        get: function () { return this.r1 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "PRG0", {
-        get: function () { return this.r3 & 15; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(MMC1.prototype, "W", {
-        /**
-         * W = WRAM Disable (0=enabled, 1=disabled)
-         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
-         * Later ones do.
-         */
-        get: function () { return (this.r3 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    MMC1.prototype.setByte = function (addr, value) {
-        /*Temporary reg port ($8000-FFFF):
-            [r... ...d]
-                r = reset flag
-                d = data bit
-
-        When 'r' is set:
-            - 'd' is ignored
-            - hidden temporary reg is reset (so that the next write is the "first" write)
-            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
-            - other bits of $8000 (and other regs) are unchanged
-
-        When 'r' is clear:
-            - 'd' proceeds as the next bit written in the 5-bit sequence
-            - If this completes the 5-bit sequence:
-                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
-                - temporary reg is reset (so that next write is the "first" write)
-        */
-        value &= 0xff;
-        var flgReset = value >> 7;
-        var flgData = value & 0x1;
-        if (flgReset === 1) {
-            this.rTemp = 0;
-            this.P = 1;
-            this.S = 1;
-            this.iWrite = 0;
-        }
-        else {
-            this.rTemp = (this.rTemp << 1) + flgData;
-            this.iWrite++;
-            if (this.iWrite === 5) {
-                if (addr <= 0x9fff)
-                    this.r0 = this.rTemp;
-                else if (addr <= 0xbfff)
-                    this.r1 = this.rTemp;
-                else if (addr <= 0xdfff)
-                    this.r2 = this.rTemp;
-                else if (addr <= 0xffff)
-                    this.r3 = this.rTemp;
-                this.update();
-            }
-        }
-    };
-    MMC1.prototype.update = function () {
-        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
-        /*
-            PRG Setup:
-            --------------------------
-            There is 1 PRG reg and 3 PRG modes.
-
-                           $8000   $A000   $C000   $E000
-                         +-------------------------------+
-            P=0:         |            <$E000>            |
-                         +-------------------------------+
-            P=1, S=0:    |     { 0 }     |     $E000     |
-                         +---------------+---------------+
-            P=1, S=1:    |     $E000     |     {$0F}     |
-                         +---------------+---------------+
-        */
-        if (this.P === 1) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
-        }
-        else if (this.S === 0) {
-            this.memory.rgmemory[3] = this.PRGBanks[0];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
-        }
-        else {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
-        }
-        /*
-            CHR Setup:
-            --------------------------
-            There are 2 CHR regs and 2 CHR modes.
-
-                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
-                      +---------------------------------------------------------------+
-            C=0:      |                            <$A000>                            |
-                      +---------------------------------------------------------------+
-            C=1:      |             $A000             |             $C000             |
-                      +-------------------------------+-------------------------------+
-        */
-        if (this.C === 0) {
-            console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
-            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
-        }
-        else {
-            console.log('chr mode 2:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
-            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
-        }
-        if (this.M === 0) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-        else if (this.M === 1) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 2) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 3) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-    };
-    return MMC1;
+    /*
+     * 0-3      String "NES^Z" used to recognize .NES files.
+        4        Number of 16kB ROM banks.
+        5        Number of 8kB VROM banks.
+        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
+                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
+                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
+                 bit 3     1 for a four-screen VRAM layout.
+                 bit 4-7   Four lower bits of ROM Mapper Type.
+        7        bit 0     1 for VS-System cartridges.
+                 bit 1-3   Reserved, must be zeroes!
+                 bit 4-7   Four higher bits of ROM Mapper Type.
+        8        Number of 8kB RAM banks. For compatibility with the previous
+                 versions of the .NES format, assume 1x8kB RAM page when this
+                 byte is zero.
+        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
+                 bit 1-7   Reserved, must be zeroes!
+        10-15    Reserved, must be zeroes!
+        16-...   ROM banks, in ascending order. If a trainer is present, its
+                 512 bytes precede the ROM bank contents.
+        ...-EOF  VROM banks, in ascending order.
+     */
+    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
+    return NesImage;
 })();
 ///<reference path="Memory.ts"/>
 var Most6502Base = (function () {
@@ -10531,6 +10390,394 @@ var Mos6502 = (function (_super) {
     };
     return Mos6502;
 })(Most6502Base);
+///<reference path="CompoundMemory.ts"/>
+///<reference path="RAM.ts"/>
+///<reference path="NesImage.ts"/>
+///<reference path="Mos6502.ts"/>
+var NesEmulator = (function () {
+    function NesEmulator(nesImage, canvas) {
+        var _this = this;
+        if (nesImage.fPAL)
+            throw 'only NTSC images are supported';
+        switch (nesImage.mapperType) {
+            case 0:
+                if (nesImage.ROMBanks.length === 1) {
+                    this.memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
+                }
+                else if (nesImage.ROMBanks.length === 2) {
+                    this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
+                }
+                if (nesImage.VRAMBanks.length > 1)
+                    throw 'unknown VRAMBanks';
+                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
+                    throw 'unknown VRAMBanks';
+                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
+                var nameTableA = new RAM(0x400);
+                var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
+                var rest = new RAM(0x1000);
+                this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
+                break;
+            case 1:
+                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
+                this.memory = mmc1.memory;
+                this.vmemory = mmc1.vmemory;
+        }
+        if (!this.memory)
+            throw 'unkown mapper ' + nesImage.mapperType;
+        this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
+        this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
+        this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
+        this.cpu = new Mos6502(this.memory);
+        this.apu = new APU(this.memory, this.cpu);
+        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
+        this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
+        this.ppu.setCtx(canvas.getContext('2d'));
+        this.cpu.reset();
+        this.controller = new Controller(canvas);
+    }
+    NesEmulator.prototype.step = function () {
+        for (var icycle = 0; icycle < 12; icycle++) {
+            if (!(icycle & 3))
+                this.ppu.step();
+            if (icycle === 0) {
+                this.cpu.step();
+            }
+            this.apu.step();
+        }
+    };
+    return NesEmulator;
+})();
+///<reference path="NesEmulator.ts"/>
+var NesRunnerBase = (function () {
+    function NesRunnerBase(container, url) {
+        this.container = container;
+        this.url = url;
+        this.onEndCallback = function () { };
+    }
+    NesRunnerBase.prototype.log = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
+    };
+    NesRunnerBase.prototype.logError = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.classList.add("error");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
+    };
+    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
+        var _this = this;
+        this.headerElement = document.createElement("h2");
+        this.headerElement.innerText = this.url;
+        this.container.appendChild(this.headerElement);
+        var canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 240;
+        canvas.style.zoom = "2";
+        this.container.appendChild(canvas);
+        this.logElement = document.createElement("div");
+        this.container.appendChild(this.logElement);
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", this.url, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function (e) {
+            if (xhr.status > 99 && xhr.status < 299) {
+                var blob = new Uint8Array(xhr.response);
+                onLoad(new NesEmulator(new NesImage(blob), canvas));
+            }
+            else {
+                _this.logError("http error " + xhr.status);
+                onLoad(null);
+            }
+        };
+        xhr.send();
+    };
+    NesRunnerBase.prototype.onEnd = function (callback) {
+        this.onEndCallback = callback;
+    };
+    NesRunnerBase.prototype.run = function () {
+        var _this = this;
+        this.loadEmulator(function (nesEmulator) {
+            _this.nesEmulator = nesEmulator;
+            if (!nesEmulator)
+                _this.onEndCallback();
+            else
+                _this.runI();
+        });
+    };
+    NesRunnerBase.prototype.runI = function () {
+        this.onEndCallback();
+    };
+    return NesRunnerBase;
+})();
+///<reference path="NesEmulator.ts"/>
+///<reference path="NesRunnerBase.ts"/>
+var CpuTestRunner = (function (_super) {
+    __extends(CpuTestRunner, _super);
+    function CpuTestRunner(container, url) {
+        _super.call(this, container, url);
+        this.callback = this.renderFrame.bind(this);
+    }
+    CpuTestRunner.prototype.testFinished = function (nesEmulator) {
+        if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
+            nesEmulator.cpu.getByte(0x6001) === 0xde &&
+            nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
+            nesEmulator.cpu.getByte(0x6003) === 0x61) {
+            var resultCode = nesEmulator.cpu.getByte(0x6000);
+            if (resultCode !== 0)
+                this.logError('res: ' + resultCode.toString(16));
+            var res = "";
+            var i = 0x6004;
+            while (nesEmulator.cpu.getByte(i) !== 0) {
+                res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+                i++;
+            }
+            this.log(res);
+            return true;
+        }
+        return false;
+    };
+    CpuTestRunner.prototype.runI = function () {
+        requestAnimationFrame(this.callback);
+    };
+    CpuTestRunner.prototype.renderFrame = function () {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        if (this.testFinished(nesEmulator)) {
+            this.onEndCallback();
+            return;
+        }
+        var frameCurrent = ppu.iFrame;
+        while (frameCurrent === ppu.iFrame)
+            nesEmulator.step();
+        requestAnimationFrame(this.callback);
+    };
+    return CpuTestRunner;
+})(NesRunnerBase);
+///<reference path="Memory.ts"/>
+///<reference path="RAM.ts"/>
+///<reference path="CompoundMemory.ts"/>
+var MMC1 = (function () {
+    function MMC1(PRGBanks, VROMBanks) {
+        this.PRGBanks = PRGBanks;
+        this.VROMBanks = VROMBanks;
+        this.iWrite = 0;
+        this.rTemp = 0;
+        /**
+         * $8000-9FFF:  [...C PSMM]
+         */
+        this.r0 = 0;
+        /**
+         *  $A000-BFFF:  [...C CCCC]
+            CHR Reg 0
+         */
+        this.r1 = 0;
+        /**
+         *  $C000-DFFF:  [...C CCCC]
+         *  CHR Reg 1
+         */
+        this.r2 = 0;
+        /**
+         * $E000-FFFF:  [...W PPPP]
+         */
+        this.r3 = 0;
+        while (PRGBanks.length < 2)
+            PRGBanks.push(new RAM(0x4000));
+        while (VROMBanks.length < 2)
+            VROMBanks.push(new RAM(0x1000));
+        this.memory = new CompoundMemory(new RepeatedMemory(4, new RAM(0x800)), new RAM(0x2000), new RAM(0x8000), PRGBanks[0], PRGBanks[1]);
+        this.nametableA = new RAM(0x400);
+        this.nametableB = new RAM(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
+        this.vmemory = new CompoundMemory(VROMBanks[0], VROMBanks[1], this.nametable, new RAM(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+    }
+    Object.defineProperty(MMC1.prototype, "C", {
+        /** CHR Mode (0=8k mode, 1=4k mode) */
+        get: function () { return (this.r0 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "P", {
+        /** PRG Size (0=32k mode, 1=16k mode) */
+        get: function () { return (this.r0 >> 3) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "S", {
+        /**
+         * Slot select:
+         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
+         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
+         *  This bit is ignored when 'P' is clear (32k mode)
+         */
+        get: function () { return (this.r0 >> 2) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "M", {
+        /**
+         *  Mirroring control:
+         *  %00 = 1ScA
+         *  %01 = 1ScB
+         *  %10 = Vert
+         *  %11 = Horz
+         */
+        get: function () { return this.r0 & 3; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "CHR0", {
+        get: function () { return this.r1 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "CHR1", {
+        get: function () { return this.r1 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "PRG0", {
+        get: function () { return this.r3 & 15; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MMC1.prototype, "W", {
+        /**
+         * W = WRAM Disable (0=enabled, 1=disabled)
+         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
+         * Later ones do.
+         */
+        get: function () { return (this.r3 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    MMC1.prototype.setByte = function (addr, value) {
+        /*Temporary reg port ($8000-FFFF):
+            [r... ...d]
+                r = reset flag
+                d = data bit
+
+        When 'r' is set:
+            - 'd' is ignored
+            - hidden temporary reg is reset (so that the next write is the "first" write)
+            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
+            - other bits of $8000 (and other regs) are unchanged
+
+        When 'r' is clear:
+            - 'd' proceeds as the next bit written in the 5-bit sequence
+            - If this completes the 5-bit sequence:
+                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
+                - temporary reg is reset (so that next write is the "first" write)
+        */
+        value &= 0xff;
+        var flgReset = value >> 7;
+        var flgData = value & 0x1;
+        if (flgReset === 1) {
+            this.rTemp = 0;
+            this.P = 1;
+            this.S = 1;
+            this.iWrite = 0;
+        }
+        else {
+            this.rTemp = (this.rTemp << 1) + flgData;
+            this.iWrite++;
+            if (this.iWrite === 5) {
+                if (addr <= 0x9fff)
+                    this.r0 = this.rTemp;
+                else if (addr <= 0xbfff)
+                    this.r1 = this.rTemp;
+                else if (addr <= 0xdfff)
+                    this.r2 = this.rTemp;
+                else if (addr <= 0xffff)
+                    this.r3 = this.rTemp;
+                this.update();
+            }
+        }
+    };
+    MMC1.prototype.update = function () {
+        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
+        /*
+            PRG Setup:
+            --------------------------
+            There is 1 PRG reg and 3 PRG modes.
+
+                           $8000   $A000   $C000   $E000
+                         +-------------------------------+
+            P=0:         |            <$E000>            |
+                         +-------------------------------+
+            P=1, S=0:    |     { 0 }     |     $E000     |
+                         +---------------+---------------+
+            P=1, S=1:    |     $E000     |     {$0F}     |
+                         +---------------+---------------+
+        */
+        if (this.P === 1) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
+            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+        }
+        else if (this.S === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
+        }
+        else {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
+        }
+        /*
+            CHR Setup:
+            --------------------------
+            There are 2 CHR regs and 2 CHR modes.
+
+                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
+                      +---------------------------------------------------------------+
+            C=0:      |                            <$A000>                            |
+                      +---------------------------------------------------------------+
+            C=1:      |             $A000             |             $C000             |
+                      +-------------------------------+-------------------------------+
+        */
+        if (this.C === 0) {
+            console.log('chr:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
+            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
+        }
+        else {
+            console.log('chr mode 2:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
+            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
+        }
+        if (this.M === 0) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+        else if (this.M === 1) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 2) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 3) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+    };
+    return MMC1;
+})();
 ///<reference path="Memory.ts"/>
 var Mos6502Old = (function () {
     function Mos6502Old(memory) {
@@ -13463,132 +13710,41 @@ var Mos6502Old = (function () {
     };
     return Mos6502Old;
 })();
-var NesImage = (function () {
-    function NesImage(rawBytes) {
-        this.trainer = null;
-        for (var i = 0; i < 4; i++)
-            if (rawBytes[i] !== NesImage.magic[i])
-                throw 'invalid NES header';
-        this.ROMBanks = new Array(rawBytes[4]);
-        this.VRAMBanks = new Array(rawBytes[5]);
-        this.fVerticalMirroring = !!(rawBytes[6] & 1);
-        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
-        var fTrainer = !!(rawBytes[6] & 4);
-        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
-        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
-        this.fVSSystem = !!(rawBytes[7] & 1);
-        if ((rawBytes[7] & 0x0e) !== 0)
-            throw 'invalid NES header';
-        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
-        this.fPAL = (rawBytes[9] & 1) === 1;
-        if ((rawBytes[9] & 0xfe) !== 0)
-            throw 'invalid NES header';
-        for (var i = 0xa; i < 0x10; i++)
-            if (rawBytes[i] !== 0)
-                throw 'invalid NES header';
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
-            throw 'invalid NES format';
-        var idx = 0x10;
-        if (fTrainer) {
-            this.trainer = rawBytes.slice(idx, idx + 0x100);
-            idx += 0x100;
-        }
-        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
-            this.RAMBanks[ibank] = new RAM(0x2000);
-        }
-        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
-            idx += 0x4000;
-        }
-        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
-            idx += 0x2000;
-        }
+///<reference path="NesEmulator.ts"/>
+///<reference path="NesRunnerBase.ts"/>
+var NesRunner = (function (_super) {
+    __extends(NesRunner, _super);
+    function NesRunner(container, url) {
+        _super.call(this, container, url);
+        this.callback = this.renderFrame.bind(this);
+        this.iFrameStart = 0;
+        this.hpcStart = 0;
     }
-    /*
-     * 0-3      String "NES^Z" used to recognize .NES files.
-        4        Number of 16kB ROM banks.
-        5        Number of 8kB VROM banks.
-        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
-                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
-                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
-                 bit 3     1 for a four-screen VRAM layout.
-                 bit 4-7   Four lower bits of ROM Mapper Type.
-        7        bit 0     1 for VS-System cartridges.
-                 bit 1-3   Reserved, must be zeroes!
-                 bit 4-7   Four higher bits of ROM Mapper Type.
-        8        Number of 8kB RAM banks. For compatibility with the previous
-                 versions of the .NES format, assume 1x8kB RAM page when this
-                 byte is zero.
-        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
-                 bit 1-7   Reserved, must be zeroes!
-        10-15    Reserved, must be zeroes!
-        16-...   ROM banks, in ascending order. If a trainer is present, its
-                 512 bytes precede the ROM bank contents.
-        ...-EOF  VROM banks, in ascending order.
-     */
-    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
-    return NesImage;
-})();
-///<reference path="CompoundMemory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="NesImage.ts"/>
-///<reference path="Mos6502.ts"/>
-var NesEmulator = (function () {
-    function NesEmulator(nesImage, canvas) {
-        var _this = this;
-        this.icycle = 0;
-        if (nesImage.fPAL)
-            throw 'only NTSC images are supported';
-        switch (nesImage.mapperType) {
-            case 0:
-                if (nesImage.ROMBanks.length === 1) {
-                    this.memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
-                }
-                else if (nesImage.ROMBanks.length === 2) {
-                    this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
-                }
-                if (nesImage.VRAMBanks.length > 1)
-                    throw 'unknown VRAMBanks';
-                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
-                    throw 'unknown VRAMBanks';
-                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
-                var nameTableA = new RAM(0x400);
-                var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
-                var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
-                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
-                var rest = new RAM(0x1000);
-                this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
-                break;
-            case 1:
-                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
-                this.memory = mmc1.memory;
-                this.vmemory = mmc1.vmemory;
-        }
-        if (!this.memory)
-            throw 'unkown mapper ' + nesImage.mapperType;
-        this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
-        this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
-        this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
-        this.cpu = new Mos6502(this.memory);
-        this.apu = new APU(this.memory, this.cpu);
-        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
-        this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.ppu.setCtx(canvas.getContext('2d'));
-        this.cpu.reset();
-        this.controller = new Controller(canvas);
-    }
-    NesEmulator.prototype.step = function () {
-        this.cpu.step();
-        for(var i=0;i<3;i++)
-        {
-            this.ppu.step();
-            this.apu.step();
-            this.apu.step();
-        }
+    NesRunner.prototype.runI = function () {
+        this.hpcStart = window.performance.now();
+        this.iFrameStart = this.nesEmulator.ppu.iFrame;
+        this.fpsElement = document.createElement("span");
+        this.headerElement.innerText += " ";
+        this.headerElement.appendChild(this.fpsElement);
+        requestAnimationFrame(this.callback);
     };
-    return NesEmulator;
-})();
+    NesRunner.prototype.renderFrame = function (hpcNow) {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        var dt = hpcNow - this.hpcStart;
+        if (dt > 1000) {
+            var fps = (ppu.iFrame - this.iFrameStart) / dt * 1000;
+            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
+            this.iFrameStart = ppu.iFrame;
+            this.hpcStart = hpcNow;
+        }
+        var frameCurrent = ppu.iFrame;
+        while (frameCurrent === ppu.iFrame)
+            nesEmulator.step();
+        requestAnimationFrame(this.callback);
+    };
+    return NesRunner;
+})(NesRunnerBase);
 var SpriteRenderingInfo = (function () {
     function SpriteRenderingInfo() {
     }
@@ -14176,19 +14332,6 @@ var PPU = (function () {
     };
     PPU.prototype.stepDraw = function () {
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
-            // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-            // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-            //
-            // The address to be fetched during rendering can be deduced from v in the following way:
-            //   tile address      = 0x2000 | (v & 0x0FFF)
-            //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-            //
-            // The low 12 bits of the attribute address are composed in the following way:
-            //   NN 1111 YYY XXX
-            //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-            //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-            //   || ++++---------- attribute offset (960 bytes)
-            //   ++--------------- nametable select
             var icolorBg;
             var bgTransparent = true;
             if (this.showBg) {
@@ -14750,11 +14893,11 @@ var ROM = (function () {
     return ROM;
 })();
 ///<reference path="NesEmulator.ts"/>
-var StepTest = (function () {
-    function StepTest() {
+var StepTestRunner = (function () {
+    function StepTestRunner() {
         this.ich = 0;
     }
-    StepTest.prototype.readLine = function () {
+    StepTestRunner.prototype.readLine = function () {
         var st = "";
         while (this.ich < this.expectedOutput.length) {
             if (this.expectedOutput[this.ich] === '\n') {
@@ -14768,7 +14911,7 @@ var StepTest = (function () {
         return st;
     };
     ;
-    StepTest.prototype.run = function (nesemu, expectedOutput, log) {
+    StepTestRunner.prototype.run = function (nesemu, expectedOutput, log) {
         var prevLines = [];
         this.expectedOutput = expectedOutput;
         this.ich = 0;
@@ -14820,6 +14963,6 @@ var StepTest = (function () {
         ;
         log('done');
     };
-    return StepTest;
+    return StepTestRunner;
 })();
 //# sourceMappingURL=app.js.map

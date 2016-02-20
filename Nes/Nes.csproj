@@ -279,9 +279,12 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\APU.ts" />
+    <TypeScriptCompile Include="app\CpuTestRunner.ts" />
     <TypeScriptCompile Include="app\Mos6502Base.ts" />
     <TypeScriptCompile Include="app\Mos6502.ts" />
     <TypeScriptCompile Include="app\Controller.ts" />
+    <TypeScriptCompile Include="app\NesRunnerBase.ts" />
+    <TypeScriptCompile Include="app\NesRunner.ts" />
     <TypeScriptCompile Include="app\PPU.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
@@ -293,7 +296,7 @@
     <TypeScriptCompile Include="app\Mos6502Old.ts" />
     <TypeScriptCompile Include="app\NesEmulator.ts" />
     <TypeScriptCompile Include="app\NesImage.ts" />
-    <TypeScriptCompile Include="app\StepTest.ts" />
+    <TypeScriptCompile Include="app\StepTestRunner.ts" />
     <TypeScriptCompile Include="Scripts\typings\jquery\jquery.d.ts" />
   </ItemGroup>
   <ItemGroup>

@@ -14,199 +14,93 @@
 </head>
 <body>
 <button id="btnTest">Test</button>
-<div id="log"></div>
+<div id="nesContainer"></div>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
 <script src="js/app.js"></script>
 <script language="javascript">
 
-	function log() {
+	//function runStepTest(url) {
+	//	log('<h2>', url, '</h2>');
+	//	loadNesEmulator(url, null, function (nesEmulator) {
+	//		$.get(url.replace('.nes', '.log')).then(function(logLines) {
+	//			new StepTestRuner().run(nesEmulator, logLines, function (st) { log(st) });
+	//		});
+	//	});
 		
-		var st = '<div>';
-		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i];
-		};
-		st += '</div>';
-		$('#log').append(st.replace(/\n/g, '<br/>'));
-	}
+	//}
 
-	function log_error() {
-		var st = '<div class="error">';
-		for (var i = 0; i < arguments.length; i++) {
-			st += ' ' + arguments[i];
-		};
-		st += "</div>";
-		$('#log').append(st.replace(/\n/g, '<br/>'));
-	}
-
-	function loadNesEmulator(url, canvas, done) {
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', url, true);
-		xhr.responseType = 'arraybuffer';
-		xhr.onload = function (e) {
-			if (this.readyState === 4 && this.status !== 200) {
-				log_error('http error ' + this.status);
-				done(null);
-			}
-			if (this.status === 200) {
-				var blob = new Uint8Array(this.response);
-				done(new NesEmulator(new NesImage(blob), canvas));
-			}
-		}
-		xhr.send();
-	}
-	function testFinished(nesEmulator) {
-		if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
-			nesEmulator.cpu.getByte(0x6001) === 0xde &&
-			nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
-			nesEmulator.cpu.getByte(0x6003) === 0x61
-		)
-		{
-			var resultCode = nesEmulator.cpu.getByte(0x6000);
-			if (resultCode !== 0)
-				log_error('res: ' + resultCode.toString(16));
-
-			var res = "";
-			var i = 0x6004;
-			while (nesEmulator.cpu.getByte(i) !== 0) {
-				res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-				i++;
-			}
-			log(res);
-			return true;
-		}
-
-		return false;
-	}
-
-
-	var $spanFps;
-	var nesEmulator;
-	var iframeStart;
-	var timeStart;
-
-	function step() {
-			
-		var frameStart = nesEmulator.ppu.iFrame;
-		while (frameStart === nesEmulator.ppu.iFrame)
-			nesEmulator.step();
-
-		//if (testFinished(nesEmulator)) {
-		//	nesEmulator.ppu.getNameTable(0);
-		//	log((Date.now() - timeStart) / 1000, 'sec', window.fps, 'fps');
-		//	done();
-		//	return;
-		//}
-		var dt = Date.now() - timeStart;
-		if (dt > 1000) {
-			window.fps = (nesEmulator.ppu.iFrame - iframeStart) / dt * 1000;
-			$spanFps.text(Math.round(window.fps * 100) / 100);
-
-			iframeStart = nesEmulator.ppu.iFrame;
-			timeStart = Date.now();
-		}
-		requestAnimationFrame(step);
-
-	}
-
-	function runTest(url, done) {
-		log('<h2>', url, '<span id="fps"></span> fps</h2>');
-
-		done = done || function () { }
-		$spanFps = $('#fps');
-		var canvas = document.createElement('canvas');
-		canvas.width = 256;
-		canvas.height = 240;
-		$(canvas).css('zoom', 2);
-		$('#log').append(canvas);
-
-		loadNesEmulator(url, canvas, function (nesEmulator) {
-			window.nesEmulator = nesEmulator;
-			timeStart = Date.now();
-			iframeStart = 0;
-			requestAnimationFrame(step);
-		});
-	}
-
-	function runStepTest(url) {
-		log('<h2>', url, '</h2>');
-		loadNesEmulator(url, null, function (nesEmulator) {
-			$.get(url.replace('.nes', '.log')).then(function(logLines) {
-				new StepTest().run(nesEmulator, logLines, function (st) { log(st) });
-			});
-		});
-		
-	}
-
-	function runAll(urls) {
+	function runAll(nesRunners) {
 		var i = 0;
 		function runSingle() {
-			if (i < urls.length) {
-				runTest(urls[i], function () {
+			if (i < nesRunners.length) {
+				nesRunners[i].onEndCallback = function () {
 					i++;
 					window.setTimeout(runSingle(), 0);
-				});
+				};
+				nesRunners[i].run();
 			}			
 		}
 		runSingle();
 	}
 
+
+
 	$('#btnTest').click(() => {
 
-		//this.runStepTest('test/smb.nes');
-		//return; 
-		var tests_blargg = [
-			//'test/dk.nes',
-			'test/smb.nes',
-			'test/color_test/color_test.nes',
-			'test/palette/palette.nes',
+		var nesContainerElement = document.getElementById('nesContainer');
 
-			//'test/ppu/vram_access.nes',
-			//'test/ppu/vbl_clear_time.nes',
-			//'test/ppu/sprite_ram.nes',
-			//'test/ppu/palette_ram.nes',
-			//'test/ppu/power_up_palette.nes',
+		var nesRunners = [
+			//new NesRunner(nesContainerElement, 'test/dk.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb.nes'),
+			//new NesRunner(nesContainerElement, 'test/color_test/color_test.nes'),
+			//new NesRunner(nesContainerElement, 'test/palette/palette.nes'),
 
-			'test/cpu_interrupts/cpu_interrupts.nes',
-			'test/cpu_interrupts/rom_singles/1-cli_latency.nes',
-			'test/cpu_interrupts/rom_singles/2-nmi_and_brk.nes',
-			'test/cpu_interrupts/rom_singles/3-nmi_and_irq.nes',
+			//new NesRunner(nesContainerElement, 'test/ppu/vram_access.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/vbl_clear_time.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/sprite_ram.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/palette_ram.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/power_up_palette.nes'),
 
-			'test/cpu_interrupts/rom_singles/4-irq_and_dma.nes',
-			'test/cpu_interrupts/rom_singles/5-branch_delays_irq.nes',
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/cpu_interrupts.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/1-cli_latency.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/2-nmi_and_brk.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/3-nmi_and_irq.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/4-irq_and_dma.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/5-branch_delays_irq.nes'),
 
-			'test/instr_timing/instr_timing.nes',
-			'test/instr_timing/rom_singles/1-instr_timing.nes',
-			'test/instr_timing/rom_singles/2-branch_timing.nes',
-		    'test/instr_test-v5/rom_singles/01-basics.nes',
-		    'test/instr_test-v5/rom_singles/02-implied.nes',
-		    'test/instr_test-v5/rom_singles/03-immediate.nes',
-		    'test/instr_test-v5/rom_singles/04-zero_page.nes',
-		    'test/instr_test-v5/rom_singles/05-zp_xy.nes',
-		    'test/instr_test-v5/rom_singles/06-absolute.nes',
-		    'test/instr_test-v5/rom_singles/07-abs_xy.nes',
-		    'test/instr_test-v5/rom_singles/08-ind_x.nes',
-		    'test/instr_test-v5/rom_singles/09-ind_y.nes',
-		    'test/instr_test-v5/rom_singles/10-branches.nes',
-		    'test/instr_test-v5/rom_singles/11-stack.nes',
-		    'test/instr_test-v5/rom_singles/12-jmp_jsr.nes',
-		    'test/instr_test-v5/rom_singles/13-rts.nes',
-		    'test/instr_test-v5/rom_singles/14-rti.nes',
-		    'test/instr_test-v5/rom_singles/15-brk.nes',
-		    'test/instr_test-v5/rom_singles/16-special.nes',
-			'test/instr_test-v5/official_only.nes',
-			'test/instr_test-v5/all_instrs.nes',
+			new CpuTestRunner(nesContainerElement, 'test/instr_timing/instr_timing.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_timing/rom_singles/1-instr_timing.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_timing/rom_singles/2-branch_timing.nes'),
 
-			'test/instr_misc/01-abs_x_wrap.nes',
-			'test/instr_misc/02-branch_wrap.nes',
-			'test/instr_misc/03-dummy_reads.nes',
-			'test/instr_misc/04-dummy_reads_apu.nes',
-			'test/instr_misc/instr_misc.nes'
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/01-basics.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/02-implied.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/03-immediate.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/04-zero_page.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/05-zp_xy.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/06-absolute.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/07-abs_xy.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/08-ind_x.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/09-ind_y.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/10-branches.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/11-stack.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/12-jmp_jsr.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/13-rts.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/14-rti.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/15-brk.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/16-special.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/official_only.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/all_instrs.nes'),
+
+			new CpuTestRunner(nesContainerElement, 'test/instr_misc/01-abs_x_wrap.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_misc/02-branch_wrap.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_misc/03-dummy_reads.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_misc/04-dummy_reads_apu.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/instr_misc/instr_misc.nes')
 		];
 
-
-		runAll(tests_blargg);
-	//	runTest(tests_inst[2]);
+		runAll(nesRunners);
 
 	});
 

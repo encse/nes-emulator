@@ -669,19 +669,7 @@ class PPU {
 
     public stepDraw() {
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
-            // The high bits of v are used for fine Y during rendering, and addressing nametable data 
-            // only requires 12 bits, with the high 2 CHR addres lines fixed to the 0x2000 region. 
-            //
-            // The address to be fetched during rendering can be deduced from v in the following way:
-            //   tile address      = 0x2000 | (v & 0x0FFF)
-            //   attribute address = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
-            //
-            // The low 12 bits of the attribute address are composed in the following way:
-            //   NN 1111 YYY XXX
-            //   || |||| ||| +++-- high 3 bits of coarse X (x / 4)
-            //   || |||| +++------ high 3 bits of coarse Y (y / 4)
-            //   || ++++---------- attribute offset (960 bytes)
-            //   ++--------------- nametable select
+          
 
             var icolorBg: number;
             var bgTransparent = true;

@@ -1,5 +1,5 @@
 ﻿///<reference path="NesEmulator.ts"/>
-class StepTest {
+class StepTestRunner {
 
     private expectedOutput: string;
     private ich = 0;
