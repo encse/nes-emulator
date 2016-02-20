@@ -4,6 +4,30 @@
     <title></title>
 	<meta charset="utf-8"/>
 	<style>
+		.passed {
+			background: lightgreen;
+		}
+		.failed{
+			background: red;
+		}
+		.test-case {
+			overflow: hidden;
+			display: flex;
+			margin: 2px;
+			height: 80px;
+		}
+		.test-case canvas {
+			order: 1;
+			height: 100%;
+		}
+		.test-case h2 {
+			margin: 0;
+			padding: 0;
+			order: 2;
+		}
+		.test-case .log {
+			order: 3;
+		}
 		.error {
 			background: yellow;
 		}
@@ -53,60 +77,79 @@
 
 		var nesRunners = [
 			//new NesRunner(nesContainerElement, 'test/dk.nes'),
-			new NesRunner(nesContainerElement, 'test/smb.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/NormalMarioBrosExtreme.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/SuperMarioBros-TimeAndPlace.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/SuperMarioRect.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/supermarioprank.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/SuperMarioGhost.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/SuperKinokoFry.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/ScrollingMarioBros.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/silhouettebros.nes'),
-			new NesRunner(nesContainerElement, 'test/smb/SuperMarioBros-Respawn.nes'),
-			//new NesRunner(nesContainerElement, 'test/color_test/color_test.nes'),
-			//new NesRunner(nesContainerElement, 'test/palette/palette.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/NormalMarioBrosExtreme.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/SuperMarioBros-TimeAndPlace.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/SuperMarioRect.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/supermarioprank.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/SuperMarioGhost.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/SuperKinokoFry.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/ScrollingMarioBros.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/silhouettebros.nes'),
+			//new NesRunner(nesContainerElement, 'test/smb/SuperMarioBros-Respawn.nes'),
 
-			//new NesRunner(nesContainerElement, 'test/ppu/vram_access.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/vbl_clear_time.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/sprite_ram.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/palette_ram.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/power_up_palette.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/color_test/color_test.nes'),
+			//new NesRunner(nesContainerElement, 'test/ppu/palette/palette.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/vram_access.nes', '$01'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/vbl_clear_time.nes', '$01'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/sprite_ram.nes', '$01'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/palette_ram.nes', '$01'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/power_up_palette.nes', '$01'),
 
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/cpu_interrupts.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/1-cli_latency.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/2-nmi_and_brk.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/3-nmi_and_irq.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/4-irq_and_dma.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu_interrupts/rom_singles/5-branch_delays_irq.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_timing/sprite_hit_timing.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/01.basics.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/02.alignment.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/03.corners.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/04.flip.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/05.left_clip.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/06.right_edge.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/07.screen_bottom.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/08.double_height.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/09.timing_basics.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/10.timing_order.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/11.edge_timing.nes', 'PASSED'),
 
-			new CpuTestRunner(nesContainerElement, 'test/instr_timing/instr_timing.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_timing/rom_singles/1-instr_timing.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_timing/rom_singles/2-branch_timing.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/1.Basics.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/2.Details.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/3.Timing.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/4.Obscure.nes', 'PASSED'),
+			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/5.Emulator.nes', 'PASSED'),
 
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/01-basics.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/02-implied.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/03-immediate.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/04-zero_page.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/05-zp_xy.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/06-absolute.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/07-abs_xy.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/08-ind_x.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/09-ind_y.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/10-branches.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/11-stack.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/12-jmp_jsr.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/13-rts.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/14-rti.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/15-brk.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/rom_singles/16-special.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/official_only.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_test-v5/all_instrs.nes'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/cpu_interrupts.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/1-cli_latency.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/2-nmi_and_brk.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/3-nmi_and_irq.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/4-irq_and_dma.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/5-branch_delays_irq.nes', 'Passed'),
 
-			new CpuTestRunner(nesContainerElement, 'test/instr_misc/01-abs_x_wrap.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_misc/02-branch_wrap.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_misc/03-dummy_reads.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_misc/04-dummy_reads_apu.nes'),
-			new CpuTestRunner(nesContainerElement, 'test/instr_misc/instr_misc.nes')
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/instr_timing.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/rom_singles/1-instr_timing.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/rom_singles/2-branch_timing.nes', 'Passed'),
+
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/01-basics.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/02-implied.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/03-immediate.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/04-zero_page.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/05-zp_xy.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/06-absolute.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/07-abs_xy.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/08-ind_x.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/09-ind_y.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/10-branches.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/11-stack.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/12-jmp_jsr.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/13-rts.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/14-rti.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/15-brk.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/16-special.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/official_only.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/all_instrs.nes', 'Passed'),
+
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/01-abs_x_wrap.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/02-branch_wrap.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/03-dummy_reads.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/04-dummy_reads_apu.nes', 'Passed'),
+			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/instr_misc.nes', 'Passed')
 		];
 
 		runAll(nesRunners);

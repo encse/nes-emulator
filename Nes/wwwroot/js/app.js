@@ -10687,6 +10687,9 @@ var NesRunnerBase = (function () {
     function NesRunnerBase(container, url) {
         this.container = container;
         this.url = url;
+        var containerT = document.createElement('div');
+        this.container.appendChild(containerT);
+        this.container = containerT;
         this.onEndCallback = function () { };
     }
     NesRunnerBase.prototype.log = function () {
@@ -10725,6 +10728,7 @@ var NesRunnerBase = (function () {
         canvas.style.zoom = "2";
         this.container.appendChild(canvas);
         this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
         this.container.appendChild(this.logElement);
         var xhr = new XMLHttpRequest();
         xhr.open("GET", this.url, true);
@@ -10763,9 +10767,11 @@ var NesRunnerBase = (function () {
 ///<reference path="NesRunnerBase.ts"/>
 var CpuTestRunner = (function (_super) {
     __extends(CpuTestRunner, _super);
-    function CpuTestRunner(container, url) {
+    function CpuTestRunner(container, url, checkForString) {
         _super.call(this, container, url);
+        this.checkForString = checkForString;
         this.callback = this.renderFrame.bind(this);
+        this.container.classList.add('test-case');
     }
     CpuTestRunner.prototype.testFinished = function (nesEmulator) {
         if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
@@ -10773,8 +10779,13 @@ var CpuTestRunner = (function (_super) {
             nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
             nesEmulator.cpu.getByte(0x6003) === 0x61) {
             var resultCode = nesEmulator.cpu.getByte(0x6000);
-            if (resultCode !== 0)
-                this.logError('res: ' + resultCode.toString(16));
+            if (resultCode !== 0) {
+                this.log('res: ' + resultCode.toString(16));
+                this.container.classList.add('failed');
+            }
+            else {
+                this.container.classList.add('passed');
+            }
             var res = "";
             var i = 0x6004;
             while (nesEmulator.cpu.getByte(i) !== 0) {
@@ -10782,6 +10793,19 @@ var CpuTestRunner = (function (_super) {
                 i++;
             }
             this.log(res);
+            return true;
+        }
+        if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
+            nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
+            nesEmulator.cpu.flgInterruptDisable) {
+            var out = nesEmulator.ppu.getNameTable(0);
+            this.log(out);
+            if (out.indexOf(this.checkForString) >= 0) {
+                this.container.classList.add('passed');
+            }
+            else {
+                this.container.classList.add('failed');
+            }
             return true;
         }
         return false;
@@ -10796,9 +10820,16 @@ var CpuTestRunner = (function (_super) {
             this.onEndCallback();
             return;
         }
-        var frameCurrent = ppu.iFrame;
-        while (frameCurrent === ppu.iFrame)
-            nesEmulator.step();
+        try {
+            var frameCurrent = ppu.iFrame;
+            while (frameCurrent === ppu.iFrame)
+                nesEmulator.step();
+        }
+        catch (e) {
+            this.logError(e);
+            this.onEndCallback();
+            return;
+        }
         requestAnimationFrame(this.callback);
     };
     return CpuTestRunner;
@@ -14192,7 +14223,7 @@ var PPU = (function () {
                     var res = this.flgVblank ? (1 << 7) : 0;
                     res += this.flgSpriteZeroHit ? (1 << 6) : 0;
                     res += this.flgSpriteOverflow ? (1 << 5) : 0;
-                    res |= (this.lastWrittenStuff & 0x63);
+                    res |= (this.lastWrittenStuff & 31);
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
                     this.cpu.nmiLine = 1;
@@ -14392,7 +14423,7 @@ var PPU = (function () {
             }
             st += '\n';
         }
-        console.log(st);
+        return st;
     };
     PPU.prototype.getPatternTable = function () {
         var canvas = document.createElement('canvas');
@@ -14503,7 +14534,7 @@ var PPU = (function () {
                         case OamState.CheckOverflow:
                             if (this.m === 0) {
                                 if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
-                                    this.flgSpriteOverflow = true;
+                                    this.flgSpriteOverflow = this.showBg || this.showSprites;
                                     this.m++;
                                 }
                                 else {

@@ -237,7 +237,7 @@ class PPU {
             let res = this.flgVblank ? (1 << 7) : 0;
             res += this.flgSpriteZeroHit ? (1 << 6) : 0;
             res += this.flgSpriteOverflow ? (1 << 5) : 0;
-            res |= (this.lastWrittenStuff & 0x63);
+            res |= (this.lastWrittenStuff & 31);
             //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
             this.flgVblank = false;
             this.cpu.nmiLine = 1;
@@ -477,7 +477,7 @@ class PPU {
             }
             st += '\n';
         }
-        console.log(st);
+        return st;
     }
 
     public getPatternTable() {
@@ -609,7 +609,7 @@ class PPU {
                         case OamState.CheckOverflow:
                             if (this.m === 0) {
                                 if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
-                                    this.flgSpriteOverflow = true;
+                                    this.flgSpriteOverflow = this.showBg || this.showSprites;
                                     this.m++;
                                 } else {
                                     this.n++;
@@ -760,7 +760,6 @@ class PPU {
                 if (this.sy === 261) {
                     if (this.sx === 1) {
                         this.flgVblank = false;
-                        //sprite 0, overflow
                     }
                 }
 

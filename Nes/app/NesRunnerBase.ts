@@ -8,7 +8,10 @@ class NesRunnerBase {
     nesEmulator: NesEmulator;
 
 
-    constructor(private container: HTMLElement, private url: string) {
+    constructor(protected container: HTMLElement, private url: string) {
+        const containerT = document.createElement('div');
+        this.container.appendChild(containerT);
+        this.container = containerT;
         this.onEndCallback = () => { };
     }
 
@@ -45,6 +48,7 @@ class NesRunnerBase {
         this.container.appendChild(canvas);
 
         this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
         this.container.appendChild(this.logElement);
 
         var xhr = new XMLHttpRequest();
