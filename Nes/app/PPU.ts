@@ -1,4 +1,5 @@
 ﻿class SpriteRenderingInfo {
+    flgZeroSprite: boolean;
     xCounter: number;
     tileLo: number;
     tileHi: number;
@@ -97,6 +98,7 @@ class PPU {
     public iFrame = 0;
 
     private secondaryOam: Uint8Array;
+    private secondaryOamISprite: Int8Array;
     private oam:Uint8Array;
     private rgspriteRenderingInfo: SpriteRenderingInfo[];
     private ispriteNext = 0;
@@ -147,6 +149,7 @@ class PPU {
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
 
         this.secondaryOam = new Uint8Array(32);
+        this.secondaryOamISprite = new Int8Array(8);
         this.oam = new Uint8Array(256);
         this.rgspriteRenderingInfo = [];
         for (let isprite = 0; isprite < 8; isprite++)
@@ -534,12 +537,6 @@ class PPU {
     public step() {
         this.stepDraw();
 
-        ////dummy sprite zero hit
-        if (this.sy === 30 && this.sx === 1)
-            this.flgSpriteZeroHit = true;
-        if (this.sy === 261 && this.sx === 0)
-            this.flgSpriteZeroHit = false;
-
         this.stepOam();
 
         this.stepBg();
@@ -565,6 +562,7 @@ class PPU {
                 // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
                 // is active that makes the read always return $FF.
                 this.secondaryOam[this.sx] = 0xff;
+                this.secondaryOamISprite[this.sx >> 2] = -1;
                 if (this.sx === 64) {
                     this.m = 0;
                     this.n = 0;
@@ -588,8 +586,10 @@ class PPU {
                             if (this.m === 0) {
                                 this.secondaryOam[this.addrSecondaryOam] = this.oamB;
                                 if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
+                                    this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
                                     this.addrSecondaryOam++;
                                     this.m++; //start copying
+
                                 } else {
                                     this.n++;
                                 }
@@ -638,32 +638,32 @@ class PPU {
                 let b0 = this.secondaryOam[addrOamBase + 0];
 
                 if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = 256;
-                }
-                else {
+                    spriteRenderingInfo.xCounter = -100;
+                } else {
                     switch (this.sx & 7) {
-                        case 1:
-                        {
-                            let b2 = this.secondaryOam[addrOamBase + 2];
-                            let b3 = this.secondaryOam[addrOamBase + 3];
-                            spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
-                            spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
-                            spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
-                            spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-                            spriteRenderingInfo.xCounter = b3;
-                        }
-                        case 0:
-                        {
-                            let b1 = this.secondaryOam[addrOamBase + 1];
-                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
-                            break;
-                        }
-                        case 6:
-                        {
-                            let b1 = this.secondaryOam[addrOamBase + 1];
-                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
-                            break;
-                        }
+                    case 1:
+                    {
+                        let b2 = this.secondaryOam[addrOamBase + 2];
+                        let b3 = this.secondaryOam[addrOamBase + 3];
+                        spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
+                        spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                        spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                        spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+                        spriteRenderingInfo.xCounter = b3;
+                        spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                    }
+                    case 0:
+                    {
+                        let b1 = this.secondaryOam[addrOamBase + 1];
+                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
+                        break;
+                    }
+                    case 6:
+                    {
+                        let b1 = this.secondaryOam[addrOamBase + 1];
+                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
+                        break;
+                    }
                     }
                 }
             }
@@ -672,6 +672,9 @@ class PPU {
     }
 
     public stepDraw() {
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
+
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
           
 
@@ -709,6 +712,7 @@ class PPU {
             let icolorSprite = -1;
             var spriteTransparent = true;
             var spriteBehindBg = true;
+            var flgZeroSprite = false;
             if (this.showSprites) {
                 for (let isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
@@ -720,7 +724,7 @@ class PPU {
                         if (ipalette0 || ipalette1) {
                             spriteTransparent = false;
                             spriteBehindBg = spriteRenderingInfo.behindBg;
-
+                            flgZeroSprite = spriteRenderingInfo.flgZeroSprite;
                             let ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
                             if ((ipalette & 3) === 0)
                                 ipalette = 0;
@@ -731,6 +735,9 @@ class PPU {
                     spriteRenderingInfo.xCounter--;
                 }
             }
+
+            if (flgZeroSprite && !bgTransparent && this.sx < 256)
+                this.flgSpriteZeroHit = true;
 
             if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
                 this.data[this.dataAddr] = this.colors[icolorSprite];

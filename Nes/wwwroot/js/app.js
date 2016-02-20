@@ -469,7 +469,6 @@ var NesImage = (function () {
 ///<reference path="Memory.ts"/>
 var Most6502Base = (function () {
     function Most6502Base(memory) {
-        var _this = this;
         this.memory = memory;
         this.addrReset = 0xfffc;
         this.addrIRQ = 0xfffe;
@@ -501,250 +500,250 @@ var Most6502Base = (function () {
         this.idma = -1;
         this.icycle = 0;
         this.opcodes = [];
-        this.opcodes[105] = function () { return _this.op0x69(); };
-        this.opcodes[101] = function () { return _this.op0x65(); };
-        this.opcodes[117] = function () { return _this.op0x75(); };
-        this.opcodes[109] = function () { return _this.op0x6d(); };
-        this.opcodes[125] = function () { return _this.op0x7d(); };
-        this.opcodes[121] = function () { return _this.op0x79(); };
-        this.opcodes[97] = function () { return _this.op0x61(); };
-        this.opcodes[113] = function () { return _this.op0x71(); };
-        this.opcodes[41] = function () { return _this.op0x29(); };
-        this.opcodes[37] = function () { return _this.op0x25(); };
-        this.opcodes[53] = function () { return _this.op0x35(); };
-        this.opcodes[45] = function () { return _this.op0x2d(); };
-        this.opcodes[61] = function () { return _this.op0x3d(); };
-        this.opcodes[57] = function () { return _this.op0x39(); };
-        this.opcodes[33] = function () { return _this.op0x21(); };
-        this.opcodes[49] = function () { return _this.op0x31(); };
-        this.opcodes[10] = function () { return _this.op0xa(); };
-        this.opcodes[6] = function () { return _this.op0x6(); };
-        this.opcodes[22] = function () { return _this.op0x16(); };
-        this.opcodes[14] = function () { return _this.op0xe(); };
-        this.opcodes[30] = function () { return _this.op0x1e(); };
-        this.opcodes[144] = function () { return _this.op0x90(); };
-        this.opcodes[176] = function () { return _this.op0xb0(); };
-        this.opcodes[240] = function () { return _this.op0xf0(); };
-        this.opcodes[48] = function () { return _this.op0x30(); };
-        this.opcodes[208] = function () { return _this.op0xd0(); };
-        this.opcodes[16] = function () { return _this.op0x10(); };
-        this.opcodes[80] = function () { return _this.op0x50(); };
-        this.opcodes[112] = function () { return _this.op0x70(); };
-        this.opcodes[36] = function () { return _this.op0x24(); };
-        this.opcodes[44] = function () { return _this.op0x2c(); };
-        this.opcodes[24] = function () { return _this.op0x18(); };
-        this.opcodes[216] = function () { return _this.op0xd8(); };
-        this.opcodes[88] = function () { return _this.op0x58(); };
-        this.opcodes[184] = function () { return _this.op0xb8(); };
-        this.opcodes[201] = function () { return _this.op0xc9(); };
-        this.opcodes[197] = function () { return _this.op0xc5(); };
-        this.opcodes[213] = function () { return _this.op0xd5(); };
-        this.opcodes[205] = function () { return _this.op0xcd(); };
-        this.opcodes[221] = function () { return _this.op0xdd(); };
-        this.opcodes[217] = function () { return _this.op0xd9(); };
-        this.opcodes[193] = function () { return _this.op0xc1(); };
-        this.opcodes[209] = function () { return _this.op0xd1(); };
-        this.opcodes[224] = function () { return _this.op0xe0(); };
-        this.opcodes[228] = function () { return _this.op0xe4(); };
-        this.opcodes[236] = function () { return _this.op0xec(); };
-        this.opcodes[192] = function () { return _this.op0xc0(); };
-        this.opcodes[196] = function () { return _this.op0xc4(); };
-        this.opcodes[204] = function () { return _this.op0xcc(); };
-        this.opcodes[198] = function () { return _this.op0xc6(); };
-        this.opcodes[214] = function () { return _this.op0xd6(); };
-        this.opcodes[206] = function () { return _this.op0xce(); };
-        this.opcodes[222] = function () { return _this.op0xde(); };
-        this.opcodes[202] = function () { return _this.op0xca(); };
-        this.opcodes[136] = function () { return _this.op0x88(); };
-        this.opcodes[230] = function () { return _this.op0xe6(); };
-        this.opcodes[246] = function () { return _this.op0xf6(); };
-        this.opcodes[238] = function () { return _this.op0xee(); };
-        this.opcodes[254] = function () { return _this.op0xfe(); };
-        this.opcodes[232] = function () { return _this.op0xe8(); };
-        this.opcodes[200] = function () { return _this.op0xc8(); };
-        this.opcodes[73] = function () { return _this.op0x49(); };
-        this.opcodes[69] = function () { return _this.op0x45(); };
-        this.opcodes[85] = function () { return _this.op0x55(); };
-        this.opcodes[77] = function () { return _this.op0x4d(); };
-        this.opcodes[93] = function () { return _this.op0x5d(); };
-        this.opcodes[89] = function () { return _this.op0x59(); };
-        this.opcodes[65] = function () { return _this.op0x41(); };
-        this.opcodes[81] = function () { return _this.op0x51(); };
-        this.opcodes[76] = function () { return _this.op0x4c(); };
-        this.opcodes[108] = function () { return _this.op0x6c(); };
-        this.opcodes[169] = function () { return _this.op0xa9(); };
-        this.opcodes[165] = function () { return _this.op0xa5(); };
-        this.opcodes[181] = function () { return _this.op0xb5(); };
-        this.opcodes[173] = function () { return _this.op0xad(); };
-        this.opcodes[189] = function () { return _this.op0xbd(); };
-        this.opcodes[185] = function () { return _this.op0xb9(); };
-        this.opcodes[161] = function () { return _this.op0xa1(); };
-        this.opcodes[177] = function () { return _this.op0xb1(); };
-        this.opcodes[162] = function () { return _this.op0xa2(); };
-        this.opcodes[166] = function () { return _this.op0xa6(); };
-        this.opcodes[182] = function () { return _this.op0xb6(); };
-        this.opcodes[174] = function () { return _this.op0xae(); };
-        this.opcodes[190] = function () { return _this.op0xbe(); };
-        this.opcodes[160] = function () { return _this.op0xa0(); };
-        this.opcodes[164] = function () { return _this.op0xa4(); };
-        this.opcodes[180] = function () { return _this.op0xb4(); };
-        this.opcodes[172] = function () { return _this.op0xac(); };
-        this.opcodes[188] = function () { return _this.op0xbc(); };
-        this.opcodes[74] = function () { return _this.op0x4a(); };
-        this.opcodes[70] = function () { return _this.op0x46(); };
-        this.opcodes[86] = function () { return _this.op0x56(); };
-        this.opcodes[78] = function () { return _this.op0x4e(); };
-        this.opcodes[94] = function () { return _this.op0x5e(); };
-        this.opcodes[234] = function () { return _this.op0xea(); };
-        this.opcodes[9] = function () { return _this.op0x9(); };
-        this.opcodes[5] = function () { return _this.op0x5(); };
-        this.opcodes[21] = function () { return _this.op0x15(); };
-        this.opcodes[13] = function () { return _this.op0xd(); };
-        this.opcodes[29] = function () { return _this.op0x1d(); };
-        this.opcodes[25] = function () { return _this.op0x19(); };
-        this.opcodes[1] = function () { return _this.op0x1(); };
-        this.opcodes[17] = function () { return _this.op0x11(); };
-        this.opcodes[72] = function () { return _this.op0x48(); };
-        this.opcodes[8] = function () { return _this.op0x8(); };
-        this.opcodes[104] = function () { return _this.op0x68(); };
-        this.opcodes[40] = function () { return _this.op0x28(); };
-        this.opcodes[42] = function () { return _this.op0x2a(); };
-        this.opcodes[38] = function () { return _this.op0x26(); };
-        this.opcodes[54] = function () { return _this.op0x36(); };
-        this.opcodes[46] = function () { return _this.op0x2e(); };
-        this.opcodes[62] = function () { return _this.op0x3e(); };
-        this.opcodes[106] = function () { return _this.op0x6a(); };
-        this.opcodes[102] = function () { return _this.op0x66(); };
-        this.opcodes[118] = function () { return _this.op0x76(); };
-        this.opcodes[110] = function () { return _this.op0x6e(); };
-        this.opcodes[126] = function () { return _this.op0x7e(); };
-        this.opcodes[0] = function () { return _this.op0x0(); };
-        this.opcodes[64] = function () { return _this.op0x40(); };
-        this.opcodes[233] = function () { return _this.op0xe9(); };
-        this.opcodes[229] = function () { return _this.op0xe5(); };
-        this.opcodes[245] = function () { return _this.op0xf5(); };
-        this.opcodes[237] = function () { return _this.op0xed(); };
-        this.opcodes[253] = function () { return _this.op0xfd(); };
-        this.opcodes[249] = function () { return _this.op0xf9(); };
-        this.opcodes[225] = function () { return _this.op0xe1(); };
-        this.opcodes[241] = function () { return _this.op0xf1(); };
-        this.opcodes[56] = function () { return _this.op0x38(); };
-        this.opcodes[248] = function () { return _this.op0xf8(); };
-        this.opcodes[120] = function () { return _this.op0x78(); };
-        this.opcodes[133] = function () { return _this.op0x85(); };
-        this.opcodes[149] = function () { return _this.op0x95(); };
-        this.opcodes[141] = function () { return _this.op0x8d(); };
-        this.opcodes[157] = function () { return _this.op0x9d(); };
-        this.opcodes[153] = function () { return _this.op0x99(); };
-        this.opcodes[129] = function () { return _this.op0x81(); };
-        this.opcodes[145] = function () { return _this.op0x91(); };
-        this.opcodes[134] = function () { return _this.op0x86(); };
-        this.opcodes[150] = function () { return _this.op0x96(); };
-        this.opcodes[142] = function () { return _this.op0x8e(); };
-        this.opcodes[132] = function () { return _this.op0x84(); };
-        this.opcodes[148] = function () { return _this.op0x94(); };
-        this.opcodes[140] = function () { return _this.op0x8c(); };
-        this.opcodes[170] = function () { return _this.op0xaa(); };
-        this.opcodes[168] = function () { return _this.op0xa8(); };
-        this.opcodes[186] = function () { return _this.op0xba(); };
-        this.opcodes[138] = function () { return _this.op0x8a(); };
-        this.opcodes[154] = function () { return _this.op0x9a(); };
-        this.opcodes[152] = function () { return _this.op0x98(); };
-        this.opcodes[32] = function () { return _this.op0x20(); };
-        this.opcodes[96] = function () { return _this.op0x60(); };
-        this.opcodes[26] = function () { return _this.op0x1a(); };
-        this.opcodes[58] = function () { return _this.op0x3a(); };
-        this.opcodes[90] = function () { return _this.op0x5a(); };
-        this.opcodes[122] = function () { return _this.op0x7a(); };
-        this.opcodes[218] = function () { return _this.op0xda(); };
-        this.opcodes[250] = function () { return _this.op0xfa(); };
-        this.opcodes[4] = function () { return _this.op0x4(); };
-        this.opcodes[20] = function () { return _this.op0x14(); };
-        this.opcodes[52] = function () { return _this.op0x34(); };
-        this.opcodes[68] = function () { return _this.op0x44(); };
-        this.opcodes[84] = function () { return _this.op0x54(); };
-        this.opcodes[116] = function () { return _this.op0x74(); };
-        this.opcodes[212] = function () { return _this.op0xd4(); };
-        this.opcodes[244] = function () { return _this.op0xf4(); };
-        this.opcodes[100] = function () { return _this.op0x64(); };
-        this.opcodes[128] = function () { return _this.op0x80(); };
-        this.opcodes[130] = function () { return _this.op0x82(); };
-        this.opcodes[194] = function () { return _this.op0xc2(); };
-        this.opcodes[226] = function () { return _this.op0xe2(); };
-        this.opcodes[137] = function () { return _this.op0x89(); };
-        this.opcodes[12] = function () { return _this.op0xc(); };
-        this.opcodes[28] = function () { return _this.op0x1c(); };
-        this.opcodes[60] = function () { return _this.op0x3c(); };
-        this.opcodes[92] = function () { return _this.op0x5c(); };
-        this.opcodes[124] = function () { return _this.op0x7c(); };
-        this.opcodes[220] = function () { return _this.op0xdc(); };
-        this.opcodes[252] = function () { return _this.op0xfc(); };
-        this.opcodes[235] = function () { return _this.op0xeb(); };
-        this.opcodes[195] = function () { return _this.op0xc3(); };
-        this.opcodes[199] = function () { return _this.op0xc7(); };
-        this.opcodes[207] = function () { return _this.op0xcf(); };
-        this.opcodes[211] = function () { return _this.op0xd3(); };
-        this.opcodes[215] = function () { return _this.op0xd7(); };
-        this.opcodes[219] = function () { return _this.op0xdb(); };
-        this.opcodes[223] = function () { return _this.op0xdf(); };
-        this.opcodes[227] = function () { return _this.op0xe3(); };
-        this.opcodes[231] = function () { return _this.op0xe7(); };
-        this.opcodes[239] = function () { return _this.op0xef(); };
-        this.opcodes[243] = function () { return _this.op0xf3(); };
-        this.opcodes[247] = function () { return _this.op0xf7(); };
-        this.opcodes[251] = function () { return _this.op0xfb(); };
-        this.opcodes[255] = function () { return _this.op0xff(); };
-        this.opcodes[171] = function () { return _this.op0xab(); };
-        this.opcodes[167] = function () { return _this.op0xa7(); };
-        this.opcodes[183] = function () { return _this.op0xb7(); };
-        this.opcodes[175] = function () { return _this.op0xaf(); };
-        this.opcodes[191] = function () { return _this.op0xbf(); };
-        this.opcodes[163] = function () { return _this.op0xa3(); };
-        this.opcodes[179] = function () { return _this.op0xb3(); };
-        this.opcodes[131] = function () { return _this.op0x83(); };
-        this.opcodes[135] = function () { return _this.op0x87(); };
-        this.opcodes[143] = function () { return _this.op0x8f(); };
-        this.opcodes[151] = function () { return _this.op0x97(); };
-        this.opcodes[3] = function () { return _this.op0x3(); };
-        this.opcodes[7] = function () { return _this.op0x7(); };
-        this.opcodes[15] = function () { return _this.op0xf(); };
-        this.opcodes[19] = function () { return _this.op0x13(); };
-        this.opcodes[23] = function () { return _this.op0x17(); };
-        this.opcodes[27] = function () { return _this.op0x1b(); };
-        this.opcodes[31] = function () { return _this.op0x1f(); };
-        this.opcodes[35] = function () { return _this.op0x23(); };
-        this.opcodes[39] = function () { return _this.op0x27(); };
-        this.opcodes[47] = function () { return _this.op0x2f(); };
-        this.opcodes[51] = function () { return _this.op0x33(); };
-        this.opcodes[55] = function () { return _this.op0x37(); };
-        this.opcodes[59] = function () { return _this.op0x3b(); };
-        this.opcodes[63] = function () { return _this.op0x3f(); };
-        this.opcodes[99] = function () { return _this.op0x63(); };
-        this.opcodes[103] = function () { return _this.op0x67(); };
-        this.opcodes[111] = function () { return _this.op0x6f(); };
-        this.opcodes[115] = function () { return _this.op0x73(); };
-        this.opcodes[119] = function () { return _this.op0x77(); };
-        this.opcodes[123] = function () { return _this.op0x7b(); };
-        this.opcodes[127] = function () { return _this.op0x7f(); };
-        this.opcodes[67] = function () { return _this.op0x43(); };
-        this.opcodes[71] = function () { return _this.op0x47(); };
-        this.opcodes[79] = function () { return _this.op0x4f(); };
-        this.opcodes[83] = function () { return _this.op0x53(); };
-        this.opcodes[87] = function () { return _this.op0x57(); };
-        this.opcodes[91] = function () { return _this.op0x5b(); };
-        this.opcodes[95] = function () { return _this.op0x5f(); };
-        this.opcodes[11] = function () { return _this.op0xb(); };
-        this.opcodes[43] = function () { return _this.op0x2b(); };
-        this.opcodes[75] = function () { return _this.op0x4b(); };
-        this.opcodes[107] = function () { return _this.op0x6b(); };
-        this.opcodes[203] = function () { return _this.op0xcb(); };
-        this.opcodes[156] = function () { return _this.op0x9c(); };
-        this.opcodes[158] = function () { return _this.op0x9e(); };
-        this.opcodes[139] = function () { return _this.op0x8b(); };
-        this.opcodes[147] = function () { return _this.op0x93(); };
-        this.opcodes[155] = function () { return _this.op0x9b(); };
-        this.opcodes[159] = function () { return _this.op0x9f(); };
-        this.opcodes[187] = function () { return _this.op0xbb(); };
+        this.opcodes[105] = this.op0x69;
+        this.opcodes[101] = this.op0x65;
+        this.opcodes[117] = this.op0x75;
+        this.opcodes[109] = this.op0x6d;
+        this.opcodes[125] = this.op0x7d;
+        this.opcodes[121] = this.op0x79;
+        this.opcodes[97] = this.op0x61;
+        this.opcodes[113] = this.op0x71;
+        this.opcodes[41] = this.op0x29;
+        this.opcodes[37] = this.op0x25;
+        this.opcodes[53] = this.op0x35;
+        this.opcodes[45] = this.op0x2d;
+        this.opcodes[61] = this.op0x3d;
+        this.opcodes[57] = this.op0x39;
+        this.opcodes[33] = this.op0x21;
+        this.opcodes[49] = this.op0x31;
+        this.opcodes[10] = this.op0xa;
+        this.opcodes[6] = this.op0x6;
+        this.opcodes[22] = this.op0x16;
+        this.opcodes[14] = this.op0xe;
+        this.opcodes[30] = this.op0x1e;
+        this.opcodes[144] = this.op0x90;
+        this.opcodes[176] = this.op0xb0;
+        this.opcodes[240] = this.op0xf0;
+        this.opcodes[48] = this.op0x30;
+        this.opcodes[208] = this.op0xd0;
+        this.opcodes[16] = this.op0x10;
+        this.opcodes[80] = this.op0x50;
+        this.opcodes[112] = this.op0x70;
+        this.opcodes[36] = this.op0x24;
+        this.opcodes[44] = this.op0x2c;
+        this.opcodes[24] = this.op0x18;
+        this.opcodes[216] = this.op0xd8;
+        this.opcodes[88] = this.op0x58;
+        this.opcodes[184] = this.op0xb8;
+        this.opcodes[201] = this.op0xc9;
+        this.opcodes[197] = this.op0xc5;
+        this.opcodes[213] = this.op0xd5;
+        this.opcodes[205] = this.op0xcd;
+        this.opcodes[221] = this.op0xdd;
+        this.opcodes[217] = this.op0xd9;
+        this.opcodes[193] = this.op0xc1;
+        this.opcodes[209] = this.op0xd1;
+        this.opcodes[224] = this.op0xe0;
+        this.opcodes[228] = this.op0xe4;
+        this.opcodes[236] = this.op0xec;
+        this.opcodes[192] = this.op0xc0;
+        this.opcodes[196] = this.op0xc4;
+        this.opcodes[204] = this.op0xcc;
+        this.opcodes[198] = this.op0xc6;
+        this.opcodes[214] = this.op0xd6;
+        this.opcodes[206] = this.op0xce;
+        this.opcodes[222] = this.op0xde;
+        this.opcodes[202] = this.op0xca;
+        this.opcodes[136] = this.op0x88;
+        this.opcodes[230] = this.op0xe6;
+        this.opcodes[246] = this.op0xf6;
+        this.opcodes[238] = this.op0xee;
+        this.opcodes[254] = this.op0xfe;
+        this.opcodes[232] = this.op0xe8;
+        this.opcodes[200] = this.op0xc8;
+        this.opcodes[73] = this.op0x49;
+        this.opcodes[69] = this.op0x45;
+        this.opcodes[85] = this.op0x55;
+        this.opcodes[77] = this.op0x4d;
+        this.opcodes[93] = this.op0x5d;
+        this.opcodes[89] = this.op0x59;
+        this.opcodes[65] = this.op0x41;
+        this.opcodes[81] = this.op0x51;
+        this.opcodes[76] = this.op0x4c;
+        this.opcodes[108] = this.op0x6c;
+        this.opcodes[169] = this.op0xa9;
+        this.opcodes[165] = this.op0xa5;
+        this.opcodes[181] = this.op0xb5;
+        this.opcodes[173] = this.op0xad;
+        this.opcodes[189] = this.op0xbd;
+        this.opcodes[185] = this.op0xb9;
+        this.opcodes[161] = this.op0xa1;
+        this.opcodes[177] = this.op0xb1;
+        this.opcodes[162] = this.op0xa2;
+        this.opcodes[166] = this.op0xa6;
+        this.opcodes[182] = this.op0xb6;
+        this.opcodes[174] = this.op0xae;
+        this.opcodes[190] = this.op0xbe;
+        this.opcodes[160] = this.op0xa0;
+        this.opcodes[164] = this.op0xa4;
+        this.opcodes[180] = this.op0xb4;
+        this.opcodes[172] = this.op0xac;
+        this.opcodes[188] = this.op0xbc;
+        this.opcodes[74] = this.op0x4a;
+        this.opcodes[70] = this.op0x46;
+        this.opcodes[86] = this.op0x56;
+        this.opcodes[78] = this.op0x4e;
+        this.opcodes[94] = this.op0x5e;
+        this.opcodes[234] = this.op0xea;
+        this.opcodes[9] = this.op0x9;
+        this.opcodes[5] = this.op0x5;
+        this.opcodes[21] = this.op0x15;
+        this.opcodes[13] = this.op0xd;
+        this.opcodes[29] = this.op0x1d;
+        this.opcodes[25] = this.op0x19;
+        this.opcodes[1] = this.op0x1;
+        this.opcodes[17] = this.op0x11;
+        this.opcodes[72] = this.op0x48;
+        this.opcodes[8] = this.op0x8;
+        this.opcodes[104] = this.op0x68;
+        this.opcodes[40] = this.op0x28;
+        this.opcodes[42] = this.op0x2a;
+        this.opcodes[38] = this.op0x26;
+        this.opcodes[54] = this.op0x36;
+        this.opcodes[46] = this.op0x2e;
+        this.opcodes[62] = this.op0x3e;
+        this.opcodes[106] = this.op0x6a;
+        this.opcodes[102] = this.op0x66;
+        this.opcodes[118] = this.op0x76;
+        this.opcodes[110] = this.op0x6e;
+        this.opcodes[126] = this.op0x7e;
+        this.opcodes[0] = this.op0x0;
+        this.opcodes[64] = this.op0x40;
+        this.opcodes[233] = this.op0xe9;
+        this.opcodes[229] = this.op0xe5;
+        this.opcodes[245] = this.op0xf5;
+        this.opcodes[237] = this.op0xed;
+        this.opcodes[253] = this.op0xfd;
+        this.opcodes[249] = this.op0xf9;
+        this.opcodes[225] = this.op0xe1;
+        this.opcodes[241] = this.op0xf1;
+        this.opcodes[56] = this.op0x38;
+        this.opcodes[248] = this.op0xf8;
+        this.opcodes[120] = this.op0x78;
+        this.opcodes[133] = this.op0x85;
+        this.opcodes[149] = this.op0x95;
+        this.opcodes[141] = this.op0x8d;
+        this.opcodes[157] = this.op0x9d;
+        this.opcodes[153] = this.op0x99;
+        this.opcodes[129] = this.op0x81;
+        this.opcodes[145] = this.op0x91;
+        this.opcodes[134] = this.op0x86;
+        this.opcodes[150] = this.op0x96;
+        this.opcodes[142] = this.op0x8e;
+        this.opcodes[132] = this.op0x84;
+        this.opcodes[148] = this.op0x94;
+        this.opcodes[140] = this.op0x8c;
+        this.opcodes[170] = this.op0xaa;
+        this.opcodes[168] = this.op0xa8;
+        this.opcodes[186] = this.op0xba;
+        this.opcodes[138] = this.op0x8a;
+        this.opcodes[154] = this.op0x9a;
+        this.opcodes[152] = this.op0x98;
+        this.opcodes[32] = this.op0x20;
+        this.opcodes[96] = this.op0x60;
+        this.opcodes[26] = this.op0x1a;
+        this.opcodes[58] = this.op0x3a;
+        this.opcodes[90] = this.op0x5a;
+        this.opcodes[122] = this.op0x7a;
+        this.opcodes[218] = this.op0xda;
+        this.opcodes[250] = this.op0xfa;
+        this.opcodes[4] = this.op0x4;
+        this.opcodes[20] = this.op0x14;
+        this.opcodes[52] = this.op0x34;
+        this.opcodes[68] = this.op0x44;
+        this.opcodes[84] = this.op0x54;
+        this.opcodes[116] = this.op0x74;
+        this.opcodes[212] = this.op0xd4;
+        this.opcodes[244] = this.op0xf4;
+        this.opcodes[100] = this.op0x64;
+        this.opcodes[128] = this.op0x80;
+        this.opcodes[130] = this.op0x82;
+        this.opcodes[194] = this.op0xc2;
+        this.opcodes[226] = this.op0xe2;
+        this.opcodes[137] = this.op0x89;
+        this.opcodes[12] = this.op0xc;
+        this.opcodes[28] = this.op0x1c;
+        this.opcodes[60] = this.op0x3c;
+        this.opcodes[92] = this.op0x5c;
+        this.opcodes[124] = this.op0x7c;
+        this.opcodes[220] = this.op0xdc;
+        this.opcodes[252] = this.op0xfc;
+        this.opcodes[235] = this.op0xeb;
+        this.opcodes[195] = this.op0xc3;
+        this.opcodes[199] = this.op0xc7;
+        this.opcodes[207] = this.op0xcf;
+        this.opcodes[211] = this.op0xd3;
+        this.opcodes[215] = this.op0xd7;
+        this.opcodes[219] = this.op0xdb;
+        this.opcodes[223] = this.op0xdf;
+        this.opcodes[227] = this.op0xe3;
+        this.opcodes[231] = this.op0xe7;
+        this.opcodes[239] = this.op0xef;
+        this.opcodes[243] = this.op0xf3;
+        this.opcodes[247] = this.op0xf7;
+        this.opcodes[251] = this.op0xfb;
+        this.opcodes[255] = this.op0xff;
+        this.opcodes[171] = this.op0xab;
+        this.opcodes[167] = this.op0xa7;
+        this.opcodes[183] = this.op0xb7;
+        this.opcodes[175] = this.op0xaf;
+        this.opcodes[191] = this.op0xbf;
+        this.opcodes[163] = this.op0xa3;
+        this.opcodes[179] = this.op0xb3;
+        this.opcodes[131] = this.op0x83;
+        this.opcodes[135] = this.op0x87;
+        this.opcodes[143] = this.op0x8f;
+        this.opcodes[151] = this.op0x97;
+        this.opcodes[3] = this.op0x3;
+        this.opcodes[7] = this.op0x7;
+        this.opcodes[15] = this.op0xf;
+        this.opcodes[19] = this.op0x13;
+        this.opcodes[23] = this.op0x17;
+        this.opcodes[27] = this.op0x1b;
+        this.opcodes[31] = this.op0x1f;
+        this.opcodes[35] = this.op0x23;
+        this.opcodes[39] = this.op0x27;
+        this.opcodes[47] = this.op0x2f;
+        this.opcodes[51] = this.op0x33;
+        this.opcodes[55] = this.op0x37;
+        this.opcodes[59] = this.op0x3b;
+        this.opcodes[63] = this.op0x3f;
+        this.opcodes[99] = this.op0x63;
+        this.opcodes[103] = this.op0x67;
+        this.opcodes[111] = this.op0x6f;
+        this.opcodes[115] = this.op0x73;
+        this.opcodes[119] = this.op0x77;
+        this.opcodes[123] = this.op0x7b;
+        this.opcodes[127] = this.op0x7f;
+        this.opcodes[67] = this.op0x43;
+        this.opcodes[71] = this.op0x47;
+        this.opcodes[79] = this.op0x4f;
+        this.opcodes[83] = this.op0x53;
+        this.opcodes[87] = this.op0x57;
+        this.opcodes[91] = this.op0x5b;
+        this.opcodes[95] = this.op0x5f;
+        this.opcodes[11] = this.op0xb;
+        this.opcodes[43] = this.op0x2b;
+        this.opcodes[75] = this.op0x4b;
+        this.opcodes[107] = this.op0x6b;
+        this.opcodes[203] = this.op0xcb;
+        this.opcodes[156] = this.op0x9c;
+        this.opcodes[158] = this.op0x9e;
+        this.opcodes[139] = this.op0x8b;
+        this.opcodes[147] = this.op0x93;
+        this.opcodes[155] = this.op0x9b;
+        this.opcodes[159] = this.op0x9f;
+        this.opcodes[187] = this.op0xbb;
     }
     Most6502Base.prototype.dma = function (addrDma) {
         this.dmaRequested = true;
@@ -806,7 +805,7 @@ var Most6502Base = (function () {
         this.icycle++;
         if (this.dmaRequested) {
             this.dmaRequested = false;
-            this.idma = 513 + (this.icycle % 2);
+            this.idma = 513 + (this.icycle & 1);
             return;
         }
         else if (this.idma > 0) {
@@ -836,7 +835,7 @@ var Most6502Base = (function () {
             this.trace(this.opcode);
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
-        this.opcodes[this.opcode]();
+        this.opcodes[this.opcode].call(this);
         if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll)
                 this.pollInterrupts();
@@ -844,6 +843,7 @@ var Most6502Base = (function () {
         }
         this.detectInterrupts();
     };
+    /* ADC Immediate 2 */
     Most6502Base.prototype.op0x69 = function () {
         switch (this.t) {
             case 0: {
@@ -858,7 +858,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -868,6 +868,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC ZeroPage 3 */
     Most6502Base.prototype.op0x65 = function () {
         switch (this.t) {
             case 0: {
@@ -887,7 +888,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -897,6 +898,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC ZeroPageX 4 */
     Most6502Base.prototype.op0x75 = function () {
         switch (this.t) {
             case 0: {
@@ -922,7 +924,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -932,6 +934,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC Absolute 4 */
     Most6502Base.prototype.op0x6d = function () {
         switch (this.t) {
             case 0: {
@@ -958,7 +961,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -968,6 +971,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC AbsoluteX 4pc  */
     Most6502Base.prototype.op0x7d = function () {
         switch (this.t) {
             case 0: {
@@ -1001,7 +1005,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1016,7 +1020,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1026,6 +1030,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC AbsoluteY 4pc  */
     Most6502Base.prototype.op0x79 = function () {
         switch (this.t) {
             case 0: {
@@ -1059,7 +1064,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1074,7 +1079,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1084,6 +1089,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC IndirectX 6 */
     Most6502Base.prototype.op0x61 = function () {
         switch (this.t) {
             case 0: {
@@ -1120,7 +1126,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1130,6 +1136,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ADC IndirectY 5pc  */
     Most6502Base.prototype.op0x71 = function () {
         switch (this.t) {
             case 0: {
@@ -1167,7 +1174,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1182,7 +1189,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -1192,6 +1199,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND Immediate 2 */
     Most6502Base.prototype.op0x29 = function () {
         switch (this.t) {
             case 0: {
@@ -1211,6 +1219,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND ZeroPage 3 */
     Most6502Base.prototype.op0x25 = function () {
         switch (this.t) {
             case 0: {
@@ -1235,6 +1244,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND ZeroPageX 4 */
     Most6502Base.prototype.op0x35 = function () {
         switch (this.t) {
             case 0: {
@@ -1265,6 +1275,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND Absolute 4 */
     Most6502Base.prototype.op0x2d = function () {
         switch (this.t) {
             case 0: {
@@ -1296,6 +1307,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND AbsoluteX 4pc  */
     Most6502Base.prototype.op0x3d = function () {
         switch (this.t) {
             case 0: {
@@ -1344,6 +1356,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND AbsoluteY 4pc  */
     Most6502Base.prototype.op0x39 = function () {
         switch (this.t) {
             case 0: {
@@ -1392,6 +1405,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND IndirectX 6 */
     Most6502Base.prototype.op0x21 = function () {
         switch (this.t) {
             case 0: {
@@ -1433,6 +1447,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AND IndirectY 5pc  */
     Most6502Base.prototype.op0x31 = function () {
         switch (this.t) {
             case 0: {
@@ -1485,6 +1500,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ASL Accumulator 2 */
     Most6502Base.prototype.op0xa = function () {
         switch (this.t) {
             case 0: {
@@ -1505,6 +1521,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ASL ZeroPage 5 */
     Most6502Base.prototype.op0x6 = function () {
         switch (this.t) {
             case 0: {
@@ -1538,6 +1555,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ASL ZeroPageX 6 */
     Most6502Base.prototype.op0x16 = function () {
         switch (this.t) {
             case 0: {
@@ -1577,6 +1595,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ASL Absolute 6 */
     Most6502Base.prototype.op0xe = function () {
         switch (this.t) {
             case 0: {
@@ -1617,6 +1636,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ASL AbsoluteX 7 */
     Most6502Base.prototype.op0x1e = function () {
         switch (this.t) {
             case 0: {
@@ -1667,6 +1687,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BCC Relative 2pc bc  */
     Most6502Base.prototype.op0x90 = function () {
         switch (this.t) {
             case 0: {
@@ -1707,6 +1728,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BCS Relative 2pc bc  */
     Most6502Base.prototype.op0xb0 = function () {
         switch (this.t) {
             case 0: {
@@ -1747,6 +1769,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BEQ Relative 2pc bc  */
     Most6502Base.prototype.op0xf0 = function () {
         switch (this.t) {
             case 0: {
@@ -1787,6 +1810,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BMI Relative 2pc bc  */
     Most6502Base.prototype.op0x30 = function () {
         switch (this.t) {
             case 0: {
@@ -1827,6 +1851,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BNE Relative 2pc bc  */
     Most6502Base.prototype.op0xd0 = function () {
         switch (this.t) {
             case 0: {
@@ -1867,6 +1892,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BPL Relative 2pc bc  */
     Most6502Base.prototype.op0x10 = function () {
         switch (this.t) {
             case 0: {
@@ -1907,6 +1933,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BVC Relative 2pc bc  */
     Most6502Base.prototype.op0x50 = function () {
         switch (this.t) {
             case 0: {
@@ -1947,6 +1974,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BVS Relative 2pc bc  */
     Most6502Base.prototype.op0x70 = function () {
         switch (this.t) {
             case 0: {
@@ -1987,6 +2015,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BIT ZeroPage 3 */
     Most6502Base.prototype.op0x24 = function () {
         switch (this.t) {
             case 0: {
@@ -2010,6 +2039,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BIT Absolute 4 */
     Most6502Base.prototype.op0x2c = function () {
         switch (this.t) {
             case 0: {
@@ -2040,6 +2070,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CLC Implied 2 */
     Most6502Base.prototype.op0x18 = function () {
         switch (this.t) {
             case 0: {
@@ -2055,6 +2086,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CLD Implied 2 */
     Most6502Base.prototype.op0xd8 = function () {
         switch (this.t) {
             case 0: {
@@ -2070,6 +2102,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CLI Implied 2 */
     Most6502Base.prototype.op0x58 = function () {
         switch (this.t) {
             case 0: {
@@ -2085,6 +2118,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CLV Implied 2 */
     Most6502Base.prototype.op0xb8 = function () {
         switch (this.t) {
             case 0: {
@@ -2100,6 +2134,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP Immediate 2 */
     Most6502Base.prototype.op0xc9 = function () {
         switch (this.t) {
             case 0: {
@@ -2118,6 +2153,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP ZeroPage 3 */
     Most6502Base.prototype.op0xc5 = function () {
         switch (this.t) {
             case 0: {
@@ -2141,6 +2177,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP ZeroPageX 4 */
     Most6502Base.prototype.op0xd5 = function () {
         switch (this.t) {
             case 0: {
@@ -2170,6 +2207,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP Absolute 4 */
     Most6502Base.prototype.op0xcd = function () {
         switch (this.t) {
             case 0: {
@@ -2200,6 +2238,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP AbsoluteX 4pc  */
     Most6502Base.prototype.op0xdd = function () {
         switch (this.t) {
             case 0: {
@@ -2246,6 +2285,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP AbsoluteY 4pc  */
     Most6502Base.prototype.op0xd9 = function () {
         switch (this.t) {
             case 0: {
@@ -2292,6 +2332,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP IndirectX 6 */
     Most6502Base.prototype.op0xc1 = function () {
         switch (this.t) {
             case 0: {
@@ -2332,6 +2373,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CMP IndirectY 5pc  */
     Most6502Base.prototype.op0xd1 = function () {
         switch (this.t) {
             case 0: {
@@ -2382,6 +2424,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPX Immediate 2 */
     Most6502Base.prototype.op0xe0 = function () {
         switch (this.t) {
             case 0: {
@@ -2400,6 +2443,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPX ZeroPage 3 */
     Most6502Base.prototype.op0xe4 = function () {
         switch (this.t) {
             case 0: {
@@ -2423,6 +2467,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPX Absolute 4 */
     Most6502Base.prototype.op0xec = function () {
         switch (this.t) {
             case 0: {
@@ -2453,6 +2498,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPY Immediate 2 */
     Most6502Base.prototype.op0xc0 = function () {
         switch (this.t) {
             case 0: {
@@ -2471,6 +2517,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPY ZeroPage 3 */
     Most6502Base.prototype.op0xc4 = function () {
         switch (this.t) {
             case 0: {
@@ -2494,6 +2541,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* CPY Absolute 4 */
     Most6502Base.prototype.op0xcc = function () {
         switch (this.t) {
             case 0: {
@@ -2524,6 +2572,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEC ZeroPage 5 */
     Most6502Base.prototype.op0xc6 = function () {
         switch (this.t) {
             case 0: {
@@ -2556,6 +2605,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEC ZeroPageX 6 */
     Most6502Base.prototype.op0xd6 = function () {
         switch (this.t) {
             case 0: {
@@ -2594,6 +2644,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEC Absolute 6 */
     Most6502Base.prototype.op0xce = function () {
         switch (this.t) {
             case 0: {
@@ -2633,6 +2684,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEC AbsoluteX 7 */
     Most6502Base.prototype.op0xde = function () {
         switch (this.t) {
             case 0: {
@@ -2682,6 +2734,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEX Accumulator 2 */
     Most6502Base.prototype.op0xca = function () {
         switch (this.t) {
             case 0: {
@@ -2701,6 +2754,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DEY Accumulator 2 */
     Most6502Base.prototype.op0x88 = function () {
         switch (this.t) {
             case 0: {
@@ -2720,6 +2774,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INC ZeroPage 5 */
     Most6502Base.prototype.op0xe6 = function () {
         switch (this.t) {
             case 0: {
@@ -2752,6 +2807,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INC ZeroPageX 6 */
     Most6502Base.prototype.op0xf6 = function () {
         switch (this.t) {
             case 0: {
@@ -2790,6 +2846,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INC Absolute 6 */
     Most6502Base.prototype.op0xee = function () {
         switch (this.t) {
             case 0: {
@@ -2829,6 +2886,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INC AbsoluteX 7 */
     Most6502Base.prototype.op0xfe = function () {
         switch (this.t) {
             case 0: {
@@ -2878,6 +2936,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INX Accumulator 2 */
     Most6502Base.prototype.op0xe8 = function () {
         switch (this.t) {
             case 0: {
@@ -2897,6 +2956,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* INY Accumulator 2 */
     Most6502Base.prototype.op0xc8 = function () {
         switch (this.t) {
             case 0: {
@@ -2916,6 +2976,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR Immediate 2 */
     Most6502Base.prototype.op0x49 = function () {
         switch (this.t) {
             case 0: {
@@ -2935,6 +2996,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR ZeroPage 3 */
     Most6502Base.prototype.op0x45 = function () {
         switch (this.t) {
             case 0: {
@@ -2959,6 +3021,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR ZeroPageX 4 */
     Most6502Base.prototype.op0x55 = function () {
         switch (this.t) {
             case 0: {
@@ -2989,6 +3052,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR Absolute 4 */
     Most6502Base.prototype.op0x4d = function () {
         switch (this.t) {
             case 0: {
@@ -3020,6 +3084,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR AbsoluteX 4pc  */
     Most6502Base.prototype.op0x5d = function () {
         switch (this.t) {
             case 0: {
@@ -3068,6 +3133,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR AbsoluteY 4pc  */
     Most6502Base.prototype.op0x59 = function () {
         switch (this.t) {
             case 0: {
@@ -3116,6 +3182,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR IndirectX 6 */
     Most6502Base.prototype.op0x41 = function () {
         switch (this.t) {
             case 0: {
@@ -3157,6 +3224,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* EOR IndirectY 5pc  */
     Most6502Base.prototype.op0x51 = function () {
         switch (this.t) {
             case 0: {
@@ -3209,6 +3277,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* JMP Absolute 3 */
     Most6502Base.prototype.op0x4c = function () {
         switch (this.t) {
             case 0: {
@@ -3230,6 +3299,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* JMP AbsoluteIndirect 5 */
     Most6502Base.prototype.op0x6c = function () {
         switch (this.t) {
             case 0: {
@@ -3262,6 +3332,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA Immediate 2 */
     Most6502Base.prototype.op0xa9 = function () {
         switch (this.t) {
             case 0: {
@@ -3280,6 +3351,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA ZeroPage 3 */
     Most6502Base.prototype.op0xa5 = function () {
         switch (this.t) {
             case 0: {
@@ -3303,6 +3375,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA ZeroPageX 4 */
     Most6502Base.prototype.op0xb5 = function () {
         switch (this.t) {
             case 0: {
@@ -3332,6 +3405,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA Absolute 4 */
     Most6502Base.prototype.op0xad = function () {
         switch (this.t) {
             case 0: {
@@ -3362,6 +3436,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA AbsoluteX 4pc  */
     Most6502Base.prototype.op0xbd = function () {
         switch (this.t) {
             case 0: {
@@ -3408,6 +3483,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA AbsoluteY 4pc  */
     Most6502Base.prototype.op0xb9 = function () {
         switch (this.t) {
             case 0: {
@@ -3454,6 +3530,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA IndirectX 6 */
     Most6502Base.prototype.op0xa1 = function () {
         switch (this.t) {
             case 0: {
@@ -3494,6 +3571,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDA IndirectY 5pc  */
     Most6502Base.prototype.op0xb1 = function () {
         switch (this.t) {
             case 0: {
@@ -3544,6 +3622,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDX Immediate 2 */
     Most6502Base.prototype.op0xa2 = function () {
         switch (this.t) {
             case 0: {
@@ -3562,6 +3641,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDX ZeroPage 3 */
     Most6502Base.prototype.op0xa6 = function () {
         switch (this.t) {
             case 0: {
@@ -3585,6 +3665,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDX ZeroPageY 4 */
     Most6502Base.prototype.op0xb6 = function () {
         switch (this.t) {
             case 0: {
@@ -3614,6 +3695,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDX Absolute 4 */
     Most6502Base.prototype.op0xae = function () {
         switch (this.t) {
             case 0: {
@@ -3644,6 +3726,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDX AbsoluteY 4pc  */
     Most6502Base.prototype.op0xbe = function () {
         switch (this.t) {
             case 0: {
@@ -3690,6 +3773,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDY Immediate 2 */
     Most6502Base.prototype.op0xa0 = function () {
         switch (this.t) {
             case 0: {
@@ -3708,6 +3792,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDY ZeroPage 3 */
     Most6502Base.prototype.op0xa4 = function () {
         switch (this.t) {
             case 0: {
@@ -3731,6 +3816,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDY ZeroPageX 4 */
     Most6502Base.prototype.op0xb4 = function () {
         switch (this.t) {
             case 0: {
@@ -3760,6 +3846,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDY Absolute 4 */
     Most6502Base.prototype.op0xac = function () {
         switch (this.t) {
             case 0: {
@@ -3790,6 +3877,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LDY AbsoluteX 4pc  */
     Most6502Base.prototype.op0xbc = function () {
         switch (this.t) {
             case 0: {
@@ -3836,6 +3924,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LSR Accumulator 2 */
     Most6502Base.prototype.op0x4a = function () {
         switch (this.t) {
             case 0: {
@@ -3856,6 +3945,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LSR ZeroPage 5 */
     Most6502Base.prototype.op0x46 = function () {
         switch (this.t) {
             case 0: {
@@ -3889,6 +3979,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LSR ZeroPageX 6 */
     Most6502Base.prototype.op0x56 = function () {
         switch (this.t) {
             case 0: {
@@ -3928,6 +4019,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LSR Absolute 6 */
     Most6502Base.prototype.op0x4e = function () {
         switch (this.t) {
             case 0: {
@@ -3968,6 +4060,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LSR AbsoluteX 7 */
     Most6502Base.prototype.op0x5e = function () {
         switch (this.t) {
             case 0: {
@@ -4018,6 +4111,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0xea = function () {
         switch (this.t) {
             case 0: {
@@ -4032,6 +4126,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA Immediate 2 */
     Most6502Base.prototype.op0x9 = function () {
         switch (this.t) {
             case 0: {
@@ -4051,6 +4146,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA ZeroPage 3 */
     Most6502Base.prototype.op0x5 = function () {
         switch (this.t) {
             case 0: {
@@ -4075,6 +4171,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA ZeroPageX 4 */
     Most6502Base.prototype.op0x15 = function () {
         switch (this.t) {
             case 0: {
@@ -4105,6 +4202,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA Absolute 4 */
     Most6502Base.prototype.op0xd = function () {
         switch (this.t) {
             case 0: {
@@ -4136,6 +4234,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA AbsoluteX 4pc  */
     Most6502Base.prototype.op0x1d = function () {
         switch (this.t) {
             case 0: {
@@ -4184,6 +4283,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA AbsoluteY 4pc  */
     Most6502Base.prototype.op0x19 = function () {
         switch (this.t) {
             case 0: {
@@ -4232,6 +4332,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA IndirectX 6 */
     Most6502Base.prototype.op0x1 = function () {
         switch (this.t) {
             case 0: {
@@ -4273,6 +4374,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ORA IndirectY 5pc  */
     Most6502Base.prototype.op0x11 = function () {
         switch (this.t) {
             case 0: {
@@ -4325,6 +4427,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* PHA Implied 3 */
     Most6502Base.prototype.op0x48 = function () {
         switch (this.t) {
             case 0: {
@@ -4344,6 +4447,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* PHP Implied 3 */
     Most6502Base.prototype.op0x8 = function () {
         switch (this.t) {
             case 0: {
@@ -4365,6 +4469,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* PLA Implied 4 */
     Most6502Base.prototype.op0x68 = function () {
         switch (this.t) {
             case 0: {
@@ -4390,6 +4495,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* PLP Implied 4 */
     Most6502Base.prototype.op0x28 = function () {
         switch (this.t) {
             case 0: {
@@ -4413,6 +4519,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROL Accumulator 2 */
     Most6502Base.prototype.op0x2a = function () {
         switch (this.t) {
             case 0: {
@@ -4434,6 +4541,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROL ZeroPage 5 */
     Most6502Base.prototype.op0x26 = function () {
         switch (this.t) {
             case 0: {
@@ -4468,6 +4576,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROL ZeroPageX 6 */
     Most6502Base.prototype.op0x36 = function () {
         switch (this.t) {
             case 0: {
@@ -4508,6 +4617,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROL Absolute 6 */
     Most6502Base.prototype.op0x2e = function () {
         switch (this.t) {
             case 0: {
@@ -4549,6 +4659,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROL AbsoluteX 7 */
     Most6502Base.prototype.op0x3e = function () {
         switch (this.t) {
             case 0: {
@@ -4600,6 +4711,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROR Accumulator 2 */
     Most6502Base.prototype.op0x6a = function () {
         switch (this.t) {
             case 0: {
@@ -4621,6 +4733,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROR ZeroPage 5 */
     Most6502Base.prototype.op0x66 = function () {
         switch (this.t) {
             case 0: {
@@ -4655,6 +4768,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROR ZeroPageX 6 */
     Most6502Base.prototype.op0x76 = function () {
         switch (this.t) {
             case 0: {
@@ -4695,6 +4809,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROR Absolute 6 */
     Most6502Base.prototype.op0x6e = function () {
         switch (this.t) {
             case 0: {
@@ -4736,6 +4851,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ROR AbsoluteX 7 */
     Most6502Base.prototype.op0x7e = function () {
         switch (this.t) {
             case 0: {
@@ -4787,6 +4903,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* BRK BRK 7 */
     Most6502Base.prototype.op0x0 = function () {
         switch (this.t) {
             case 0: {
@@ -4840,6 +4957,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RTI RTI 6 */
     Most6502Base.prototype.op0x40 = function () {
         switch (this.t) {
             case 0: {
@@ -4873,6 +4991,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC Immediate 2 */
     Most6502Base.prototype.op0xe9 = function () {
         switch (this.t) {
             case 0: {
@@ -4888,7 +5007,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -4898,6 +5017,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC ZeroPage 3 */
     Most6502Base.prototype.op0xe5 = function () {
         switch (this.t) {
             case 0: {
@@ -4918,7 +5038,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -4928,6 +5048,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC ZeroPageX 4 */
     Most6502Base.prototype.op0xf5 = function () {
         switch (this.t) {
             case 0: {
@@ -4954,7 +5075,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -4964,6 +5085,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC Absolute 4 */
     Most6502Base.prototype.op0xed = function () {
         switch (this.t) {
             case 0: {
@@ -4991,7 +5113,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5001,6 +5123,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC AbsoluteX 4pc  */
     Most6502Base.prototype.op0xfd = function () {
         switch (this.t) {
             case 0: {
@@ -5035,7 +5158,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5051,7 +5174,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5061,6 +5184,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC AbsoluteY 4pc  */
     Most6502Base.prototype.op0xf9 = function () {
         switch (this.t) {
             case 0: {
@@ -5095,7 +5219,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5111,7 +5235,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5121,6 +5245,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC IndirectX 6 */
     Most6502Base.prototype.op0xe1 = function () {
         switch (this.t) {
             case 0: {
@@ -5158,7 +5283,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5168,6 +5293,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC IndirectY 5pc  */
     Most6502Base.prototype.op0xf1 = function () {
         switch (this.t) {
             case 0: {
@@ -5206,7 +5332,7 @@ var Most6502Base = (function () {
                     var bothPositive = this.b < 128 && this.rA < 128;
                     var bothNegative = this.b >= 128 && this.rA >= 128;
                     this.flgCarry = sum > 255 ? 1 : 0;
-                    this.b = sum % 256;
+                    this.b = sum & 255;
                     this.flgNegative = this.b >= 128 ? 1 : 0;
                     this.flgZero = this.b === 0 ? 1 : 0;
                     this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5222,7 +5348,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -5232,6 +5358,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SEC Implied 2 */
     Most6502Base.prototype.op0x38 = function () {
         switch (this.t) {
             case 0: {
@@ -5247,6 +5374,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SED Implied 2 */
     Most6502Base.prototype.op0xf8 = function () {
         switch (this.t) {
             case 0: {
@@ -5262,6 +5390,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SEI Implied 2 */
     Most6502Base.prototype.op0x78 = function () {
         switch (this.t) {
             case 0: {
@@ -5277,6 +5406,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA ZeroPage 3 */
     Most6502Base.prototype.op0x85 = function () {
         switch (this.t) {
             case 0: {
@@ -5298,6 +5428,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA ZeroPageX 4 */
     Most6502Base.prototype.op0x95 = function () {
         switch (this.t) {
             case 0: {
@@ -5325,6 +5456,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA Absolute 4 */
     Most6502Base.prototype.op0x8d = function () {
         switch (this.t) {
             case 0: {
@@ -5353,6 +5485,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA AbsoluteX 5 */
     Most6502Base.prototype.op0x9d = function () {
         switch (this.t) {
             case 0: {
@@ -5391,6 +5524,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA AbsoluteY 5 */
     Most6502Base.prototype.op0x99 = function () {
         switch (this.t) {
             case 0: {
@@ -5429,6 +5563,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA IndirectX 6 */
     Most6502Base.prototype.op0x81 = function () {
         switch (this.t) {
             case 0: {
@@ -5467,6 +5602,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STA IndirectY 6 */
     Most6502Base.prototype.op0x91 = function () {
         switch (this.t) {
             case 0: {
@@ -5509,6 +5645,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STX ZeroPage 3 */
     Most6502Base.prototype.op0x86 = function () {
         switch (this.t) {
             case 0: {
@@ -5530,6 +5667,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STX ZeroPageY 4 */
     Most6502Base.prototype.op0x96 = function () {
         switch (this.t) {
             case 0: {
@@ -5557,6 +5695,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STX Absolute 4 */
     Most6502Base.prototype.op0x8e = function () {
         switch (this.t) {
             case 0: {
@@ -5585,6 +5724,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STY ZeroPage 3 */
     Most6502Base.prototype.op0x84 = function () {
         switch (this.t) {
             case 0: {
@@ -5606,6 +5746,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STY ZeroPageX 4 */
     Most6502Base.prototype.op0x94 = function () {
         switch (this.t) {
             case 0: {
@@ -5633,6 +5774,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* STY Absolute 4 */
     Most6502Base.prototype.op0x8c = function () {
         switch (this.t) {
             case 0: {
@@ -5661,6 +5803,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TAX Accumulator 2 */
     Most6502Base.prototype.op0xaa = function () {
         switch (this.t) {
             case 0: {
@@ -5679,6 +5822,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TAY Accumulator 2 */
     Most6502Base.prototype.op0xa8 = function () {
         switch (this.t) {
             case 0: {
@@ -5697,6 +5841,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TSX Accumulator 2 */
     Most6502Base.prototype.op0xba = function () {
         switch (this.t) {
             case 0: {
@@ -5715,6 +5860,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TXA Accumulator 2 */
     Most6502Base.prototype.op0x8a = function () {
         switch (this.t) {
             case 0: {
@@ -5733,6 +5879,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TXS Accumulator 2 */
     Most6502Base.prototype.op0x9a = function () {
         switch (this.t) {
             case 0: {
@@ -5749,6 +5896,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* TYA Accumulator 2 */
     Most6502Base.prototype.op0x98 = function () {
         switch (this.t) {
             case 0: {
@@ -5767,6 +5915,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* JSR JSR 6 */
     Most6502Base.prototype.op0x20 = function () {
         switch (this.t) {
             case 0: {
@@ -5801,6 +5950,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RTS RTS 6 */
     Most6502Base.prototype.op0x60 = function () {
         switch (this.t) {
             case 0: {
@@ -5834,6 +5984,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0x1a = function () {
         switch (this.t) {
             case 0: {
@@ -5848,6 +5999,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0x3a = function () {
         switch (this.t) {
             case 0: {
@@ -5862,6 +6014,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0x5a = function () {
         switch (this.t) {
             case 0: {
@@ -5876,6 +6029,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0x7a = function () {
         switch (this.t) {
             case 0: {
@@ -5890,6 +6044,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0xda = function () {
         switch (this.t) {
             case 0: {
@@ -5904,6 +6059,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Implied 2 */
     Most6502Base.prototype.op0xfa = function () {
         switch (this.t) {
             case 0: {
@@ -5918,6 +6074,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPage 3 */
     Most6502Base.prototype.op0x4 = function () {
         switch (this.t) {
             case 0: {
@@ -5938,6 +6095,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0x14 = function () {
         switch (this.t) {
             case 0: {
@@ -5964,6 +6122,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0x34 = function () {
         switch (this.t) {
             case 0: {
@@ -5990,6 +6149,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPage 3 */
     Most6502Base.prototype.op0x44 = function () {
         switch (this.t) {
             case 0: {
@@ -6010,6 +6170,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0x54 = function () {
         switch (this.t) {
             case 0: {
@@ -6036,6 +6197,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0x74 = function () {
         switch (this.t) {
             case 0: {
@@ -6062,6 +6224,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0xd4 = function () {
         switch (this.t) {
             case 0: {
@@ -6088,6 +6251,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPageX 4 */
     Most6502Base.prototype.op0xf4 = function () {
         switch (this.t) {
             case 0: {
@@ -6114,6 +6278,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP ZeroPage 3 */
     Most6502Base.prototype.op0x64 = function () {
         switch (this.t) {
             case 0: {
@@ -6134,6 +6299,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Immediate 2 */
     Most6502Base.prototype.op0x80 = function () {
         switch (this.t) {
             case 0: {
@@ -6149,6 +6315,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Immediate 2 */
     Most6502Base.prototype.op0x82 = function () {
         switch (this.t) {
             case 0: {
@@ -6164,6 +6331,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Immediate 2 */
     Most6502Base.prototype.op0xc2 = function () {
         switch (this.t) {
             case 0: {
@@ -6179,6 +6347,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Immediate 2 */
     Most6502Base.prototype.op0xe2 = function () {
         switch (this.t) {
             case 0: {
@@ -6194,6 +6363,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Immediate 2 */
     Most6502Base.prototype.op0x89 = function () {
         switch (this.t) {
             case 0: {
@@ -6209,6 +6379,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP Absolute 4 */
     Most6502Base.prototype.op0xc = function () {
         switch (this.t) {
             case 0: {
@@ -6236,6 +6407,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0x1c = function () {
         switch (this.t) {
             case 0: {
@@ -6276,6 +6448,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0x3c = function () {
         switch (this.t) {
             case 0: {
@@ -6316,6 +6489,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0x5c = function () {
         switch (this.t) {
             case 0: {
@@ -6356,6 +6530,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0x7c = function () {
         switch (this.t) {
             case 0: {
@@ -6396,6 +6571,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0xdc = function () {
         switch (this.t) {
             case 0: {
@@ -6436,6 +6612,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* NOP AbsoluteX 4pc  */
     Most6502Base.prototype.op0xfc = function () {
         switch (this.t) {
             case 0: {
@@ -6476,6 +6653,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SBC Immediate 2 */
     Most6502Base.prototype.op0xeb = function () {
         switch (this.t) {
             case 0: {
@@ -6491,7 +6669,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -6501,6 +6679,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP IndirectX 8 */
     Most6502Base.prototype.op0xc3 = function () {
         switch (this.t) {
             case 0: {
@@ -6551,6 +6730,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP ZeroPage 5 */
     Most6502Base.prototype.op0xc7 = function () {
         switch (this.t) {
             case 0: {
@@ -6584,6 +6764,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP Absolute 6 */
     Most6502Base.prototype.op0xcf = function () {
         switch (this.t) {
             case 0: {
@@ -6624,6 +6805,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP IndirectY 8 */
     Most6502Base.prototype.op0xd3 = function () {
         switch (this.t) {
             case 0: {
@@ -6678,6 +6860,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP ZeroPageX 6 */
     Most6502Base.prototype.op0xd7 = function () {
         switch (this.t) {
             case 0: {
@@ -6717,6 +6900,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP AbsoluteY 7 */
     Most6502Base.prototype.op0xdb = function () {
         switch (this.t) {
             case 0: {
@@ -6767,6 +6951,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* DCP AbsoluteX 7 */
     Most6502Base.prototype.op0xdf = function () {
         switch (this.t) {
             case 0: {
@@ -6817,6 +7002,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC IndirectX 8 */
     Most6502Base.prototype.op0xe3 = function () {
         switch (this.t) {
             case 0: {
@@ -6866,7 +7052,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -6876,6 +7062,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC ZeroPage 5 */
     Most6502Base.prototype.op0xe7 = function () {
         switch (this.t) {
             case 0: {
@@ -6908,7 +7095,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -6918,6 +7105,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC Absolute 6 */
     Most6502Base.prototype.op0xef = function () {
         switch (this.t) {
             case 0: {
@@ -6957,7 +7145,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -6967,6 +7155,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC IndirectY 8 */
     Most6502Base.prototype.op0xf3 = function () {
         switch (this.t) {
             case 0: {
@@ -7020,7 +7209,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -7030,6 +7219,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC ZeroPageX 6 */
     Most6502Base.prototype.op0xf7 = function () {
         switch (this.t) {
             case 0: {
@@ -7068,7 +7258,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -7078,6 +7268,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC AbsoluteY 7 */
     Most6502Base.prototype.op0xfb = function () {
         switch (this.t) {
             case 0: {
@@ -7127,7 +7318,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -7137,6 +7328,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ISC AbsoluteX 7 */
     Most6502Base.prototype.op0xff = function () {
         switch (this.t) {
             case 0: {
@@ -7186,7 +7378,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -7196,6 +7388,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX Immediate 2 */
     Most6502Base.prototype.op0xab = function () {
         switch (this.t) {
             case 0: {
@@ -7215,6 +7408,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX ZeroPage 3 */
     Most6502Base.prototype.op0xa7 = function () {
         switch (this.t) {
             case 0: {
@@ -7239,6 +7433,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX ZeroPageY 4 */
     Most6502Base.prototype.op0xb7 = function () {
         switch (this.t) {
             case 0: {
@@ -7269,6 +7464,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX Absolute 4 */
     Most6502Base.prototype.op0xaf = function () {
         switch (this.t) {
             case 0: {
@@ -7300,6 +7496,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX AbsoluteY 4pc  */
     Most6502Base.prototype.op0xbf = function () {
         switch (this.t) {
             case 0: {
@@ -7348,6 +7545,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX IndirectX 6 */
     Most6502Base.prototype.op0xa3 = function () {
         switch (this.t) {
             case 0: {
@@ -7389,6 +7587,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAX IndirectY 5pc  */
     Most6502Base.prototype.op0xb3 = function () {
         switch (this.t) {
             case 0: {
@@ -7441,6 +7640,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SAX IndirectX 6 */
     Most6502Base.prototype.op0x83 = function () {
         switch (this.t) {
             case 0: {
@@ -7479,6 +7679,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SAX ZeroPage 3 */
     Most6502Base.prototype.op0x87 = function () {
         switch (this.t) {
             case 0: {
@@ -7500,6 +7701,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SAX Absolute 4 */
     Most6502Base.prototype.op0x8f = function () {
         switch (this.t) {
             case 0: {
@@ -7528,6 +7730,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SAX ZeroPageY 4 */
     Most6502Base.prototype.op0x97 = function () {
         switch (this.t) {
             case 0: {
@@ -7555,6 +7758,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO IndirectX 8 */
     Most6502Base.prototype.op0x3 = function () {
         switch (this.t) {
             case 0: {
@@ -7609,6 +7813,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO ZeroPage 5 */
     Most6502Base.prototype.op0x7 = function () {
         switch (this.t) {
             case 0: {
@@ -7646,6 +7851,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO Absolute 6 */
     Most6502Base.prototype.op0xf = function () {
         switch (this.t) {
             case 0: {
@@ -7690,6 +7896,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO IndirectY 8 */
     Most6502Base.prototype.op0x13 = function () {
         switch (this.t) {
             case 0: {
@@ -7748,6 +7955,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO ZeroPageX 6 */
     Most6502Base.prototype.op0x17 = function () {
         switch (this.t) {
             case 0: {
@@ -7791,6 +7999,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO AbsoluteY 7 */
     Most6502Base.prototype.op0x1b = function () {
         switch (this.t) {
             case 0: {
@@ -7845,6 +8054,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SLO AbsoluteX 7 */
     Most6502Base.prototype.op0x1f = function () {
         switch (this.t) {
             case 0: {
@@ -7899,6 +8109,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA IndirectX 8 */
     Most6502Base.prototype.op0x23 = function () {
         switch (this.t) {
             case 0: {
@@ -7954,6 +8165,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA ZeroPage 5 */
     Most6502Base.prototype.op0x27 = function () {
         switch (this.t) {
             case 0: {
@@ -7992,6 +8204,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA Absolute 6 */
     Most6502Base.prototype.op0x2f = function () {
         switch (this.t) {
             case 0: {
@@ -8037,6 +8250,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA IndirectY 8 */
     Most6502Base.prototype.op0x33 = function () {
         switch (this.t) {
             case 0: {
@@ -8096,6 +8310,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA ZeroPageX 6 */
     Most6502Base.prototype.op0x37 = function () {
         switch (this.t) {
             case 0: {
@@ -8140,6 +8355,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA AbsoluteY 7 */
     Most6502Base.prototype.op0x3b = function () {
         switch (this.t) {
             case 0: {
@@ -8195,6 +8411,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RLA AbsoluteX 7 */
     Most6502Base.prototype.op0x3f = function () {
         switch (this.t) {
             case 0: {
@@ -8250,6 +8467,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA IndirectX 8 */
     Most6502Base.prototype.op0x63 = function () {
         switch (this.t) {
             case 0: {
@@ -8300,7 +8518,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8310,6 +8528,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA ZeroPage 5 */
     Most6502Base.prototype.op0x67 = function () {
         switch (this.t) {
             case 0: {
@@ -8343,7 +8562,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8353,6 +8572,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA Absolute 6 */
     Most6502Base.prototype.op0x6f = function () {
         switch (this.t) {
             case 0: {
@@ -8393,7 +8613,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8403,6 +8623,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA IndirectY 8 */
     Most6502Base.prototype.op0x73 = function () {
         switch (this.t) {
             case 0: {
@@ -8457,7 +8678,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8467,6 +8688,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA ZeroPageX 6 */
     Most6502Base.prototype.op0x77 = function () {
         switch (this.t) {
             case 0: {
@@ -8506,7 +8728,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8516,6 +8738,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA AbsoluteY 7 */
     Most6502Base.prototype.op0x7b = function () {
         switch (this.t) {
             case 0: {
@@ -8566,7 +8789,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8576,6 +8799,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* RRA AbsoluteX 7 */
     Most6502Base.prototype.op0x7f = function () {
         switch (this.t) {
             case 0: {
@@ -8626,7 +8850,7 @@ var Most6502Base = (function () {
                 var bothPositive = this.b < 128 && this.rA < 128;
                 var bothNegative = this.b >= 128 && this.rA >= 128;
                 this.flgCarry = sum > 255 ? 1 : 0;
-                this.b = sum % 256;
+                this.b = sum & 255;
                 this.flgNegative = this.b >= 128 ? 1 : 0;
                 this.flgZero = this.b === 0 ? 1 : 0;
                 this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
@@ -8636,6 +8860,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE IndirectX 8 */
     Most6502Base.prototype.op0x43 = function () {
         switch (this.t) {
             case 0: {
@@ -8690,6 +8915,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE ZeroPage 5 */
     Most6502Base.prototype.op0x47 = function () {
         switch (this.t) {
             case 0: {
@@ -8727,6 +8953,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE Absolute 6 */
     Most6502Base.prototype.op0x4f = function () {
         switch (this.t) {
             case 0: {
@@ -8771,6 +8998,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE IndirectY 8 */
     Most6502Base.prototype.op0x53 = function () {
         switch (this.t) {
             case 0: {
@@ -8829,6 +9057,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE ZeroPageX 6 */
     Most6502Base.prototype.op0x57 = function () {
         switch (this.t) {
             case 0: {
@@ -8872,6 +9101,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE AbsoluteY 7 */
     Most6502Base.prototype.op0x5b = function () {
         switch (this.t) {
             case 0: {
@@ -8926,6 +9156,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SRE AbsoluteX 7 */
     Most6502Base.prototype.op0x5f = function () {
         switch (this.t) {
             case 0: {
@@ -8980,6 +9211,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ANC Immediate 2 */
     Most6502Base.prototype.op0xb = function () {
         switch (this.t) {
             case 0: {
@@ -9000,6 +9232,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ANC Immediate 2 */
     Most6502Base.prototype.op0x2b = function () {
         switch (this.t) {
             case 0: {
@@ -9020,6 +9253,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ALR Immediate 2 */
     Most6502Base.prototype.op0x4b = function () {
         switch (this.t) {
             case 0: {
@@ -9043,6 +9277,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* ARR Immediate 2 */
     Most6502Base.prototype.op0x6b = function () {
         switch (this.t) {
             case 0: {
@@ -9069,6 +9304,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AXS Immediate 2 */
     Most6502Base.prototype.op0xcb = function () {
         switch (this.t) {
             case 0: {
@@ -9090,6 +9326,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SYA AbsoluteX 5 */
     Most6502Base.prototype.op0x9c = function () {
         switch (this.t) {
             case 0: {
@@ -9132,6 +9369,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* SXA AbsoluteY 5 */
     Most6502Base.prototype.op0x9e = function () {
         switch (this.t) {
             case 0: {
@@ -9174,6 +9412,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* XAA Immediate 2 */
     Most6502Base.prototype.op0x8b = function () {
         switch (this.t) {
             case 0: {
@@ -9189,6 +9428,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AXA IndirectY 6 */
     Most6502Base.prototype.op0x93 = function () {
         switch (this.t) {
             case 0: {
@@ -9230,6 +9470,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* XAS AbsoluteY 5 */
     Most6502Base.prototype.op0x9b = function () {
         switch (this.t) {
             case 0: {
@@ -9267,6 +9508,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* AXA AbsoluteY 5 */
     Most6502Base.prototype.op0x9f = function () {
         switch (this.t) {
             case 0: {
@@ -9304,6 +9546,7 @@ var Most6502Base = (function () {
             }
         }
     };
+    /* LAR AbsoluteY 4pc  */
     Most6502Base.prototype.op0xbb = function () {
         switch (this.t) {
             case 0: {
@@ -13834,6 +14077,7 @@ var PPU = (function () {
         vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
         vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
         this.secondaryOam = new Uint8Array(32);
+        this.secondaryOamISprite = new Int8Array(8);
         this.oam = new Uint8Array(256);
         this.rgspriteRenderingInfo = [];
         for (var isprite = 0; isprite < 8; isprite++)
@@ -14197,11 +14441,6 @@ var PPU = (function () {
     // zizi = 0;
     PPU.prototype.step = function () {
         this.stepDraw();
-        ////dummy sprite zero hit
-        if (this.sy === 30 && this.sx === 1)
-            this.flgSpriteZeroHit = true;
-        if (this.sy === 261 && this.sx === 0)
-            this.flgSpriteZeroHit = false;
         this.stepOam();
         this.stepBg();
         this.stepS();
@@ -14218,6 +14457,7 @@ var PPU = (function () {
                 // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
                 // is active that makes the read always return $FF.
                 this.secondaryOam[this.sx] = 0xff;
+                this.secondaryOamISprite[this.sx >> 2] = -1;
                 if (this.sx === 64) {
                     this.m = 0;
                     this.n = 0;
@@ -14241,6 +14481,7 @@ var PPU = (function () {
                             if (this.m === 0) {
                                 this.secondaryOam[this.addrSecondaryOam] = this.oamB;
                                 if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
+                                    this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
                                     this.addrSecondaryOam++;
                                     this.m++; //start copying
                                 }
@@ -14290,7 +14531,7 @@ var PPU = (function () {
                 this.oamAddr = 0;
                 var b0 = this.secondaryOam[addrOamBase + 0];
                 if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = 256;
+                    spriteRenderingInfo.xCounter = -100;
                 }
                 else {
                     switch (this.sx & 7) {
@@ -14303,6 +14544,7 @@ var PPU = (function () {
                                 spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
                                 spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
                                 spriteRenderingInfo.xCounter = b3;
+                                spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
                             }
                         case 0:
                             {
@@ -14323,6 +14565,8 @@ var PPU = (function () {
         var _a, _b, _c, _d, _e;
     };
     PPU.prototype.stepDraw = function () {
+        if (this.sy === 261 && this.sx === 0)
+            this.flgSpriteZeroHit = false;
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
             var icolorBg;
             var bgTransparent = true;
@@ -14351,6 +14595,7 @@ var PPU = (function () {
             var icolorSprite = -1;
             var spriteTransparent = true;
             var spriteBehindBg = true;
+            var flgZeroSprite = false;
             if (this.showSprites) {
                 for (var isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
@@ -14361,6 +14606,7 @@ var PPU = (function () {
                         if (ipalette0 || ipalette1) {
                             spriteTransparent = false;
                             spriteBehindBg = spriteRenderingInfo.behindBg;
+                            flgZeroSprite = spriteRenderingInfo.flgZeroSprite;
                             var ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
                             if ((ipalette & 3) === 0)
                                 ipalette = 0;
@@ -14370,6 +14616,8 @@ var PPU = (function () {
                     spriteRenderingInfo.xCounter--;
                 }
             }
+            if (flgZeroSprite && !bgTransparent && this.sx < 256)
+                this.flgSpriteZeroHit = true;
             if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
                 this.data[this.dataAddr] = this.colors[icolorSprite];
             else

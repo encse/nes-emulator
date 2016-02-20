@@ -499,7 +499,7 @@ export class Mos6502Gen {
             .then(`const bothPositive = this.b < 128 && this.rA < 128`)
             .then(`const bothNegative = this.b >= 128 && this.rA >= 128`)
             .then(`this.flgCarry = sum > 255 ? 1 : 0`)
-            .then(`this.b = sum % 256`)
+            .then(`this.b = sum & 255`)
             .then(`this.flgNegative = this.b >= 128 ? 1 : 0`)
             .then(`this.flgZero = this.b === 0 ? 1 : 0`)
             .then(`this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0`);
@@ -1689,7 +1689,8 @@ export class Mos6502Gen {
     private genStatement(statement:Statement) {
         var ctx = new Ctx();
 
-        ctx.writeLine(`op0x${statement.opcode.toString(16)}() /* ${statement.mnemonic} ${statement.cycleCount.toString()} */ {`);
+        ctx.writeLine(`/* ${statement.mnemonic} ${statement.cycleCount.toString()} */
+op0x${statement.opcode.toString(16)}() {`);
         ctx.indent();
         var rgcycle = statement.getCycles(this);
     
@@ -2063,11 +2064,11 @@ class Most6502Base {
 
     private icycle = 0;
 
-    private opcodes: (()=>())[];
+    private opcodes: (()=>void)[] = [];
     public constructor(public memory: Memory) {
         `;
         for (var stm of statements) {
-            res += `this.opcodes[${stm.opcode}] = () => this.op0x${stm.opcode.toString(16)}();
+            res += `this.opcodes[${stm.opcode}] = this.op0x${stm.opcode.toString(16)};
 `;
         }
         res+=`
@@ -2140,7 +2141,7 @@ class Most6502Base {
         this.icycle++;
         if (this.dmaRequested) {
             this.dmaRequested = false;
-            this.idma = 513 + (this.icycle % 2);
+            this.idma = 513 + (this.icycle & 1);
             return;
         } else if (this.idma > 0) {
             if (this.idma === 514 || this.idma === 513) {
@@ -2171,7 +2172,7 @@ class Most6502Base {
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 
-        this.opcodes[this.opcode]();
+        this.opcodes[this.opcode].call(this);
 `;
 
         res += `
