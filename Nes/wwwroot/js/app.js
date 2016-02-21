@@ -14516,8 +14516,7 @@ var PPU = (function () {
                 this.secondaryOam[this.sx] = 0xff;
                 this.secondaryOamISprite[this.sx >> 2] = -1;
                 if (this.sx === 64) {
-                    this.m = 0;
-                    this.n = 0;
+                    this.addrOam2 = 0;
                     this.addrSecondaryOam = 0;
                     this.oamState = OamState.FillSecondaryOam;
                 }
@@ -14530,7 +14529,7 @@ var PPU = (function () {
                 //        (unless 8 sprites have been found, in which case the write is ignored).
                 //     1a.If Y- coordinate is in range, copy remaining bytes of sprite data (OAM[n][1] thru OAM[n][3]) into secondary OAM.
                 if (this.sx & 1) {
-                    this.oamB = this.oam[(this.n << 2) + this.m];
+                    this.oamB = this.oam[this.addrOam2];
                 }
                 else {
                     switch (this.oamState) {
@@ -14539,43 +14538,42 @@ var PPU = (function () {
                             if (this.copyToSecondaryOam) {
                                 this.copyToSecondaryOam--;
                                 this.addrSecondaryOam++;
-                                this.m++;
+                                this.addrOam2++;
                             }
                             else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
-                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
+                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.addrOam2 >> 2;
                                 this.addrSecondaryOam++;
                                 this.copyToSecondaryOam = 3;
-                                this.m++; //start copying
+                                this.addrOam2++;
                             }
-                            else
-                                this.n++;
+                            else {
+                                this.addrOam2 += 4;
+                            }
                             if (this.addrSecondaryOam === 32)
                                 this.oamState = OamState.CheckOverflow;
                             break;
                         case OamState.CheckOverflow:
                             if (this.copyToSecondaryOam) {
                                 this.copyToSecondaryOam--;
-                                this.m++;
+                                this.addrOam2++;
                             }
                             else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
                                 this.flgSpriteOverflow = true;
                                 this.copyToSecondaryOam = 3;
-                                this.m++;
+                                this.addrOam2++;
                             }
                             else {
-                                this.n++;
-                                this.m = this.m === 3 ? 0 : this.m + 1; //this is the sprite overflow bug
+                                this.addrOam2 += 4;
+                                this.addrOam2 = (this.addrOam2 & 0xfc) | (((this.addrOam2 & 3) + 1) & 3);
                             }
                             break;
                         case OamState.Done:
                             break;
                     }
                 }
-                if (this.m === 4)
-                    _a = [this.n + 1, 0], this.n = _a[0], this.m = _a[1];
-                if (this.n === 64) {
+                if ((this.addrOam2 & 0xfc) === 64) {
                     this.oamState = OamState.Done;
-                    this.n = 0;
+                    this.addrOam2 &= 0x3;
                 }
             }
             else if (this.sx >= 257 && this.sx <= 320) {
@@ -14616,7 +14614,6 @@ var PPU = (function () {
                 }
             }
         }
-        var _a;
     };
     PPU.prototype.stepDraw = function () {
         if (this.sy === 261 && this.sx === 0)
