@@ -1,12 +1,12 @@
 ﻿class SpriteRenderingInfo {
-    flgZeroSprite: boolean;
-    xCounter: number;
-    tileLo: number;
-    tileHi: number;
-    ipaletteBase:number;
-    flipHoriz:boolean;
-    flipVert: boolean;
-    behindBg: boolean;
+    flgZeroSprite: boolean = false;
+    xCounter: number = -1000;
+    tileLo: number = 0 ;
+    tileHi: number = 0;
+    ipaletteBase:number = 0 ;
+    flipHoriz:boolean = false;
+    flipVert: boolean = false;
+    behindBg: boolean = false;
 }
 
 enum OamState {
@@ -154,6 +154,10 @@ class PPU {
         this.rgspriteRenderingInfo = [];
         for (let isprite = 0; isprite < 8; isprite++)
             this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
+
+        for (let i = 0; i < 32; i++) 
+            this.vmemory.setByte(0x3f00 + i, this.initialPaletteValues[i]);
+       
     }
 
     public setCtx(ctx: CanvasRenderingContext2D) {
@@ -284,9 +288,6 @@ class PPU {
             this.addrTileBase = value & 0x10 ? 0x1000 : 0;
             this.spriteHeight = value & 0x20 ? 16 : 8;
             this.nmi_output = !!(value & 0x80);
-
-            if (this.spriteHeight === 16)
-                throw 'sprite height 16 is not supported';
             break;
         case 0x1:
             this.imageGrayscale = !!(value & 0x01);
@@ -549,6 +550,7 @@ class PPU {
 
     oamB: number;
     m: number;
+    copyToSecondaryOam: number;
     n: number;
     addrSecondaryOam;
     oamState:OamState;
@@ -587,52 +589,51 @@ class PPU {
                 } else {
                     switch (this.oamState) {
                         case OamState.FillSecondaryOam:
-                            if (this.m === 0) {
-                                this.secondaryOam[this.addrSecondaryOam] = this.oamB;
-                                if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
-                                    this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
-                                    this.addrSecondaryOam++;
-                                    this.m++; //start copying
+                            this.secondaryOam[this.addrSecondaryOam] = this.oamB;
 
-                                } else {
-                                    this.n++;
-                                }
-                            } else { //copying
-                                this.secondaryOam[this.addrSecondaryOam++] = this.oamB;
+                            if (this.copyToSecondaryOam) {
+                                this.copyToSecondaryOam--;
+                                this.addrSecondaryOam++;
                                 this.m++;
-                                if (this.m === 4)
-                                    [this.n, this.m] = [this.n + 1, 0];
-                            }
-
-                            if (this.n === 64)
-                                [this.oamState, this.n, this.m] = [OamState.Done, 0, 0];
-                            else if (this.addrSecondaryOam === 32) //found 8 sprites
-                                [this.oamState, this.n, this.m] = [OamState.CheckOverflow, this.n, 0];
+                            } else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
+                                this.addrSecondaryOam++;
+                                this.copyToSecondaryOam = 3;
+                                this.m++; //start copying
+                            } else
+                                this.n++;
+                       
+                            if (this.addrSecondaryOam === 32) //found 8 sprites
+                                this.oamState = OamState.CheckOverflow;
                             break;
 
                         case OamState.CheckOverflow:
-                            if (this.m === 0) {
-                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
-                                    this.flgSpriteOverflow = this.showBg || this.showSprites;
-                                    this.m++;
-                                } else {
-                                    this.n++;
-                                    this.m++; //this is the sprite overflow bug.
-                                }
-                            } else { //dummy reads
+                            if (this.copyToSecondaryOam) {
+                                this.copyToSecondaryOam--;
                                 this.m++;
-                                if (this.m === 4) 
-                                    [this.n, this.m] = [this.n + 1, 0]; 
+                            } else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                                this.flgSpriteOverflow = true;
+                                this.copyToSecondaryOam = 3;
+                                this.m++;
+                            } else {
+                                this.n++;
+                                this.m = this.m === 3 ? 0 : this.m + 1; //this is the sprite overflow bug
                             }
-
-                            if (this.n === 64)
-                                [this.oamState, this.n, this.m] = [OamState.Done, 0, 0];
                             break;
-
+                       
                         case OamState.Done:
                             break;
-                        }
+                    }
                 }
+                
+                if (this.m === 4)
+                    [this.n, this.m] = [this.n + 1, 0];
+
+                if (this.n === 64) {
+                    this.oamState = OamState.Done;
+                    this.n = 0;
+                }
+
             }
             else if (this.sx >= 257 && this.sx <= 320) {
                 let isprite = (this.sx - 257) >> 3;
@@ -642,32 +643,32 @@ class PPU {
                 let b0 = this.secondaryOam[addrOamBase + 0];
 
                 if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = -100;
+                    spriteRenderingInfo.xCounter = -1000;
                 } else {
                     switch (this.sx & 7) {
-                    case 1:
-                    {
-                        let b2 = this.secondaryOam[addrOamBase + 2];
-                        let b3 = this.secondaryOam[addrOamBase + 3];
-                        spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
-                        spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
-                        spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
-                        spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-                        spriteRenderingInfo.xCounter = b3;
-                        spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
-                    }
-                    case 0:
-                    {
-                        let b1 = this.secondaryOam[addrOamBase + 1];
-                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
-                        break;
-                    }
-                    case 6:
-                    {
-                        let b1 = this.secondaryOam[addrOamBase + 1];
-                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
-                        break;
-                    }
+                        case 1:
+                        {
+                            let b2 = this.secondaryOam[addrOamBase + 2];
+                            let b3 = this.secondaryOam[addrOamBase + 3];
+                            spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
+                            spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                            spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                            spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+                            spriteRenderingInfo.xCounter = b3;
+                            spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                        }
+                        case 0:
+                        {
+                            let b1 = this.secondaryOam[addrOamBase + 1];
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
+                            break;
+                        }
+                        case 6:
+                        {
+                            let b1 = this.secondaryOam[addrOamBase + 1];
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
+                            break;
+                        }
                     }
                 }
             }
@@ -680,8 +681,6 @@ class PPU {
             this.flgSpriteZeroHit = false;
 
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
-          
-
             var icolorBg: number;
             var bgTransparent = true;
             if (this.showBg) {
@@ -740,8 +739,11 @@ class PPU {
                 }
             }
 
-            if (flgZeroSprite && !bgTransparent && this.sx < 256)
+            if (flgZeroSprite && !bgTransparent && this.showBg && this.showSprites
+                && this.sx < 256 && this.sy > 0
+                && (this.sx > 8 || (this.showSpritesInLeftmost8Pixels && this.showBgInLeftmost8Pixels))) {
                 this.flgSpriteZeroHit = true;
+            }
 
             if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
                 this.data[this.dataAddr] = this.colors[icolorSprite];
@@ -762,9 +764,8 @@ class PPU {
                 this.p3 = (this.p3 << 1) & 0xffffff;
 
                 if (this.sy === 261) {
-                    if (this.sx === 1) {
+                    if (this.sx === 1) 
                         this.flgVblank = false;
-                    }
                 }
 
                 if ((this.sx & 0x07) === 2) {
@@ -847,9 +848,11 @@ class PPU {
         0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298, 
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ]);
-
-
-
+    
+    private initialPaletteValues = [
+          0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
+          0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
+    ];
 
 
 }

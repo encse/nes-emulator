@@ -43,7 +43,9 @@ class CpuTestRunner extends NesRunnerBase{
 
         if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
             nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
-            nesEmulator.cpu.flgInterruptDisable) {
+            nesEmulator.cpu.flgInterruptDisable &&
+            !nesEmulator.ppu.nmi_output
+        ) {
 
             const out = nesEmulator.ppu.getNameTable(0);
             this.log(out);

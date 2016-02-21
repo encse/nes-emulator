@@ -10804,7 +10804,8 @@ var CpuTestRunner = (function (_super) {
         }
         if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
             nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
-            nesEmulator.cpu.flgInterruptDisable) {
+            nesEmulator.cpu.flgInterruptDisable &&
+            !nesEmulator.ppu.nmi_output) {
             var out = nesEmulator.ppu.getNameTable(0);
             this.log(out);
             if (out.indexOf(this.checkForString) >= 0) {
@@ -14020,6 +14021,14 @@ var NesRunner = (function (_super) {
 })(NesRunnerBase);
 var SpriteRenderingInfo = (function () {
     function SpriteRenderingInfo() {
+        this.flgZeroSprite = false;
+        this.xCounter = -1000;
+        this.tileLo = 0;
+        this.tileHi = 0;
+        this.ipaletteBase = 0;
+        this.flipHoriz = false;
+        this.flipVert = false;
+        this.behindBg = false;
     }
     return SpriteRenderingInfo;
 })();
@@ -14106,6 +14115,10 @@ var PPU = (function () {
             0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298,
             0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
         ]);
+        this.initialPaletteValues = [
+            0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
+            0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
+        ];
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
         memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
@@ -14122,6 +14135,8 @@ var PPU = (function () {
         this.rgspriteRenderingInfo = [];
         for (var isprite = 0; isprite < 8; isprite++)
             this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
+        for (var i = 0; i < 32; i++)
+            this.vmemory.setByte(0x3f00 + i, this.initialPaletteValues[i]);
     }
     Object.defineProperty(PPU.prototype, "y", {
         /**
@@ -14275,8 +14290,6 @@ var PPU = (function () {
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
                 this.nmi_output = !!(value & 0x80);
-                if (this.spriteHeight === 16)
-                    throw 'sprite height 16 is not supported';
                 break;
             case 0x1:
                 this.imageGrayscale = !!(value & 0x01);
@@ -14522,50 +14535,47 @@ var PPU = (function () {
                 else {
                     switch (this.oamState) {
                         case OamState.FillSecondaryOam:
-                            if (this.m === 0) {
-                                this.secondaryOam[this.addrSecondaryOam] = this.oamB;
-                                if (this.sy >= this.oamB && this.sy <= this.oamB + 7) {
-                                    this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
-                                    this.addrSecondaryOam++;
-                                    this.m++; //start copying
-                                }
-                                else {
-                                    this.n++;
-                                }
-                            }
-                            else {
-                                this.secondaryOam[this.addrSecondaryOam++] = this.oamB;
+                            this.secondaryOam[this.addrSecondaryOam] = this.oamB;
+                            if (this.copyToSecondaryOam) {
+                                this.copyToSecondaryOam--;
+                                this.addrSecondaryOam++;
                                 this.m++;
-                                if (this.m === 4)
-                                    _a = [this.n + 1, 0], this.n = _a[0], this.m = _a[1];
                             }
-                            if (this.n === 64)
-                                _b = [OamState.Done, 0, 0], this.oamState = _b[0], this.n = _b[1], this.m = _b[2];
-                            else if (this.addrSecondaryOam === 32)
-                                _c = [OamState.CheckOverflow, this.n, 0], this.oamState = _c[0], this.n = _c[1], this.m = _c[2];
+                            else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.n;
+                                this.addrSecondaryOam++;
+                                this.copyToSecondaryOam = 3;
+                                this.m++; //start copying
+                            }
+                            else
+                                this.n++;
+                            if (this.addrSecondaryOam === 32)
+                                this.oamState = OamState.CheckOverflow;
                             break;
                         case OamState.CheckOverflow:
-                            if (this.m === 0) {
-                                if (this.oamB >= this.sy - 1 && this.oamB <= this.sy + 7) {
-                                    this.flgSpriteOverflow = this.showBg || this.showSprites;
-                                    this.m++;
-                                }
-                                else {
-                                    this.n++;
-                                    this.m++; //this is the sprite overflow bug.
-                                }
+                            if (this.copyToSecondaryOam) {
+                                this.copyToSecondaryOam--;
+                                this.m++;
+                            }
+                            else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                                this.flgSpriteOverflow = true;
+                                this.copyToSecondaryOam = 3;
+                                this.m++;
                             }
                             else {
-                                this.m++;
-                                if (this.m === 4)
-                                    _d = [this.n + 1, 0], this.n = _d[0], this.m = _d[1];
+                                this.n++;
+                                this.m = this.m === 3 ? 0 : this.m + 1; //this is the sprite overflow bug
                             }
-                            if (this.n === 64)
-                                _e = [OamState.Done, 0, 0], this.oamState = _e[0], this.n = _e[1], this.m = _e[2];
                             break;
                         case OamState.Done:
                             break;
                     }
+                }
+                if (this.m === 4)
+                    _a = [this.n + 1, 0], this.n = _a[0], this.m = _a[1];
+                if (this.n === 64) {
+                    this.oamState = OamState.Done;
+                    this.n = 0;
                 }
             }
             else if (this.sx >= 257 && this.sx <= 320) {
@@ -14575,7 +14585,7 @@ var PPU = (function () {
                 this.oamAddr = 0;
                 var b0 = this.secondaryOam[addrOamBase + 0];
                 if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = -100;
+                    spriteRenderingInfo.xCounter = -1000;
                 }
                 else {
                     switch (this.sx & 7) {
@@ -14606,7 +14616,7 @@ var PPU = (function () {
                 }
             }
         }
-        var _a, _b, _c, _d, _e;
+        var _a;
     };
     PPU.prototype.stepDraw = function () {
         if (this.sy === 261 && this.sx === 0)
@@ -14660,8 +14670,11 @@ var PPU = (function () {
                     spriteRenderingInfo.xCounter--;
                 }
             }
-            if (flgZeroSprite && !bgTransparent && this.sx < 256)
+            if (flgZeroSprite && !bgTransparent && this.showBg && this.showSprites
+                && this.sx < 256 && this.sy > 0
+                && (this.sx > 8 || (this.showSpritesInLeftmost8Pixels && this.showBgInLeftmost8Pixels))) {
                 this.flgSpriteZeroHit = true;
+            }
             if (!spriteTransparent && (bgTransparent || !spriteBehindBg))
                 this.data[this.dataAddr] = this.colors[icolorSprite];
             else
@@ -14678,9 +14691,8 @@ var PPU = (function () {
                 this.p2 = (this.p2 << 1) & 0xffffff;
                 this.p3 = (this.p3 << 1) & 0xffffff;
                 if (this.sy === 261) {
-                    if (this.sx === 1) {
+                    if (this.sx === 1)
                         this.flgVblank = false;
-                    }
                 }
                 if ((this.sx & 0x07) === 2) {
                     this.fetchNt();
