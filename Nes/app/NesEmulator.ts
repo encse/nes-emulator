@@ -53,7 +53,7 @@ class NesEmulator {
             throw 'unkown mapper ' + nesImage.mapperType;
 
         this.memory.shadowSetter(0x4014, 0x4014, (_, v) => {
-            this.addrOamAtDmaStart = this.ppu.oamAddr; 
+            this.addrOamAtDmaStart = this.ppu.addrOam; 
             this.dmaRequested = true;
             this.addrDma = v << 8;
         });
