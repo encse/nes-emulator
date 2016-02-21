@@ -243,6 +243,10 @@ class PPU {
             this.cpu.nmiLine = 1;
             return res;
         }
+        case 0x4:
+        {
+            return this.oam[this.oamAddr];
+        }
         case 0x7:
         {
             this.v &= 0x3fff;

@@ -52,6 +52,12 @@ class NesEmulator {
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
 
+        this.memory.shadowSetter(0x4014, 0x4014, (_, v) => {
+            this.addrOamAtDmaStart = this.ppu.oamAddr; 
+            this.dmaRequested = true;
+            this.addrDma = v << 8;
+        });
+
         this.memory.shadowGetter(0x4016, 0x4016, () => { return this.controller.reg4016; });
         this.memory.shadowSetter(0x4016, 0x4016, (_, v) => { this.controller.reg4016 = v; });
         this.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4016; });
@@ -65,14 +71,37 @@ class NesEmulator {
         this.controller = new Controller(canvas);
     }
 
+  
+    private bDma: number;
+    private dmaRequested = false;
+    private addrOamAtDmaStart: number;
+    private addrDma: number;
+    private idma = -1;
+    
     public step() {
-
         for (let icycle = 0; icycle < 12; icycle++) {
             if (!(icycle & 3))
                 this.ppu.step();
 
             if (icycle === 0) {
-                this.cpu.step();
+                if (this.dmaRequested) {
+                    this.dmaRequested = false;
+                    this.idma = 513 + (this.cpu.icycle & 1);
+                } else if (this.idma > 0) {
+                    if (this.idma === 514 || this.idma === 513) {
+                        //nop
+                    } else if (!(this.idma & 1)) {
+                        this.bDma = this.memory.getByte(this.addrDma++);
+                        this.addrDma &= 0xffff;
+                    } else {
+                        this.memory.setByte(0x2004, this.bDma);
+                    }
+                    this.idma--;
+                    if (!this.idma) 
+                        this.memory.setByte(0x2003, this.addrOamAtDmaStart);
+                } else {
+                    this.cpu.step();
+                }
             }
             this.apu.step();
         }

@@ -132,9 +132,6 @@ var APU = (function () {
                 // is set to 0.
                 this.lc0Halt = 1 - (value & 1);
                 break;
-            case 0x4014:
-                this.cpu.dma(value << 8);
-                break;
             case 0x4017:
                 // On a write to $4017, the divider and sequencer are reset, then the sequencer is
                 // configured. Two sequences are available, and frame IRQ generation can be
@@ -496,8 +493,6 @@ var Most6502Base = (function () {
         this.enablePCIncrement = true;
         this.enableInterruptPoll = true;
         this.canSetFlgBreak = true;
-        this.dmaRequested = false;
-        this.idma = -1;
         this.icycle = 0;
         this.opcodes = [];
         this.opcodes[105] = this.op0x69;
@@ -745,10 +740,6 @@ var Most6502Base = (function () {
         this.opcodes[159] = this.op0x9f;
         this.opcodes[187] = this.op0xbb;
     }
-    Most6502Base.prototype.dma = function (addrDma) {
-        this.dmaRequested = true;
-        this.addrDma = addrDma;
-    };
     Most6502Base.prototype.pollInterrupts = function () {
         if (this.nmiDetected) {
             this.nmiRequested = true;
@@ -803,24 +794,6 @@ var Most6502Base = (function () {
     };
     Most6502Base.prototype.clk = function () {
         this.icycle++;
-        if (this.dmaRequested) {
-            this.dmaRequested = false;
-            this.idma = 513 + (this.icycle & 1);
-            return;
-        }
-        else if (this.idma > 0) {
-            if (this.idma === 514 || this.idma === 513) {
-            }
-            else if (!(this.idma & 1)) {
-                this.bDma = this.memory.getByte(this.addrDma++);
-                this.addrDma &= 0xffff;
-            }
-            else {
-                this.memory.setByte(0x2004, this.bDma);
-            }
-            this.idma--;
-            return;
-        }
         if (this.t === 0) {
             if (this.nmiRequested || this.irqRequested) {
                 this.canSetFlgBreak = false;
@@ -10630,6 +10603,8 @@ var Mos6502 = (function (_super) {
 var NesEmulator = (function () {
     function NesEmulator(nesImage, canvas) {
         var _this = this;
+        this.dmaRequested = false;
+        this.idma = -1;
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType) {
@@ -10659,6 +10634,11 @@ var NesEmulator = (function () {
         }
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
+        this.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
+            _this.addrOamAtDmaStart = _this.ppu.oamAddr;
+            _this.dmaRequested = true;
+            _this.addrDma = v << 8;
+        });
         this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
         this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
         this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
@@ -10675,7 +10655,27 @@ var NesEmulator = (function () {
             if (!(icycle & 3))
                 this.ppu.step();
             if (icycle === 0) {
-                this.cpu.step();
+                if (this.dmaRequested) {
+                    this.dmaRequested = false;
+                    this.idma = 513 + (this.cpu.icycle & 1);
+                }
+                else if (this.idma > 0) {
+                    if (this.idma === 514 || this.idma === 513) {
+                    }
+                    else if (!(this.idma & 1)) {
+                        this.bDma = this.memory.getByte(this.addrDma++);
+                        this.addrDma &= 0xffff;
+                    }
+                    else {
+                        this.memory.setByte(0x2004, this.bDma);
+                    }
+                    this.idma--;
+                    if (!this.idma)
+                        this.memory.setByte(0x2003, this.addrOamAtDmaStart);
+                }
+                else {
+                    this.cpu.step();
+                }
             }
             this.apu.step();
         }
@@ -10768,10 +10768,17 @@ var NesRunnerBase = (function () {
 var CpuTestRunner = (function (_super) {
     __extends(CpuTestRunner, _super);
     function CpuTestRunner(container, url, checkForString) {
+        var _this = this;
         _super.call(this, container, url);
         this.checkForString = checkForString;
         this.callback = this.renderFrame.bind(this);
         this.container.classList.add('test-case');
+        var collapseButton = document.createElement('div');
+        collapseButton.className = 'collapse-button';
+        collapseButton.onclick = function (e) {
+            $(_this.container).toggleClass('collapsed');
+        };
+        this.container.appendChild(collapseButton);
     }
     CpuTestRunner.prototype.testFinished = function (nesEmulator) {
         if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
@@ -10817,6 +10824,7 @@ var CpuTestRunner = (function (_super) {
         var nesEmulator = this.nesEmulator;
         var ppu = nesEmulator.ppu;
         if (this.testFinished(nesEmulator)) {
+            this.container.classList.add('collapsed');
             this.onEndCallback();
             return;
         }
@@ -10826,6 +10834,7 @@ var CpuTestRunner = (function (_super) {
                 nesEmulator.step();
         }
         catch (e) {
+            this.container.classList.add('collapsed');
             this.logError(e);
             this.onEndCallback();
             return;
@@ -14228,6 +14237,10 @@ var PPU = (function () {
                     this.flgVblank = false;
                     this.cpu.nmiLine = 1;
                     return res;
+                }
+            case 0x4:
+                {
+                    return this.oam[this.oamAddr];
                 }
             case 0x7:
                 {

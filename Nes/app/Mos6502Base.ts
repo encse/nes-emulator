@@ -46,12 +46,8 @@ class Most6502Base {
     private canSetFlgBreak = true;
     private addrBrk : number;
 
-    private bDma:number;
-    private dmaRequested = false;
-    private addrDma:number;
-    private idma = -1;
 
-    private icycle = 0;
+    icycle = 0;
 
     private opcodes: (()=>void)[] = [];
     public constructor(public memory: Memory) {
@@ -302,11 +298,6 @@ this.opcodes[187] = this.op0xbb;
 
     }
 
-    public dma(addrDma:number) {
-        this.dmaRequested = true;
-        this.addrDma = addrDma;
-    }
-
     private pollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
@@ -367,22 +358,7 @@ this.opcodes[187] = this.op0xbb;
    
     public clk() {
         this.icycle++;
-        if (this.dmaRequested) {
-            this.dmaRequested = false;
-            this.idma = 513 + (this.icycle & 1);
-            return;
-        } else if (this.idma > 0) {
-            if (this.idma === 514 || this.idma === 513) {
-                //nop
-            } else if (!(this.idma & 1)) {
-                this.bDma = this.memory.getByte(this.addrDma ++);
-                this.addrDma &= 0xffff;
-            } else {
-                this.memory.setByte(0x2004, this.bDma);
-            }
-            this.idma--;
-            return;
-        }
+        
 
         if (this.t === 0) {
 

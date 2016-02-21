@@ -154,9 +154,7 @@
 
                 this.lc0Halt = 1 - (value & 1);
                 break;
-            case 0x4014:
-                this.cpu.dma(value << 8);
-                break;
+         
             case 0x4017:
                 // On a write to $4017, the divider and sequencer are reset, then the sequencer is
                 // configured. Two sequences are available, and frame IRQ generation can be

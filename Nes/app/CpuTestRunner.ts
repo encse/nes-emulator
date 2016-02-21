@@ -7,6 +7,13 @@ class CpuTestRunner extends NesRunnerBase{
     constructor(container: HTMLElement, url: string, private checkForString: string) {
         super(container, url);
         this.container.classList.add('test-case');
+        const collapseButton = document.createElement('div');
+        collapseButton.className = 'collapse-button';
+        collapseButton.onclick = (e:MouseEvent) => {
+            $(this.container).toggleClass('collapsed');
+        };
+        this.container.appendChild(collapseButton);
+
     }
 
     protected testFinished(nesEmulator) {
@@ -29,6 +36,7 @@ class CpuTestRunner extends NesRunnerBase{
                 i++;
             }
             this.log(res);
+
             return true;
         }
 
@@ -45,7 +53,6 @@ class CpuTestRunner extends NesRunnerBase{
             } else {
                 this.container.classList.add('failed');
             }
-
             return true;
         }
 
@@ -62,6 +69,7 @@ class CpuTestRunner extends NesRunnerBase{
         const ppu = nesEmulator.ppu;
 
         if (this.testFinished(nesEmulator)) {
+            this.container.classList.add('collapsed');
             this.onEndCallback();
             return;
         }
@@ -71,6 +79,7 @@ class CpuTestRunner extends NesRunnerBase{
             while (frameCurrent === ppu.iFrame)
                 nesEmulator.step();
         } catch (e) {
+            this.container.classList.add('collapsed');
             this.logError(e);
             this.onEndCallback();
             return;
