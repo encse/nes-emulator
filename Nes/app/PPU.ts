@@ -45,7 +45,7 @@ class PPU {
         ||| ++-------------- nametable select
         +++----------------- fine Y scroll
      */
-    addrOam: number = 0; // Current oam address
+    oamAddr: number = 0; // Current oam address
     v: number = 0; // Current VRAM address (15 bits)
     t: number = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
     x: number = 0; // Fine X scroll (3 bits)
@@ -249,7 +249,7 @@ class PPU {
         }
         case 0x4:
         {
-            return this.oam[this.addrOam];
+            return this.oam[this.oamAddr];
         }
         case 0x7:
         {
@@ -300,10 +300,10 @@ class PPU {
             this.emphasizeBlue =   !!(value & 0x80);
             break;
         case 0x3:
-            this.addrOam = value;
+            this.oamAddr = value;
             break;
         case 0x4:
-            this.oam[this.addrOam++] = value;
+            this.oam[this.oamAddr++] = value;
             break;
         case 0x5:
             if (this.w === 0) {
@@ -551,6 +551,7 @@ class PPU {
     oamB: number;
     copyToSecondaryOam: number;
     addrSecondaryOam : number;
+    addrOam2 : number;
     oamState:OamState;
 
     public stepOam() {
@@ -568,7 +569,7 @@ class PPU {
                 this.secondaryOam[this.sx] = 0xff;
                 this.secondaryOamISprite[this.sx >> 2] = -1;
                 if (this.sx === 64) {
-                    this.addrOam = 0;
+                    this.addrOam2 = 0;
                     this.addrSecondaryOam = 0;
                     this.oamState = OamState.FillSecondaryOam;
                 }
@@ -582,7 +583,7 @@ class PPU {
                //     1a.If Y- coordinate is in range, copy remaining bytes of sprite data (OAM[n][1] thru OAM[n][3]) into secondary OAM.
 
                 if (this.sx & 1) {
-                    this.oamB = this.oam[this.addrOam];
+                    this.oamB = this.oam[this.addrOam2];
                 } else {
                     switch (this.oamState) {
                         case OamState.FillSecondaryOam:
@@ -591,14 +592,15 @@ class PPU {
                             if (this.copyToSecondaryOam) {
                                 this.copyToSecondaryOam--;
                                 this.addrSecondaryOam++;
-                                this.addrOam ++;
+                                this.addrOam2++;
                             } else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
-                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.addrOam >> 2;
+
+                                this.secondaryOamISprite[this.addrSecondaryOam >> 2] = this.addrOam2 >> 2;
                                 this.addrSecondaryOam++;
                                 this.copyToSecondaryOam = 3;
-                                this.addrOam++;
+                                this.addrOam2++;
                             } else {
-                                this.addrOam += 4;
+                                this.addrOam2 += 4;
                             }
 
                             if (this.addrSecondaryOam === 32) //found 8 sprites
@@ -608,14 +610,14 @@ class PPU {
                         case OamState.CheckOverflow:
                             if (this.copyToSecondaryOam) {
                                 this.copyToSecondaryOam--;
-                                this.addrOam ++;
+                                this.addrOam2 ++;
                             } else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
                                 this.flgSpriteOverflow = true;
                                 this.copyToSecondaryOam = 3;
-                                this.addrOam ++ ;
+                                this.addrOam2 ++ ;
                             } else {
-                                this.addrOam += 4;
-                                this.addrOam = (this.addrOam & 0xfc) | (((this.addrOam & 3) + 1) & 3);
+                                this.addrOam2 += 4;
+                                this.addrOam2 = (this.addrOam2 & 0xfffc) | (((this.addrOam2 & 3) + 1) & 3);
                             }
                             break;
                        
@@ -624,16 +626,17 @@ class PPU {
                     }
                 }
 
-                if ((this.addrOam & 0xfc) === 64) {
+             
+                if (this.addrOam2 >> 2 === 64) {
                     this.oamState = OamState.Done;
-                    this.addrOam &= 0x3;
+                    this.addrOam2 &= 0x3;
                 }
             }
             else if (this.sx >= 257 && this.sx <= 320) {
                 let isprite = (this.sx - 257) >> 3;
                 var addrOamBase = isprite << 2;
                 let spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
-                this.addrOam = 0;
+                this.oamAddr = 0;
                 let b0 = this.secondaryOam[addrOamBase + 0];
 
                 if (b0 >= 0xef) {
