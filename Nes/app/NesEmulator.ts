@@ -76,7 +76,7 @@ class NesEmulator {
     private dmaRequested = false;
     private addrOamAtDmaStart: number;
     private addrDma: number;
-    private idma = -1;
+    private idma = 0;
     
     public step() {
         for (let icycle = 0; icycle < 12; icycle++) {
@@ -97,12 +97,15 @@ class NesEmulator {
                         this.memory.setByte(0x2004, this.bDma);
                     }
                     this.idma--;
-                    if (!this.idma) 
+                    if (!this.idma)
                         this.memory.setByte(0x2003, this.addrOamAtDmaStart);
-                } else {
-                    this.cpu.step();
                 }
+
+                if (!this.idma) 
+                    this.cpu.step();
+                
             }
+        
             this.apu.step();
         }
     }

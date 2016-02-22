@@ -10604,7 +10604,7 @@ var NesEmulator = (function () {
     function NesEmulator(nesImage, canvas) {
         var _this = this;
         this.dmaRequested = false;
-        this.idma = -1;
+        this.idma = 0;
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType) {
@@ -10673,9 +10673,8 @@ var NesEmulator = (function () {
                     if (!this.idma)
                         this.memory.setByte(0x2003, this.addrOamAtDmaStart);
                 }
-                else {
+                if (!this.idma)
                     this.cpu.step();
-                }
             }
             this.apu.step();
         }
@@ -14077,6 +14076,7 @@ var PPU = (function () {
         this.addrSpriteBase = 0;
         this.addrTileBase = 0;
         this.flgVblank = false;
+        this.flgVblankSuppress = false;
         this.flgSpriteZeroHit = false;
         this.flgSpriteOverflow = false;
         this.nmi_output = false;
@@ -14097,6 +14097,7 @@ var PPU = (function () {
         this.lastWrittenStuff = 0;
         this.vramReadBuffer = 0;
         this.icycle = 0;
+        this.shortFrame = false;
         this.colors = new Uint32Array([
             0xff545454, 0xff741e00, 0xff901008, 0xff880030,
             0xff640044, 0xff30005c, 0xff000454, 0xff00183c,
@@ -14244,12 +14245,13 @@ var PPU = (function () {
                     Caution: Reading PPUSTATUS at the exact start of vertical blank will return 0 in bit 7 but clear the latch anyway, causing the program to miss frames. See NMI for details
                   */
                     this.w = 0;
-                    var res = this.flgVblank ? (1 << 7) : 0;
-                    res += this.flgSpriteZeroHit ? (1 << 6) : 0;
-                    res += this.flgSpriteOverflow ? (1 << 5) : 0;
-                    res |= (this.lastWrittenStuff & 31);
+                    var res = (this.flgVblank ? (1 << 7) : 0)
+                        | (this.flgSpriteZeroHit ? (1 << 6) : 0)
+                        | (this.flgSpriteOverflow ? (1 << 5) : 0)
+                        | (this.lastWrittenStuff & 31);
                     //Read PPUSTATUS: Return old status of NMI_occurred in bit 7, then set NMI_occurred to false.
                     this.flgVblank = false;
+                    this.flgVblankSuppress = true; //suppress setting flgVBlank in next ppu cycle http://wiki.nesdev.com/w/index.php/PPU_frame_timing#VBL_Flag_Timing
                     this.cpu.nmiLine = 1;
                     return res;
                 }
@@ -14290,6 +14292,10 @@ var PPU = (function () {
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
                 this.nmi_output = !!(value & 0x80);
+                if (!this.nmi_output)
+                    this.cpu.nmiLine = 1;
+                if (this.nmi_output && this.flgVblank)
+                    this.cpu.nmiLine = 0;
                 break;
             case 0x1:
                 this.imageGrayscale = !!(value & 0x01);
@@ -14501,6 +14507,7 @@ var PPU = (function () {
         this.stepOam();
         this.stepBg();
         this.stepS();
+        this.flgVblankSuppress = false;
     };
     PPU.prototype.stepOam = function () {
         //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
@@ -14729,21 +14736,21 @@ var PPU = (function () {
             }
         }
         else if (this.sy === 241) {
-            if (this.sx === 1) {
+            if (this.sx === 1 && !this.flgVblankSuppress) {
                 this.flgVblank = true;
                 if (this.nmi_output) {
-                    //  this.nmi_output = false;
-                    //    console.log('ppu nmi');
                     this.cpu.nmiLine = 0;
                 }
             }
-            else if (this.sx === 250) {
+            else if (this.sx === 260) {
                 this.cpu.nmiLine = 1;
             }
         }
     };
     PPU.prototype.stepS = function () {
-        if ((this.showBg || this.showSprites) && this.sx === 339 && this.sy === 261 && (this.iFrame & 1)) {
+        if (this.sx === 338 && this.sy === 261)
+            this.shortFrame = (this.iFrame & 1) && (this.showBg || this.showSprites);
+        if (this.shortFrame && this.sx === 339 && this.sy === 261) {
             this.sx = 0;
             this.sy = 0;
         }
