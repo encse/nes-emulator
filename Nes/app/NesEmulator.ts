@@ -88,7 +88,7 @@ class NesEmulator {
                 const nmiBefore = this.cpu.nmiLine;
                 this.ppu.step();
                 const nmiAfter = this.cpu.nmiLine;
-                if (nmiBefore !== nmiAfter && this.icycle === 4)
+                if (nmiBefore > nmiAfter && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
 

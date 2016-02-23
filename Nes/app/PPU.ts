@@ -294,6 +294,10 @@ class PPU {
 
             if (!this.nmi_output)
                 this.cpu.nmiLine = 1;
+
+            if (this.sy === 261 && this.sx === 1)
+                this.flgVblank = false;
+            
             if (this.nmi_output && this.flgVblank)
                 this.cpu.nmiLine = 0;
 
@@ -546,8 +550,7 @@ class PPU {
     }
     icycle = 0;
 
-    //iFrameX = 0;
-    // zizi = 0;
+  
     public step() {
         this.stepDraw();
 
@@ -822,7 +825,6 @@ class PPU {
     public stepS() {
         if (this.sx === 338 && this.sy === 261)
             this.shortFrame = (this.iFrame & 1) && (this.showBg || this.showSprites);
-
         if (this.shortFrame && this.sx === 339 && this.sy === 261) {
             this.sx = 0;
             this.sy = 0;

@@ -10658,7 +10658,7 @@ var NesEmulator = (function () {
                 var nmiBefore = this.cpu.nmiLine;
                 this.ppu.step();
                 var nmiAfter = this.cpu.nmiLine;
-                if (nmiBefore !== nmiAfter && this.icycle === 4)
+                if (nmiBefore > nmiAfter && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
@@ -14302,6 +14302,8 @@ var PPU = (function () {
                 this.nmi_output = !!(value & 0x80);
                 if (!this.nmi_output)
                     this.cpu.nmiLine = 1;
+                if (this.sy === 261 && this.sx === 1)
+                    this.flgVblank = false;
                 if (this.nmi_output && this.flgVblank)
                     this.cpu.nmiLine = 0;
                 break;
@@ -14508,8 +14510,6 @@ var PPU = (function () {
         }
         console.log(st);
     };
-    //iFrameX = 0;
-    // zizi = 0;
     PPU.prototype.step = function () {
         this.stepDraw();
         this.stepOam();
