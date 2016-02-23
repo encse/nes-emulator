@@ -298,7 +298,7 @@ this.opcodes[187] = this.op0xbb;
 
     }
 
-    private pollInterrupts() {
+    public pollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
@@ -310,7 +310,7 @@ this.opcodes[187] = this.op0xbb;
         }
     }
 
-    private detectInterrupts() {
+    public detectInterrupts() {
 
         if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
             this.nmiDetected = true;
@@ -358,7 +358,6 @@ this.opcodes[187] = this.op0xbb;
    
     public clk() {
         this.icycle++;
-        
 
         if (this.t === 0) {
 
@@ -377,7 +376,6 @@ this.opcodes[187] = this.op0xbb;
         }
 
         this.opcodes[this.opcode].call(this);
-
 
         if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll)

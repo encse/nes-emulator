@@ -69,6 +69,8 @@ class NesEmulator {
         this.ppu.setCtx(canvas.getContext('2d'));
         this.cpu.reset();
         this.controller = new Controller(canvas);
+
+        window['nesemulator'] = this;
     }
 
   
@@ -77,13 +79,22 @@ class NesEmulator {
     private addrOamAtDmaStart: number;
     private addrDma: number;
     private idma = 0;
-    
+    private icycle = 0;
     public step() {
-        for (let icycle = 0; icycle < 12; icycle++) {
-            if (!(icycle & 3))
-                this.ppu.step();
 
-            if (icycle === 0) {
+        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
+
+            if ((this.icycle & 3) === 0) {
+                const nmiBefore = this.cpu.nmiLine;
+                this.ppu.step();
+                const nmiAfter = this.cpu.nmiLine;
+                if (nmiBefore !== nmiAfter && this.icycle === 4)
+                    this.cpu.detectInterrupts();
+            }
+
+
+            if (this.icycle === 0) {
+
                 if (this.dmaRequested) {
                     this.dmaRequested = false;
                     this.idma = 513 + (this.cpu.icycle & 1);
@@ -101,11 +112,12 @@ class NesEmulator {
                         this.memory.setByte(0x2003, this.addrOamAtDmaStart);
                 }
 
-                if (!this.idma) 
+                if (!this.idma) {
+                   
                     this.cpu.step();
-                
+                }
             }
-        
+            
             this.apu.step();
         }
     }

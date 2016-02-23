@@ -10605,6 +10605,7 @@ var NesEmulator = (function () {
         var _this = this;
         this.dmaRequested = false;
         this.idma = 0;
+        this.icycle = 0;
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType) {
@@ -10649,12 +10650,18 @@ var NesEmulator = (function () {
         this.ppu.setCtx(canvas.getContext('2d'));
         this.cpu.reset();
         this.controller = new Controller(canvas);
+        window['nesemulator'] = this;
     }
     NesEmulator.prototype.step = function () {
-        for (var icycle = 0; icycle < 12; icycle++) {
-            if (!(icycle & 3))
+        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
+            if ((this.icycle & 3) === 0) {
+                var nmiBefore = this.cpu.nmiLine;
                 this.ppu.step();
-            if (icycle === 0) {
+                var nmiAfter = this.cpu.nmiLine;
+                if (nmiBefore !== nmiAfter && this.icycle === 4)
+                    this.cpu.detectInterrupts();
+            }
+            if (this.icycle === 0) {
                 if (this.dmaRequested) {
                     this.dmaRequested = false;
                     this.idma = 513 + (this.cpu.icycle & 1);
@@ -10673,8 +10680,9 @@ var NesEmulator = (function () {
                     if (!this.idma)
                         this.memory.setByte(0x2003, this.addrOamAtDmaStart);
                 }
-                if (!this.idma)
+                if (!this.idma) {
                     this.cpu.step();
+                }
             }
             this.apu.step();
         }
