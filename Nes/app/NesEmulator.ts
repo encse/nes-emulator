@@ -94,26 +94,22 @@ class NesEmulator {
 
 
             if (this.icycle === 0) {
-
-                if (this.dmaRequested) {
+                if (this.dmaRequested && this.cpu.t === 0) {
                     this.dmaRequested = false;
-                    this.idma = 513 + (this.cpu.icycle & 1);
+                    this.idma = 512 + (this.cpu.icycle & 1);
+                    
+                } else if (this.idma > 512) {
+                    this.idma--; 
                 } else if (this.idma > 0) {
-                    if (this.idma === 514 || this.idma === 513) {
-                        //nop
-                    } else if (!(this.idma & 1)) {
+                    if (!(this.idma & 1)) {
                         this.bDma = this.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;
                     } else {
-                        this.memory.setByte(0x2004, this.bDma);
+                        this.ppu.oam[this.addrOamAtDmaStart++] = this.bDma;
                     }
                     this.idma--;
-                    if (!this.idma)
-                        this.memory.setByte(0x2003, this.addrOamAtDmaStart);
                 }
-
-                if (!this.idma) {
-                   
+                else {
                     this.cpu.step();
                 }
             }

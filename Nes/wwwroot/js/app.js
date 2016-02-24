@@ -10662,25 +10662,24 @@ var NesEmulator = (function () {
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
-                if (this.dmaRequested) {
+                if (this.dmaRequested && this.cpu.t === 0) {
                     this.dmaRequested = false;
-                    this.idma = 513 + (this.cpu.icycle & 1);
+                    this.idma = 512 + (this.cpu.icycle & 1);
+                }
+                else if (this.idma > 512) {
+                    this.idma--;
                 }
                 else if (this.idma > 0) {
-                    if (this.idma === 514 || this.idma === 513) {
-                    }
-                    else if (!(this.idma & 1)) {
+                    if (!(this.idma & 1)) {
                         this.bDma = this.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;
                     }
                     else {
-                        this.memory.setByte(0x2004, this.bDma);
+                        this.ppu.oam[this.addrOamAtDmaStart++] = this.bDma;
                     }
                     this.idma--;
-                    if (!this.idma)
-                        this.memory.setByte(0x2003, this.addrOamAtDmaStart);
                 }
-                if (!this.idma) {
+                else {
                     this.cpu.step();
                 }
             }
@@ -10807,6 +10806,7 @@ var CpuTestRunner = (function (_super) {
                 i++;
             }
             this.log(res);
+            console.log('xxx done');
             return true;
         }
         if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
@@ -10821,6 +10821,7 @@ var CpuTestRunner = (function (_super) {
             else {
                 this.container.classList.add('failed');
             }
+            console.log('xxx done');
             return true;
         }
         return false;
@@ -14076,6 +14077,7 @@ var PPU = (function () {
            +++----------------- fine Y scroll
         */
         this.addrOam = 0; // Current oam address
+        this.addrOam2 = 0; // Current oam address
         this.v = 0; // Current VRAM address (15 bits)
         this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
         this.x = 0; // Fine X scroll (3 bits)
@@ -14265,7 +14267,7 @@ var PPU = (function () {
                 }
             case 0x4:
                 {
-                    return this.oam[this.addrOam];
+                    return this.oam[this.addrOam2];
                 }
             case 0x7:
                 {
@@ -14318,10 +14320,10 @@ var PPU = (function () {
                 this.emphasizeBlue = !!(value & 0x80);
                 break;
             case 0x3:
-                this.addrOam = value;
+                this.addrOam2 = value;
                 break;
             case 0x4:
-                this.oam[this.addrOam++] = value;
+                this.oam[this.addrOam2++] = value;
                 break;
             case 0x5:
                 if (this.w === 0) {
@@ -14595,7 +14597,7 @@ var PPU = (function () {
                 var isprite = (this.sx - 257) >> 3;
                 var addrOamBase = isprite << 2;
                 var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
-                this.addrOam = 0;
+                this.addrOam2 = 0;
                 var b0 = this.secondaryOam[addrOamBase + 0];
                 if (b0 >= 0xef) {
                     spriteRenderingInfo.xCounter = -1000;
@@ -14758,7 +14760,6 @@ var PPU = (function () {
     PPU.prototype.stepS = function () {
         if (this.sx === 338 && this.sy === 261)
             this.shortFrame = (this.iFrame & 1) && (this.showBg || this.showSprites);
-        
         if (this.shortFrame && this.sx === 339 && this.sy === 261) {
             this.sx = 0;
             this.sy = 0;

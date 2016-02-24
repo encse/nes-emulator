@@ -93,7 +93,7 @@ reset:
      pla
      and  #$20
      jsr  error_if_ne
-     txa
+     txa	;$e210
      and  #$20
      jsr  error_if_eq
      
