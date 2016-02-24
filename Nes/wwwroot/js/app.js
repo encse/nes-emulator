@@ -14758,6 +14758,7 @@ var PPU = (function () {
     PPU.prototype.stepS = function () {
         if (this.sx === 338 && this.sy === 261)
             this.shortFrame = (this.iFrame & 1) && (this.showBg || this.showSprites);
+        
         if (this.shortFrame && this.sx === 339 && this.sy === 261) {
             this.sx = 0;
             this.sy = 0;
