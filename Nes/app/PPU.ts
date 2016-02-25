@@ -100,7 +100,7 @@ class PPU {
 
     private secondaryOam: Uint8Array;
     private secondaryOamISprite: Int8Array;
-    private oam:Uint8Array;
+    oam:Uint8Array;
     private rgspriteRenderingInfo: SpriteRenderingInfo[];
     private ispriteNext = 0;
     /**
@@ -585,6 +585,7 @@ class PPU {
                     this.addrOam = 0;
                     this.addrSecondaryOam = 0;
                     this.oamState = OamState.FillSecondaryOam;
+                    this.copyToSecondaryOam = 0;
                 }
             }
             else if (this.sx >= 65 && this.sx <= 256) {
@@ -616,8 +617,11 @@ class PPU {
                                 this.addrOam += 4;
                             }
 
-                            if (this.addrSecondaryOam === 32) //found 8 sprites
+                            if (this.addrSecondaryOam === 32) //found 8 sprites 
+                            {
+                                this.copyToSecondaryOam = 0;
                                 this.oamState = OamState.CheckOverflow;
+                            }
                             break;
 
                         case OamState.CheckOverflow:
