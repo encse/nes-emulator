@@ -77,7 +77,7 @@ reset:
      sta  $2001
      ldy  #142
      jsr  delay_y_scanlines
-     lda  $2002     ; have emulator think it'll occur next
+     lda  $2002     ; e1e9 have emulator think it'll occur next
      lda  #$00      ; disable rendering
      sta  $2001
      jsr  dma_sprite_table
@@ -85,15 +85,15 @@ reset:
      sta  $2001
      ldy  #104
      jsr  delay_y_scanlines
-     lda  $2002
+     lda  $2002		;e1fe
      pha
      ldy  #4
      jsr  delay_y_scanlines
-     ldx  $2002
+     ldx  $2002		;e207
      pla
      and  #$20
      jsr  error_if_ne
-     txa	;$e210
+     txa			;$e210
      and  #$20
      jsr  error_if_eq
      

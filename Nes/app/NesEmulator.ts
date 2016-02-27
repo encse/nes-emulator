@@ -55,6 +55,7 @@ class NesEmulator {
         this.memory.shadowSetter(0x4014, 0x4014, (_, v) => {
             this.addrOamAtDmaStart = this.ppu.addrOam; 
             this.dmaRequested = true;
+            this.ppu.log = true;
             this.addrDma = v << 8;
         });
 
@@ -92,22 +93,31 @@ class NesEmulator {
                     this.cpu.detectInterrupts();
             }
 
-
             if (this.icycle === 0) {
-                if (this.dmaRequested && this.cpu.t === 0) {
-                    this.dmaRequested = false;
-                    this.idma = 512 + (this.cpu.icycle & 1);
                     
+                if (this.dmaRequested) {
+
+                    if (!(this.cpu.icycle & 1)) {
+                        this.dmaRequested = false;
+                        this.idma = 512;
+                    }
+                    this.cpu.icycle++;
                 } else if (this.idma > 512) {
-                    this.idma--; 
+                    this.idma--;
+                    this.cpu.icycle++;
                 } else if (this.idma > 0) {
+                    
+                    this.cpu.icycle++;
                     if (!(this.idma & 1)) {
                         this.bDma = this.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;
                     } else {
-                        this.ppu.oam[this.addrOamAtDmaStart++] = this.bDma;
+                        this.ppu.oam[this.addrOamAtDmaStart] = this.bDma;
+                        this.addrOamAtDmaStart++;
+                        this.addrOamAtDmaStart &= 255;
                     }
                     this.idma--;
+                  
                 }
                 else {
                     this.cpu.step();

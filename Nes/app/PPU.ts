@@ -86,8 +86,8 @@ class PPU {
     static sxMin = 0;
     static sxMax = 340;
 
-    private sy = PPU.syFirstVisible;
-    private sx = PPU.sxMin;
+    sy = PPU.syFirstVisible;
+    sx = PPU.sxMin;
 
     private ctx:CanvasRenderingContext2D;
     private imageData: ImageData;
@@ -248,6 +248,7 @@ class PPU {
             this.flgVblank = false;
             this.flgVblankSuppress = true; //suppress setting flgVBlank in next ppu cycle http://wiki.nesdev.com/w/index.php/PPU_frame_timing#VBL_Flag_Timing
             this.cpu.nmiLine = 1;
+
             return res;
         }
         case 0x4:
@@ -310,7 +311,8 @@ class PPU {
             this.showSprites =  !!(value & 0x10);
             this.emphasizeRed = !!(value & 0x20);
             this.emphasizeGreen =  !!(value & 0x40);
-            this.emphasizeBlue =   !!(value & 0x80);
+            this.emphasizeBlue = !!(value & 0x80);
+
             break;
         case 0x3:
             this.addrOam = value;
@@ -629,7 +631,7 @@ class PPU {
                                 this.copyToSecondaryOam--;
                                 this.addrOam++;
                             } else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
-                                this.flgSpriteOverflow = true;
+;                               this.flgSpriteOverflow = true;
                                 this.copyToSecondaryOam = 3;
                                 this.addrOam++;
                             } else {
@@ -868,6 +870,5 @@ class PPU {
           0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
           0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
     ];
-
 
 }
