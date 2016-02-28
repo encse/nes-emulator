@@ -7,7 +7,7 @@ test_name:
      .code
 
 reset:
-     jsr  begin_sprite_overflow_tests
+     jsr  begin_sprite_overflow_tests ; e147
      
      jsr  clear_sprite_table
      lda  #128
@@ -17,7 +17,7 @@ reset:
      lda  #2;) Didn't calculate overflow when no $2002 read for frame
      ldx  #$18
      jsr  begin_overflow_test
-     ldy  #16
+     ldy  #16  ;e15d
      jsr  delay_y_scanlines
      ldy  #240
      jsr  delay_y_scanlines
@@ -80,8 +80,8 @@ reset:
      lda  $2002     ; e1e9 have emulator think it'll occur next
      lda  #$00      ; disable rendering
      sta  $2001
-     jsr  dma_sprite_table
-     lda  #$18      ; enable rendering
+     jsr  dma_sprite_table ;e1f1
+     lda  #$18      ; e1f4 enable rendering
      sta  $2001
      ldy  #104
      jsr  delay_y_scanlines

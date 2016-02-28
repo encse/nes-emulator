@@ -253,7 +253,7 @@ class PPU {
         }
         case 0x4:
         {
-            return this.oam[this.addrOam];
+            return this.oam[this.addrOam & 0xff];
         }
         case 0x7:
         {
@@ -318,7 +318,15 @@ class PPU {
             this.addrOam = value;
             break;
         case 0x4:
-            this.oam[this.addrOam++] = value;
+            if ((this.showBg || this.showSprites) && (this.sy === 261 || this.sy < 240)) {
+                this.addrOam += 4;
+            } else {
+                this.oam[this.addrOam & 0xff] = value;
+                this.addrOam++;
+            }
+            this.addrOam &= 255;
+            //this.addrOam++;
+
             break;
         case 0x5:
             if (this.w === 0) {
@@ -576,6 +584,9 @@ class PPU {
         if (this.sy === 261 && this.sx === 1) {
             this.flgSpriteOverflow = false;
         } else if (this.sy >= 0 && this.sy <= 239) {
+            if (!this.showSprites && !this.showBg)
+                return;
+
             if (this.sx >= 1 && this.sx <= 64) {
                 // Cycles 1- 64: Secondary OAM (32 - byte buffer for current sprites on scanline) is
                 // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
@@ -597,6 +608,7 @@ class PPU {
                //  1. Starting at n = 0, read a sprite's Y-coordinate (OAM[n][0], copying it to the next open slot in secondary OAM
                //        (unless 8 sprites have been found, in which case the write is ignored).
                //     1a.If Y- coordinate is in range, copy remaining bytes of sprite data (OAM[n][1] thru OAM[n][3]) into secondary OAM.
+
 
                 if (this.sx & 1) {
                     this.oamB = this.oam[this.addrOam];
@@ -630,7 +642,7 @@ class PPU {
                             if (this.copyToSecondaryOam) {
                                 this.copyToSecondaryOam--;
                                 this.addrOam++;
-                            } else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                            } else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
 ;                               this.flgSpriteOverflow = true;
                                 this.copyToSecondaryOam = 3;
                                 this.addrOam++;
@@ -645,11 +657,11 @@ class PPU {
                     }
                 }
 
-             
                 if (this.addrOam >> 2 === 64) {
                     this.oamState = OamState.Done;
                     this.addrOam &= 0x3;
                 }
+                this.addrOam &= 255;
             }
             else if (this.sx >= 257 && this.sx <= 320) {
                 let isprite = (this.sx - 257) >> 3;

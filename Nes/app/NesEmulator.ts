@@ -53,9 +53,7 @@ class NesEmulator {
             throw 'unkown mapper ' + nesImage.mapperType;
 
         this.memory.shadowSetter(0x4014, 0x4014, (_, v) => {
-            this.addrOamAtDmaStart = this.ppu.addrOam; 
             this.dmaRequested = true;
-            this.ppu.log = true;
             this.addrDma = v << 8;
         });
 
@@ -77,7 +75,6 @@ class NesEmulator {
   
     private bDma: number;
     private dmaRequested = false;
-    private addrOamAtDmaStart: number;
     private addrDma: number;
     private idma = 0;
     private icycle = 0;
@@ -112,9 +109,7 @@ class NesEmulator {
                         this.bDma = this.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;
                     } else {
-                        this.ppu.oam[this.addrOamAtDmaStart] = this.bDma;
-                        this.addrOamAtDmaStart++;
-                        this.addrOamAtDmaStart &= 255;
+                        this.memory.setByte(0x2004, this.bDma);
                     }
                     this.idma--;
                   

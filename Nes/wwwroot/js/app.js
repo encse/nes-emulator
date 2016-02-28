@@ -10636,9 +10636,7 @@ var NesEmulator = (function () {
         if (!this.memory)
             throw 'unkown mapper ' + nesImage.mapperType;
         this.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
-            _this.addrOamAtDmaStart = _this.ppu.addrOam;
             _this.dmaRequested = true;
-            _this.ppu.log = true;
             _this.addrDma = v << 8;
         });
         this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
@@ -10681,9 +10679,7 @@ var NesEmulator = (function () {
                         this.addrDma &= 0xffff;
                     }
                     else {
-                        this.ppu.oam[this.addrOamAtDmaStart] = this.bDma;
-                        this.addrOamAtDmaStart++;
-                        this.addrOamAtDmaStart &= 255;
+                        this.memory.setByte(0x2004, this.bDma);
                     }
                     this.idma--;
                 }
@@ -14056,7 +14052,6 @@ var PPU = (function () {
     function PPU(memory, vmemory, cpu) {
         this.vmemory = vmemory;
         this.cpu = cpu;
-        this.log = false;
         /**
          *
             Address range	Size	Description
@@ -14273,7 +14268,7 @@ var PPU = (function () {
                 }
             case 0x4:
                 {
-                    return this.oam[this.addrOam];
+                    return this.oam[this.addrOam & 0xff];
                 }
             case 0x7:
                 {
@@ -14329,7 +14324,15 @@ var PPU = (function () {
                 this.addrOam = value;
                 break;
             case 0x4:
-                this.oam[this.addrOam++] = value;
+                if ((this.showBg || this.showSprites) && (this.sy === 261 || this.sy < 240)) {
+                    this.addrOam += 4;
+                }
+                else {
+                    this.oam[this.addrOam & 0xff] = value;
+                    this.addrOam++;
+                }
+                this.addrOam &= 255;
+                //this.addrOam++;
                 break;
             case 0x5:
                 if (this.w === 0) {
@@ -14531,6 +14534,8 @@ var PPU = (function () {
             this.flgSpriteOverflow = false;
         }
         else if (this.sy >= 0 && this.sy <= 239) {
+            if (!this.showSprites && !this.showBg)
+                return;
             if (this.sx >= 1 && this.sx <= 64) {
                 // Cycles 1- 64: Secondary OAM (32 - byte buffer for current sprites on scanline) is
                 // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
@@ -14583,7 +14588,7 @@ var PPU = (function () {
                                 this.copyToSecondaryOam--;
                                 this.addrOam++;
                             }
-                            else if ((this.showBg || this.showSprites) && this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
+                            else if (this.sy >= this.oamB && this.sy < this.oamB + this.spriteHeight) {
                                 ;
                                 this.flgSpriteOverflow = true;
                                 this.copyToSecondaryOam = 3;
@@ -14602,6 +14607,7 @@ var PPU = (function () {
                     this.oamState = OamState.Done;
                     this.addrOam &= 0x3;
                 }
+                this.addrOam &= 255;
             }
             else if (this.sx >= 257 && this.sx <= 320) {
                 var isprite = (this.sx - 257) >> 3;
