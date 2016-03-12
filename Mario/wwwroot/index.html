@@ -1,0 +1,26 @@
+﻿
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="app.css" type="text/css" rel="stylesheet" media="all" />
+</head>
+<body>
+	<header>
+		<h1>Encse's Nes emulator</h1>
+	</header>
+<main id="content">
+	<p>If doesn't work, try in Chrome.</p>
+	<div id="nesContainer"></div>
+	<h2>Controls</h2>
+	<p>Select - Space<br/>Start - Enter<br/>Jump - A<br/>Fire - B</p>
+</main>
+	<footer>
+		<p><a href="https://csokavar.hu">csokavar.hu</a> - 2016</p>
+	</footer>
+	<script src="app.js"></script>
+	<script language="javascript">
+		new NesRunner(document.getElementById('nesContainer'), 'smb.nes').run();
+	</script>
+</body>
+</html>

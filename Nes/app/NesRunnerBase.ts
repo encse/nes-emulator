@@ -46,7 +46,6 @@ class NesRunnerBase {
         canvas.height = 240;
         canvas.style.zoom = "2";
         this.container.appendChild(canvas);
-
         this.logElement = document.createElement("div");
         this.logElement.classList.add('log');
         this.container.appendChild(this.logElement);

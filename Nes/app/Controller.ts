@@ -19,6 +19,7 @@ class Controller {
 
     constructor(canvas: HTMLElement) {
         canvas.tabIndex = 1;
+        canvas.focus();
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
     }
