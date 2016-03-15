@@ -3,12 +3,12 @@
 ///<reference path="NesImage.ts"/>
 ///<reference path="Mos6502.ts"/>
 class NesEmulator {
-    public cpu: Mos6502;
-    public memory: CompoundMemory;
-    public vmemory: CompoundMemory;
-    public ppu: PPU;
-    public apu: APU;
-    public controller: Controller;
+    cpu: Mos6502;
+    memory: CompoundMemory;
+    vmemory: CompoundMemory;
+    ppu: PPU;
+    apu: APU;
+    controller: Controller;
 
     public constructor(nesImage: NesImage, canvas:HTMLCanvasElement) {
         if (nesImage.fPAL)
@@ -78,7 +78,7 @@ class NesEmulator {
     private addrDma: number;
     private idma = 0;
     private icycle = 0;
-    public step() {
+    step() {
 
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
 

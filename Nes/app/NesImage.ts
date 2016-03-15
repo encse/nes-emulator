@@ -24,16 +24,16 @@
 
     private static magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
 
-    public ROMBanks:ROM[];
-    public VRAMBanks: ROM[];
-    public RAMBanks: RAM[];
-    public fVerticalMirroring:boolean;
-    public fBatteryPackedRAM:boolean;
-    public trainer: Uint8Array = null;
-    public fFourScreenVRAM:boolean;
-    public mapperType:number;
-    public fVSSystem:boolean;
-    public fPAL:boolean;
+    ROMBanks:ROM[];
+    VRAMBanks: ROM[];
+    RAMBanks: RAM[];
+    fVerticalMirroring:boolean;
+    fBatteryPackedRAM:boolean;
+    trainer: Uint8Array = null;
+    fFourScreenVRAM:boolean;
+    mapperType:number;
+    fVSSystem:boolean;
+    fPAL:boolean;
    
     public constructor(rawBytes: Uint8Array) {
         for (let i = 0; i < 4; i++)

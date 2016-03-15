@@ -2,26 +2,26 @@
 
 class Most6502Base {
 
-    public addrReset = 0xfffc;
-    public addrIRQ = 0xfffe;
-    public addrNMI = 0xfffa;
+    addrReset = 0xfffc;
+    addrIRQ = 0xfffe;
+    addrNMI = 0xfffa;
 
-    public opcode: number;
-    public ip: number = 0;
-    public ipCur: number = 0;
-    public sp: number = 0;
-    public t: number = 0;
-    public b: number = 0;
-    public rA: number = 0;
-    public rX: number = 0;
-    public rY: number = 0;
+    opcode: number;
+    ip: number = 0;
+    ipCur: number = 0;
+    sp: number = 0;
+    t: number = 0;
+    b: number = 0;
+    rA: number = 0;
+    rX: number = 0;
+    rY: number = 0;
     
-    public nmiLine = 1;
+    nmiLine = 1;
     private nmiLinePrev = 1;
     private nmiRequested = false;
     private nmiDetected: boolean;
    
-    public irqLine = 1;
+    irqLine = 1;
     private irqRequested = false;
     private irqDetected: boolean;
 
@@ -298,7 +298,7 @@ this.opcodes[187] = this.op0xbb;
 
     }
 
-    public pollInterrupts() {
+    pollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
@@ -310,7 +310,7 @@ this.opcodes[187] = this.op0xbb;
         }
     }
 
-    public detectInterrupts() {
+    detectInterrupts() {
 
         if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
             this.nmiDetected = true;
@@ -329,7 +329,7 @@ this.opcodes[187] = this.op0xbb;
         return this.memory.getByte(0x100 + this.sp);
     }
 
-    public get rP(): number {
+    get rP(): number {
         return (this.flgNegative << 7) +
             (this.flgOverflow << 6) +
             (1 << 5) +
@@ -340,7 +340,7 @@ this.opcodes[187] = this.op0xbb;
             (this.flgCarry << 0);
     }
 
-    public set rP(byte: number) {
+    set rP(byte: number) {
         this.flgNegative = (byte >> 7) & 1;
         this.flgOverflow = (byte >> 6) & 1;
         //skip (byte >> 5) & 1;
@@ -352,11 +352,11 @@ this.opcodes[187] = this.op0xbb;
         this.flgCarry = (byte >> 0) & 1;
     }
 
-    public trace(opcode){
+    trace(opcode){
     
     }
    
-    public clk() {
+    clk() {
         this.icycle++;
 
         if (this.t === 0) {
@@ -9079,7 +9079,7 @@ op0xbb() {
     }
 }
 
-    public opcodeToMnemonic(opcode:number){
+    opcodeToMnemonic(opcode:number){
         if(opcode === 105) return 'ADC Immediate';
 if(opcode === 101) return 'ADC ZeroPage';
 if(opcode === 117) return 'ADC ZeroPageX';
@@ -9328,7 +9328,7 @@ return '???';
 
     }
 
-    public sizeFromOpcode(opcode:number){
+    sizeFromOpcode(opcode:number){
         if(opcode === 105) return 2;
 if(opcode === 101) return 2;
 if(opcode === 117) return 2;

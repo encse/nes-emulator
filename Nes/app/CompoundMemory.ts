@@ -1,6 +1,6 @@
 ///<reference path="Memory.ts"/>
 class CompoundMemory implements Memory {
-    public rgmemory: Memory[] = [];
+    rgmemory: Memory[] = [];
     private setters: {addrFirst: number, addrLast: number, setter:(addr: number, value: number) => void}[] = [];
     private getters: { addrFirst: number, addrLast: number, getter: (addr: number) => number}[] = [];
 
@@ -12,17 +12,17 @@ class CompoundMemory implements Memory {
         rgmemory.forEach(memory => this.sizeI += memory.size());
     }
 
-    public size():number {
+    size():number {
         return this.sizeI;
     }
 
-    public shadowSetter(addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void) {
+    shadowSetter(addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void) {
         this.setters.push({addrFirst: addrFirst, addrLast: addrLast, setter: setter });
     }
-    public shadowGetter(addrFirst: number, addrLast: number, getter: (addr: number) => number) {
+    shadowGetter(addrFirst: number, addrLast: number, getter: (addr: number) => number) {
         this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
     }
-    public getByte(addr: number): number {
+    getByte(addr: number): number {
         for (let i = 0; i < this.getters.length; i++) {
             const getter = this.getters[i];
             if (getter.addrFirst <= addr && addr <= getter.addrLast) {
@@ -41,7 +41,7 @@ class CompoundMemory implements Memory {
         throw 'address out of bounds';
     }
 
-    public setByte(addr: number, value: number): void {
+    setByte(addr: number, value: number): void {
         //if (addr == 0x3c2) {
         //    console.log('xxx set', value.toString(16));
         //}

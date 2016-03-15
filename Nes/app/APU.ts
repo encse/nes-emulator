@@ -200,7 +200,7 @@
 
     }
 
-    public step() {
+    step() {
         
         //The divider generates an output clock rate of just under 240 Hz, and appears to
         //be derived by dividing the 21.47727 MHz system clock by 89490. The sequencer is

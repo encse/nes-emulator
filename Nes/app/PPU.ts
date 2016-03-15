@@ -96,7 +96,7 @@ class PPU {
     private data: Uint32Array;
     private dataAddr = 0;
 
-    public iFrame = 0;
+    iFrame = 0;
 
     private secondaryOam: Uint8Array;
     private secondaryOamISprite: Int8Array;
@@ -161,7 +161,7 @@ class PPU {
        
     }
 
-    public setCtx(ctx: CanvasRenderingContext2D) {
+    setCtx(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
         this.imageData = this.ctx.getImageData(0, 0, 256, 240);
         //this.imageData = this.ctx.getImageData(0, 0, 300, 300);
@@ -497,7 +497,7 @@ class PPU {
         this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
     }
 
-    public getNameTable(i) {
+    getNameTable(i) {
         var st = '';
         for (var y = 0; y < 30; y++){
             for (var x = 0; x < 32; x++) {
@@ -508,7 +508,7 @@ class PPU {
         return st;
     }
 
-    public getPatternTable() {
+    getPatternTable() {
         const canvas:HTMLCanvasElement = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 128;
@@ -539,7 +539,7 @@ class PPU {
 
     
     }
-    public getAttributeTable(i) {
+    getAttributeTable(i) {
         var st = '';
         for (var dy = 0; dy < 30; dy+=2){
             for (var dx = 0; dx < 32; dx+=2) {
@@ -561,7 +561,7 @@ class PPU {
     icycle = 0;
 
   
-    public step() {
+    step() {
         this.stepDraw();
 
         this.stepOam();
@@ -577,7 +577,7 @@ class PPU {
     addrSecondaryOam : number;
     oamState:OamState;
 
-    public stepOam() {
+    stepOam() {
 
         //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
 
@@ -704,7 +704,7 @@ class PPU {
         }
     }
 
-    public stepDraw() {
+    stepDraw() {
         if (this.sy === 261 && this.sx === 0)
             this.flgSpriteZeroHit = false;
 
@@ -781,7 +781,7 @@ class PPU {
         }
     }
 
-    public stepBg() {
+    stepBg() {
         //http://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
         if (this.sy >= 0 && this.sy <= 239 || this.sy === 261) {
 
@@ -840,7 +840,7 @@ class PPU {
     }
 
     shortFrame = false;
-    public stepS() {
+    stepS() {
         if (this.sx === 338 && this.sy === 261)
             this.shortFrame = (this.iFrame & 1) && (this.showBg || this.showSprites);
         if (this.shortFrame && this.sx === 339 && this.sy === 261) {

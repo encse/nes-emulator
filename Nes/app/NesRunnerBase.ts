@@ -65,11 +65,11 @@ class NesRunnerBase {
         xhr.send();
     }
 
-    public onEnd(callback: () => void) {
+    onEnd(callback: () => void) {
         this.onEndCallback = callback;
     }
 
-    public run() {
+    run() {
         this.loadEmulator((nesEmulator: NesEmulator) => {
             this.nesEmulator = nesEmulator;
 

@@ -17,7 +17,7 @@ class StepTestRunner {
         return st;
     };
 
-    public run(nesemu: NesEmulator, expectedOutput:string, log:(st: string)=>void ):void {
+    run(nesemu: NesEmulator, expectedOutput:string, log:(st: string)=>void ):void {
         var prevLines = [];
         this.expectedOutput = expectedOutput;
         this.ich = 0;

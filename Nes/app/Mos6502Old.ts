@@ -10,12 +10,12 @@ class Mos6502Old {
     rX: number = 0;
     rY: number = 0;
 
-    public ip: number;
-    public sp: number;
+    ip: number;
+    sp: number;
 
-    public addrReset = 0xfffc;
-    public addrIRQ = 0xfffe;
-    public addrNMI = 0xfffa;
+    addrReset = 0xfffc;
+    addrIRQ = 0xfffe;
+    addrNMI = 0xfffa;
  
     private flgCarry: number = 0;
     private flgZero: number = 0;
@@ -38,13 +38,13 @@ class Mos6502Old {
     private flgOverflow: number = 0;
     private flgNegative: number = 0;
 
-    public nmiLine = 1;
+    nmiLine = 1;
     private nmiLinePrev = 1;
     private nmiDetected: boolean;
     private nmiRequested: boolean;
 
     private irqRequested: boolean = false;
-    public irqLine = 1;
+    irqLine = 1;
     private irqDetected: boolean;
 
     private pollInterrupts() {
@@ -67,13 +67,13 @@ class Mos6502Old {
         this.irqDetected = this.irqLine === 0;
     }
 
-    public Reset() {
+    Reset() {
         this.ip = this.getWord(this.addrReset);
         this.sp = 0xfd;
     }
 
 
-    public get rP(): number {
+    get rP(): number {
         return (this.flgNegative << 7) +
             (this.flgOverflow << 6) +
             (1 << 5) +
@@ -84,7 +84,7 @@ class Mos6502Old {
             (this.flgCarry << 0);
     }
 
-    public set rP(byte: number) {
+    set rP(byte: number) {
         this.flgNegative = (byte >> 7) & 1;
         this.flgOverflow = (byte >> 6) & 1;
         //skip (byte >> 5) & 1;
@@ -1333,7 +1333,7 @@ class Mos6502Old {
         this.jumpToNewPage = addrDstLow < 0 || addrDstLow > 0xff ? 1 : 0;
     }
 
-    public step() {
+    step() {
 
         if (this.t === this.tLim - 1)
             this.pollInterrupts();
