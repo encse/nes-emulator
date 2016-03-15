@@ -22,9 +22,124 @@
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="web.config">
+    <Content Include="mapper_docs\000.txt" />
+    <Content Include="mapper_docs\001.txt" />
+    <Content Include="mapper_docs\002.txt" />
+    <Content Include="mapper_docs\003.txt" />
+    <Content Include="mapper_docs\004.txt" />
+    <Content Include="mapper_docs\005.txt" />
+    <Content Include="mapper_docs\007.txt" />
+    <Content Include="mapper_docs\009.txt" />
+    <Content Include="mapper_docs\010.txt" />
+    <Content Include="mapper_docs\011.txt" />
+    <Content Include="mapper_docs\013.txt" />
+    <Content Include="mapper_docs\015.txt" />
+    <Content Include="mapper_docs\016.txt" />
+    <Content Include="mapper_docs\018.txt" />
+    <Content Include="mapper_docs\019.txt" />
+    <Content Include="mapper_docs\021.txt" />
+    <Content Include="mapper_docs\022.txt" />
+    <Content Include="mapper_docs\023.txt" />
+    <Content Include="mapper_docs\024.txt" />
+    <Content Include="mapper_docs\025.txt" />
+    <Content Include="mapper_docs\026.txt" />
+    <Content Include="mapper_docs\032.txt" />
+    <Content Include="mapper_docs\033.txt" />
+    <Content Include="mapper_docs\034.txt" />
+    <Content Include="mapper_docs\044.txt" />
+    <Content Include="mapper_docs\045.txt" />
+    <Content Include="mapper_docs\046.txt" />
+    <Content Include="mapper_docs\047.txt" />
+    <Content Include="mapper_docs\048.txt" />
+    <Content Include="mapper_docs\049.txt" />
+    <Content Include="mapper_docs\050.txt" />
+    <Content Include="mapper_docs\052.txt" />
+    <Content Include="mapper_docs\057.txt" />
+    <Content Include="mapper_docs\058.txt" />
+    <Content Include="mapper_docs\060.txt" />
+    <Content Include="mapper_docs\061.txt" />
+    <Content Include="mapper_docs\062.txt" />
+    <Content Include="mapper_docs\064.txt" />
+    <Content Include="mapper_docs\065.txt" />
+    <Content Include="mapper_docs\066.txt" />
+    <Content Include="mapper_docs\067.txt" />
+    <Content Include="mapper_docs\068.txt" />
+    <Content Include="mapper_docs\069.txt" />
+    <Content Include="mapper_docs\070.txt" />
+    <Content Include="mapper_docs\071.txt" />
+    <Content Include="mapper_docs\072.txt" />
+    <Content Include="mapper_docs\073.txt" />
+    <Content Include="mapper_docs\074.txt" />
+    <Content Include="mapper_docs\075.txt" />
+    <Content Include="mapper_docs\076.txt" />
+    <Content Include="mapper_docs\077.txt" />
+    <Content Include="mapper_docs\078.txt" />
+    <Content Include="mapper_docs\079.txt" />
+    <Content Include="mapper_docs\080.txt" />
+    <Content Include="mapper_docs\082.txt" />
+    <Content Include="mapper_docs\085.txt" />
+    <Content Include="mapper_docs\086.txt" />
+    <Content Include="mapper_docs\087.txt" />
+    <Content Include="mapper_docs\088.txt" />
+    <Content Include="mapper_docs\089.txt" />
+    <Content Include="mapper_docs\090.txt" />
+    <Content Include="mapper_docs\091.txt" />
+    <Content Include="mapper_docs\092.txt" />
+    <Content Include="mapper_docs\093.txt" />
+    <Content Include="mapper_docs\094.txt" />
+    <Content Include="mapper_docs\095.txt" />
+    <Content Include="mapper_docs\096.txt" />
+    <Content Include="mapper_docs\097.txt" />
+    <Content Include="mapper_docs\105.txt" />
+    <Content Include="mapper_docs\107.txt" />
+    <Content Include="mapper_docs\112.txt" />
+    <Content Include="mapper_docs\113.txt" />
+    <Content Include="mapper_docs\115.txt" />
+    <Content Include="mapper_docs\118.txt" />
+    <Content Include="mapper_docs\119.txt" />
+    <Content Include="mapper_docs\140.txt" />
+    <Content Include="mapper_docs\152.txt" />
+    <Content Include="mapper_docs\154.txt" />
+    <Content Include="mapper_docs\159.txt" />
+    <Content Include="mapper_docs\164.txt" />
+    <Content Include="mapper_docs\165.txt" />
+    <Content Include="mapper_docs\180.txt" />
+    <Content Include="mapper_docs\182.txt" />
+    <Content Include="mapper_docs\184.txt" />
+    <Content Include="mapper_docs\185.txt" />
+    <Content Include="mapper_docs\189.txt" />
+    <Content Include="mapper_docs\191.txt" />
+    <Content Include="mapper_docs\192.txt" />
+    <Content Include="mapper_docs\193.txt" />
+    <Content Include="mapper_docs\194.txt" />
+    <Content Include="mapper_docs\200.txt" />
+    <Content Include="mapper_docs\201.txt" />
+    <Content Include="mapper_docs\203.txt" />
+    <Content Include="mapper_docs\205.txt" />
+    <Content Include="mapper_docs\207.txt" />
+    <Content Include="mapper_docs\209.txt" />
+    <Content Include="mapper_docs\210.txt" />
+    <Content Include="mapper_docs\225.txt" />
+    <Content Include="mapper_docs\226.txt" />
+    <Content Include="mapper_docs\227.txt" />
+    <Content Include="mapper_docs\228.txt" />
+    <Content Include="mapper_docs\230.txt" />
+    <Content Include="mapper_docs\231.txt" />
+    <Content Include="mapper_docs\232.txt" />
+    <Content Include="mapper_docs\233.txt" />
+    <Content Include="mapper_docs\234.txt" />
+    <Content Include="mapper_docs\240.txt" />
+    <Content Include="mapper_docs\242.txt" />
+    <Content Include="mapper_docs\243.txt" />
+    <Content Include="mapper_docs\245.txt" />
+    <Content Include="mapper_docs\246.txt" />
+    <Content Include="mapper_docs\changes.txt" />
+    <Content Include="mapper_docs\__ READ THIS FIRST __.txt" />
+    <Content Include="wwwroot\web.config">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="wwwroot\style\app.css" />
+    <Content Include="wwwroot\index.html" />
     <Content Include="wwwroot\test\ppu\color_test\color_test.s" />
     <Content Include="wwwroot\test\ppu\color_test\color_test.txt" />
     <Content Include="wwwroot\test\cpu\cpu_interrupts\readme.txt" />
@@ -121,15 +236,15 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
-    <None Include="web.Debug.config">
+    <None Include="wwwroot\web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
       <SubType>Designer</SubType>
     </None>
-    <None Include="web.Release.config">
+    <None Include="wwwroot\web.Release.config">
       <DependentUpon>web.config</DependentUpon>
       <SubType>Designer</SubType>
     </None>
-    <Content Include="wwwroot\index.html" />
+    <Content Include="wwwroot\test\index.html" />
     <Content Include="wwwroot\test\cpu\instr_misc\01-abs_x_wrap.nes" />
     <Content Include="wwwroot\test\cpu\instr_misc\02-branch_wrap.nes" />
     <Content Include="wwwroot\test\cpu\instr_misc\03-dummy_reads.nes" />
@@ -390,9 +505,10 @@
     <TypeScriptCompile Include="app\NesImage.ts" />
     <TypeScriptCompile Include="app\runner\StepTestRunner.ts" />
     <TypeScriptCompile Include="Scripts\typings\jquery\jquery.d.ts" />
-    <Content Include="wwwroot\js\webgl-utils.js" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="wwwroot\js\" />
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>
@@ -405,16 +521,7 @@
     <VisualStudio>
       <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
         <WebProjectProperties>
-          <UseIIS>True</UseIIS>
-          <AutoAssignPort>True</AutoAssignPort>
-          <DevelopmentServerPort>52610</DevelopmentServerPort>
-          <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost:52610/wwwroot</IISUrl>
-          <NTLMAuthentication>False</NTLMAuthentication>
-          <UseCustomServer>False</UseCustomServer>
-          <CustomServerUrl>
-          </CustomServerUrl>
-          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+          <SaveServerSettingsInUserFile>True</SaveServerSettingsInUserFile>
         </WebProjectProperties>
       </FlavorProperties>
     </VisualStudio>

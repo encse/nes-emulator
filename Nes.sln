@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nes", "Nes\Nes.csproj", "{2
 EndProject
 Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "codegen", "codegen\codegen.njsproj", "{B353CC23-3854-471A-989C-89D2A31E5F66}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mario", "Mario\Mario.csproj", "{1F705955-CBE2-4C6E-94CB-D8BCE302DCB9}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,10 +21,6 @@ Global
 		{B353CC23-3854-471A-989C-89D2A31E5F66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B353CC23-3854-471A-989C-89D2A31E5F66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B353CC23-3854-471A-989C-89D2A31E5F66}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1F705955-CBE2-4C6E-94CB-D8BCE302DCB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1F705955-CBE2-4C6E-94CB-D8BCE302DCB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1F705955-CBE2-4C6E-94CB-D8BCE302DCB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1F705955-CBE2-4C6E-94CB-D8BCE302DCB9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

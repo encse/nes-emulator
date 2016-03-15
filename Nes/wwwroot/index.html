@@ -1,182 +1,35 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <title></title>
-	<meta charset="utf-8"/>
-	<style>
-		.passed {
-			background: lightgreen;
-		}
-		.failed{
-			background: red;
-		}
-		.test-case {
-		
-			position: relative;
-			padding-left: 30px;
-		}
-		.test-case .collapse-button {
-			position: absolute;
-			top: 0;
-			left: 0;
-			width: 20px;
-			bottom: 0;
-			background: rgba(50, 50, 50, .10);
-		}
-		.test-case.collapsed {
-			overflow: hidden;
-			display: flex;
-			margin: 2px;
-			height: 80px;
-			padding-left: 20px;
-		}
-		.test-case.collapsed canvas {
-			order: 1;
-			height: 100%;
-		}
-		.test-case.collapsed h2 {
-			margin: 0;
-			padding: 0;
-			order: 2;
-		}
-		.test-case.collapsed .log {
-			order: 3;
-		}
-	
-		canvas{
-			width: 585px;
-			height: 512px;
-		
-		}
-	</style>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="style/app.css" type="text/css" rel="stylesheet" media="all" />
+	<title>Encse's NES emulator</title>
 </head>
 <body>
-<button id="btnTest">Test</button>
-<div id="nesContainer"></div>
-
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-<script src="js/app.js"></script>
-<script language="javascript">
-
-	//function runStepTest(url) {
-	//	log('<h2>', url, '</h2>');
-	//	loadNesEmulator(url, null, function (nesEmulator) {
-	//		$.get(url.replace('.nes', '.log')).then(function(logLines) {
-	//			new StepTestRuner().run(nesEmulator, logLines, function (st) { log(st) });
-	//		});
-	//	});
+	<header>
+		<h1>Encse's Nes emulator</h1>
+	</header>
+	<main>
+		<p>If doesn't work, try in Chrome.</p>
+		<div id="nesContainer"></div>
+		<h2>Controls</h2>
+		<p>Start - Enter<br/>Select - Space<br/>Jump - A<br/>Fire - B</p>
+	</main>
+	<footer>
+		<p><a href="https://csokavar.hu">csokavar.hu</a> - 2016</p>
+	</footer>
+	<script src="js/app.js"></script>
+	<script>
+		new NesRunner(document.getElementById('nesContainer'), 'roms/smb/Super Mario Bros.nes').run();
+	</script>
+	<script>
+		(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+		(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+		m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m);
+		})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 		
-	//}
-
-	function runAll(nesRunners) {
-		var i = 0;
-		function runSingle() {
-			if (i < nesRunners.length) {
-				nesRunners[i].onEndCallback = function () {
-					i++;
-					window.setTimeout(runSingle(), 0);
-				};
-				nesRunners[i].run();
-			}			
-		}
-		runSingle();
-	}
-
-
-
-	$('#btnTest').click(() => {
-
-		var nesContainerElement = document.getElementById('nesContainer');
-
-		var nesRunners = [
-			new NesRunner(nesContainerElement, 'roms/smb/smb.nes'),
-
-			//new NesRunner(nesContainerElement, 'test/ppu/color_test/color_test.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/palette/palette.nes'),
-			//new NesRunner(nesContainerElement, 'test/ppu/tvpassfail/tv.nes', '$01'),
-			//new NesRunner(nesContainerElement, 'test/ppu/full_palette/full_palette.nes', '$01'),
-			//new NesRunner(nesContainerElement, 'test/ppu/full_palette/full_palette_alt.nes', '$01'),
-
-
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/vram_access.nes', '$01'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/vbl_clear_time.nes', '$01'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/sprite_ram.nes', '$01'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/palette_ram.nes', '$01'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu/power_up_palette.nes', '$01'),
-
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/ppu_vbl_nmi.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/01-vbl_basics.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/02-vbl_set_time.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/03-vbl_clear_time.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/04-nmi_control.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/05-nmi_timing.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/06-suppression.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/07-nmi_on_timing.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/08-nmi_off_timing.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/09-even_odd_frames.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes', 'Passed'),
-
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_timing/sprite_hit_timing.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/01.basics.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/02.alignment.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/03.corners.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/04.flip.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/05.left_clip.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/06.right_edge.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/07.screen_bottom.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/08.double_height.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/09.timing_basics.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/10.timing_order.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_hit_tests_2005.10.05/11.edge_timing.nes', 'PASSED'),
-
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/1.Basics.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/2.Details.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/3.Timing.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/4.Obscure.nes', 'PASSED'),
-			new CpuTestRunner(nesContainerElement, 'test/ppu/sprite_overflow_tests/5.Emulator.nes', 'PASSED'),
-
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/cpu_interrupts.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/1-cli_latency.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/2-nmi_and_brk.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/3-nmi_and_irq.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/4-irq_and_dma.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/cpu_interrupts/rom_singles/5-branch_delays_irq.nes', 'Passed'),
-
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/instr_timing.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/rom_singles/1-instr_timing.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_timing/rom_singles/2-branch_timing.nes', 'Passed'),
-
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/01-basics.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/02-implied.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/03-immediate.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/04-zero_page.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/05-zp_xy.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/06-absolute.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/07-abs_xy.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/08-ind_x.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/09-ind_y.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/10-branches.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/11-stack.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/12-jmp_jsr.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/13-rts.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/14-rti.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/15-brk.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/rom_singles/16-special.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/official_only.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_test-v5/all_instrs.nes', 'Passed'),
-
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/01-abs_x_wrap.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/02-branch_wrap.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/03-dummy_reads.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/04-dummy_reads_apu.nes', 'Passed'),
-			new CpuTestRunner(nesContainerElement, 'test/cpu/instr_misc/instr_misc.nes', 'Passed')
-		];
-
-		runAll(nesRunners);
-
-	});
-
-</script>
+		ga('create', 'UA-203054-9', 'auto');
+		ga('send', 'pageview');
+	</script>
 </body>
 </html>
