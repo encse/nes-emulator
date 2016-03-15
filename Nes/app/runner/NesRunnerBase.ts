@@ -42,7 +42,6 @@ class NesRunnerBase {
         var canvas = document.createElement("canvas");
         canvas.width = 256;
         canvas.height = 240;
-        canvas.style.zoom = "2";
 
         this.container.appendChild(canvas);
         const driver = new DriverFactory().createRenderer(canvas);

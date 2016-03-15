@@ -6,7 +6,8 @@
 }
 
 canvas {
-	transform: matrix(1.143, 0, 0, 1, 0,0);
+	width: 585px;
+	height: 512px;
 }
 
 main {
