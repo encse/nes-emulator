@@ -36,7 +36,7 @@ header, footer{
 	background-size:100px 100px, 100px 100px, 50px 50px, 50px 50px;
 }
 
-header a, footer a {
+header, footer, header a, footer a {
 	color: white;
 	text-decoration: none;
 }
