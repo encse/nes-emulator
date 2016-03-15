@@ -396,7 +396,7 @@
     <TypeScriptCompile Include="app\NesRunnerBase.ts" />
     <TypeScriptCompile Include="app\NesRunner.ts" />
     <TypeScriptCompile Include="app\PPU.ts" />
-    <TypeScriptCompile Include="app\Renderer.ts" />
+    <TypeScriptCompile Include="app\Driver.ts" />
     <TypeScriptCompile Include="app\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\MMC1.ts" />

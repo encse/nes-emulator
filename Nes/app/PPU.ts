@@ -89,7 +89,7 @@ class PPU {
     sy = PPU.syFirstVisible;
     sx = PPU.sxMin;
 
-    private renderer:IRenderer;
+    private renderer:IDriver;
     private data: Uint32Array;
     private dataAddr = 0;
 
@@ -158,7 +158,7 @@ class PPU {
        
     }
 
-    setRenderer(renderer: IRenderer) {
+    setRenderer(renderer: IDriver) {
         this.renderer = renderer;
         this.data = this.renderer.getBuffer();
     }
