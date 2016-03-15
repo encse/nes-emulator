@@ -192,69 +192,6 @@ var APU = (function () {
     };
     return APU;
 })();
-///<reference path="Memory.ts"/>
-var CompoundMemory = (function () {
-    function CompoundMemory() {
-        var _this = this;
-        var rgmemory = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            rgmemory[_i - 0] = arguments[_i];
-        }
-        this.rgmemory = [];
-        this.setters = [];
-        this.getters = [];
-        this.sizeI = 0;
-        this.rgmemory = rgmemory;
-        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
-    }
-    CompoundMemory.prototype.size = function () {
-        return this.sizeI;
-    };
-    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
-        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
-    };
-    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
-        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
-    };
-    CompoundMemory.prototype.getByte = function (addr) {
-        for (var i = 0; i < this.getters.length; i++) {
-            var getter = this.getters[i];
-            if (getter.addrFirst <= addr && addr <= getter.addrLast) {
-                return getter.getter(addr);
-            }
-        }
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            if (addr < memory.size())
-                return memory.getByte(addr);
-            else
-                addr -= memory.size();
-        }
-        throw 'address out of bounds';
-    };
-    CompoundMemory.prototype.setByte = function (addr, value) {
-        //if (addr == 0x3c2) {
-        //    console.log('xxx set', value.toString(16));
-        //}
-        for (var i = 0; i < this.setters.length; i++) {
-            var setter = this.setters[i];
-            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
-                setter.setter(addr, value);
-                return;
-            }
-        }
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            if (addr < memory.size()) {
-                memory.setByte(addr, value);
-                return;
-            }
-            else
-                addr -= memory.size();
-        }
-    };
-    return CompoundMemory;
-})();
 var ControllerKeys;
 (function (ControllerKeys) {
     ControllerKeys[ControllerKeys["A_Key"] = 0] = "A_Key";
@@ -376,95 +313,6 @@ var Controller = (function () {
     });
     return Controller;
 })();
-///<reference path="Memory.ts"/>
-var RAM = (function () {
-    function RAM(size) {
-        this.memory = new Uint8Array(size);
-    }
-    RAM.fromBytes = function (memory) {
-        var res = new RAM(0);
-        res.memory = memory;
-        return res;
-    };
-    RAM.prototype.size = function () {
-        return this.memory.length;
-    };
-    RAM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    RAM.prototype.setByte = function (addr, value) {
-        this.memory[addr] = value & 0xff;
-    };
-    return RAM;
-})();
-var NesImage = (function () {
-    function NesImage(rawBytes) {
-        this.trainer = null;
-        for (var i = 0; i < 4; i++)
-            if (rawBytes[i] !== NesImage.magic[i])
-                throw 'invalid NES header';
-        this.ROMBanks = new Array(rawBytes[4]);
-        this.VRAMBanks = new Array(rawBytes[5]);
-        this.fVerticalMirroring = !!(rawBytes[6] & 1);
-        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
-        var fTrainer = !!(rawBytes[6] & 4);
-        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
-        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
-        this.fVSSystem = !!(rawBytes[7] & 1);
-        if ((rawBytes[7] & 0x0e) !== 0)
-            throw 'invalid NES header';
-        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
-        this.fPAL = (rawBytes[9] & 1) === 1;
-        if ((rawBytes[9] & 0xfe) !== 0)
-            throw 'invalid NES header';
-        for (var i = 0xa; i < 0x10; i++)
-            if (rawBytes[i] !== 0)
-                throw 'invalid NES header';
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
-            throw 'invalid NES format';
-        var idx = 0x10;
-        if (fTrainer) {
-            this.trainer = rawBytes.slice(idx, idx + 0x100);
-            idx += 0x100;
-        }
-        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
-            this.RAMBanks[ibank] = new RAM(0x2000);
-        }
-        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
-            idx += 0x4000;
-        }
-        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
-            idx += 0x2000;
-        }
-    }
-    /*
-     * 0-3      String "NES^Z" used to recognize .NES files.
-        4        Number of 16kB ROM banks.
-        5        Number of 8kB VROM banks.
-        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
-                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
-                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
-                 bit 3     1 for a four-screen VRAM layout.
-                 bit 4-7   Four lower bits of ROM Mapper Type.
-        7        bit 0     1 for VS-System cartridges.
-                 bit 1-3   Reserved, must be zeroes!
-                 bit 4-7   Four higher bits of ROM Mapper Type.
-        8        Number of 8kB RAM banks. For compatibility with the previous
-                 versions of the .NES format, assume 1x8kB RAM page when this
-                 byte is zero.
-        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
-                 bit 1-7   Reserved, must be zeroes!
-        10-15    Reserved, must be zeroes!
-        16-...   ROM banks, in ascending order. If a trainer is present, its
-                 512 bytes precede the ROM bank contents.
-        ...-EOF  VROM banks, in ascending order.
-     */
-    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
-    return NesImage;
-})();
-///<reference path="Memory.ts"/>
 var Most6502Base = (function () {
     function Most6502Base(memory) {
         this.memory = memory;
@@ -10545,7 +10393,6 @@ var Most6502Base = (function () {
     };
     return Most6502Base;
 })();
-///<reference path="Memory.ts"/>
 ///<reference path="Mos6502Base.ts"/>
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -10597,264 +10444,7 @@ var Mos6502 = (function (_super) {
     };
     return Mos6502;
 })(Most6502Base);
-///<reference path="CompoundMemory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="NesImage.ts"/>
-///<reference path="Mos6502.ts"/>
-var NesEmulator = (function () {
-    function NesEmulator(nesImage, canvas) {
-        var _this = this;
-        this.dmaRequested = false;
-        this.idma = 0;
-        this.icycle = 0;
-        if (nesImage.fPAL)
-            throw 'only NTSC images are supported';
-        switch (nesImage.mapperType) {
-            case 0:
-                if (nesImage.ROMBanks.length === 1) {
-                    this.memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
-                }
-                else if (nesImage.ROMBanks.length === 2) {
-                    this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
-                }
-                if (nesImage.VRAMBanks.length > 1)
-                    throw 'unknown VRAMBanks';
-                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
-                    throw 'unknown VRAMBanks';
-                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
-                var nameTableA = new RAM(0x400);
-                var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
-                var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
-                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
-                var rest = new RAM(0x1000);
-                this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
-                break;
-            case 1:
-                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
-                this.memory = mmc1.memory;
-                this.vmemory = mmc1.vmemory;
-        }
-        if (!this.memory)
-            throw 'unkown mapper ' + nesImage.mapperType;
-        this.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
-            _this.dmaRequested = true;
-            _this.addrDma = v << 8;
-        });
-        this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
-        this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
-        this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
-        this.cpu = new Mos6502(this.memory);
-        this.apu = new APU(this.memory, this.cpu);
-        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
-        this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.ppu.setRenderer(new RendererFactory().createRenderer(canvas));
-        this.cpu.reset();
-        this.controller = new Controller(canvas);
-        window['nesemulator'] = this;
-    }
-    NesEmulator.prototype.step = function () {
-        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
-            if ((this.icycle & 3) === 0) {
-                var nmiBefore = this.cpu.nmiLine;
-                this.ppu.step();
-                var nmiAfter = this.cpu.nmiLine;
-                if (nmiBefore > nmiAfter && this.icycle === 4)
-                    this.cpu.detectInterrupts();
-            }
-            if (this.icycle === 0) {
-                if (this.dmaRequested) {
-                    if (!(this.cpu.icycle & 1)) {
-                        this.dmaRequested = false;
-                        this.idma = 512;
-                    }
-                    this.cpu.icycle++;
-                }
-                else if (this.idma > 512) {
-                    this.idma--;
-                    this.cpu.icycle++;
-                }
-                else if (this.idma > 0) {
-                    this.cpu.icycle++;
-                    if (!(this.idma & 1)) {
-                        this.bDma = this.memory.getByte(this.addrDma++);
-                        this.addrDma &= 0xffff;
-                    }
-                    else {
-                        this.memory.setByte(0x2004, this.bDma);
-                    }
-                    this.idma--;
-                }
-                else {
-                    this.cpu.step();
-                }
-            }
-            this.apu.step();
-        }
-    };
-    return NesEmulator;
-})();
-///<reference path="NesEmulator.ts"/>
-var NesRunnerBase = (function () {
-    function NesRunnerBase(container, url) {
-        this.container = container;
-        this.url = url;
-        var containerT = document.createElement('div');
-        this.container.appendChild(containerT);
-        this.container = containerT;
-        this.onEndCallback = function () { };
-    }
-    NesRunnerBase.prototype.log = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var st = "";
-        for (var i = 0; i < args.length; i++)
-            st += " " + args[i];
-        var div = document.createElement("div");
-        div.innerHTML = st.replace(/\n/g, "<br/>");
-        this.logElement.appendChild(div);
-    };
-    NesRunnerBase.prototype.logError = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var st = "";
-        for (var i = 0; i < args.length; i++)
-            st += " " + args[i];
-        var div = document.createElement("div");
-        div.classList.add("error");
-        div.innerHTML = st.replace(/\n/g, "<br/>");
-        this.logElement.appendChild(div);
-    };
-    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
-        var _this = this;
-        this.headerElement = document.createElement("h2");
-        this.headerElement.innerText = this.url;
-        this.container.appendChild(this.headerElement);
-        var canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 240;
-        canvas.style.zoom = "2";
-        this.container.appendChild(canvas);
-        this.logElement = document.createElement("div");
-        this.logElement.classList.add('log');
-        this.container.appendChild(this.logElement);
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", this.url, true);
-        xhr.responseType = "arraybuffer";
-        xhr.onload = function (e) {
-            if (xhr.status > 99 && xhr.status < 299) {
-                var blob = new Uint8Array(xhr.response);
-                onLoad(new NesEmulator(new NesImage(blob), canvas));
-            }
-            else {
-                _this.logError("http error " + xhr.status);
-                onLoad(null);
-            }
-        };
-        xhr.send();
-    };
-    NesRunnerBase.prototype.onEnd = function (callback) {
-        this.onEndCallback = callback;
-    };
-    NesRunnerBase.prototype.run = function () {
-        var _this = this;
-        this.loadEmulator(function (nesEmulator) {
-            _this.nesEmulator = nesEmulator;
-            if (!nesEmulator)
-                _this.onEndCallback();
-            else
-                _this.runI();
-        });
-    };
-    NesRunnerBase.prototype.runI = function () {
-        this.onEndCallback();
-    };
-    return NesRunnerBase;
-})();
-///<reference path="NesEmulator.ts"/>
-///<reference path="NesRunnerBase.ts"/>
-var CpuTestRunner = (function (_super) {
-    __extends(CpuTestRunner, _super);
-    function CpuTestRunner(container, url, checkForString) {
-        var _this = this;
-        _super.call(this, container, url);
-        this.checkForString = checkForString;
-        this.callback = this.renderFrame.bind(this);
-        this.container.classList.add('test-case');
-        var collapseButton = document.createElement('div');
-        collapseButton.className = 'collapse-button';
-        collapseButton.onclick = function (e) {
-            $(_this.container).toggleClass('collapsed');
-        };
-        this.container.appendChild(collapseButton);
-    }
-    CpuTestRunner.prototype.testFinished = function (nesEmulator) {
-        if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
-            nesEmulator.cpu.getByte(0x6001) === 0xde &&
-            nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
-            nesEmulator.cpu.getByte(0x6003) === 0x61) {
-            var resultCode = nesEmulator.cpu.getByte(0x6000);
-            if (resultCode !== 0) {
-                this.log('res: ' + resultCode.toString(16));
-                this.container.classList.add('failed');
-            }
-            else {
-                this.container.classList.add('passed');
-            }
-            var res = "";
-            var i = 0x6004;
-            while (nesEmulator.cpu.getByte(i) !== 0) {
-                res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-                i++;
-            }
-            this.log(res);
-            return true;
-        }
-        if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
-            nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
-            nesEmulator.cpu.flgInterruptDisable &&
-            !nesEmulator.ppu.nmi_output) {
-            var out = nesEmulator.ppu.getNameTable(0);
-            this.log(out);
-            if (out.indexOf(this.checkForString) >= 0) {
-                this.container.classList.add('passed');
-            }
-            else {
-                this.container.classList.add('failed');
-            }
-            return true;
-        }
-        return false;
-    };
-    CpuTestRunner.prototype.runI = function () {
-        requestAnimationFrame(this.callback);
-    };
-    CpuTestRunner.prototype.renderFrame = function () {
-        var nesEmulator = this.nesEmulator;
-        var ppu = nesEmulator.ppu;
-        if (this.testFinished(nesEmulator)) {
-            this.container.classList.add('collapsed');
-            this.onEndCallback();
-            return;
-        }
-        try {
-            var frameCurrent = ppu.iFrame;
-            while (frameCurrent === ppu.iFrame)
-                nesEmulator.step();
-        }
-        catch (e) {
-            this.container.classList.add('collapsed');
-            this.logError(e);
-            this.onEndCallback();
-            return;
-        }
-        requestAnimationFrame(this.callback);
-    };
-    return CpuTestRunner;
-})(NesRunnerBase);
+///<reference path="IDriver.ts"/>
 var CanvasDriver = (function () {
     function CanvasDriver(canvas) {
         this.ctx = canvas.getContext("2d");
@@ -10870,8 +10460,26 @@ var CanvasDriver = (function () {
         this.imageData.data.set(this.buf8);
         this.ctx.putImageData(this.imageData, 0, 0);
     };
+    CanvasDriver.prototype.tsto = function () {
+        return "Canvas driver";
+    };
     return CanvasDriver;
 })();
+var DriverFactory = (function () {
+    function DriverFactory() {
+    }
+    DriverFactory.prototype.createRenderer = function (canvas) {
+        try {
+            return new WebGlDriver(canvas);
+        }
+        catch (e) {
+            console.error(e);
+            return new CanvasDriver(canvas);
+        }
+    };
+    return DriverFactory;
+})();
+///<reference path="IDriver.ts"/>
 var WebGlDriver = (function () {
     function WebGlDriver(canvas) {
         _a = [canvas.width, canvas.height], this.width = _a[0], this.height = _a[1];
@@ -10969,6 +10577,9 @@ var WebGlDriver = (function () {
         this.glContext.drawArrays(this.glContext.TRIANGLES, 0, WebGlDriver.NUM_VIEWPORT_VERTICES);
         this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
     };
+    WebGlDriver.prototype.tsto = function () {
+        return "WebGL driver";
+    };
     // vertices representing entire viewport as two triangles which make up the whole
     // rectangle, in post-projection/clipspace coordinates
     WebGlDriver.VIEWPORT_VERTICES = new Float32Array([
@@ -10989,23 +10600,135 @@ var WebGlDriver = (function () {
         1.0, 0.0]);
     return WebGlDriver;
 })();
-var RendererFactory = (function () {
-    function RendererFactory() {
-    }
-    RendererFactory.prototype.createRenderer = function (canvas) {
-        try {
-            return new WebGlDriver(canvas);
+///<reference path="Memory.ts"/>
+var CompoundMemory = (function () {
+    function CompoundMemory() {
+        var _this = this;
+        var rgmemory = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            rgmemory[_i - 0] = arguments[_i];
         }
-        catch (e) {
-            console.error(e);
-            return new CanvasDriver(canvas);
+        this.rgmemory = [];
+        this.setters = [];
+        this.getters = [];
+        this.sizeI = 0;
+        this.rgmemory = rgmemory;
+        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
+    }
+    CompoundMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
+        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
+    };
+    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
+        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
+    };
+    CompoundMemory.prototype.getByte = function (addr) {
+        for (var i = 0; i < this.getters.length; i++) {
+            var getter = this.getters[i];
+            if (getter.addrFirst <= addr && addr <= getter.addrLast) {
+                return getter.getter(addr);
+            }
+        }
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size())
+                return memory.getByte(addr);
+            else
+                addr -= memory.size();
+        }
+        throw 'address out of bounds';
+    };
+    CompoundMemory.prototype.setByte = function (addr, value) {
+        //if (addr == 0x3c2) {
+        //    console.log('xxx set', value.toString(16));
+        //}
+        for (var i = 0; i < this.setters.length; i++) {
+            var setter = this.setters[i];
+            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
+                setter.setter(addr, value);
+                return;
+            }
+        }
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            if (addr < memory.size()) {
+                memory.setByte(addr, value);
+                return;
+            }
+            else
+                addr -= memory.size();
         }
     };
-    return RendererFactory;
+    return CompoundMemory;
 })();
 ///<reference path="Memory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="CompoundMemory.ts"/>
+var RAM = (function () {
+    function RAM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    RAM.fromBytes = function (memory) {
+        var res = new RAM(0);
+        res.memory = memory;
+        return res;
+    };
+    RAM.prototype.size = function () {
+        return this.memory.length;
+    };
+    RAM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    RAM.prototype.setByte = function (addr, value) {
+        this.memory[addr] = value & 0xff;
+    };
+    return RAM;
+})();
+///<reference path="Memory.ts"/>
+var RepeatedMemory = (function () {
+    function RepeatedMemory(count, memory) {
+        this.count = count;
+        this.memory = memory;
+        this.sizeI = this.memory.size() * this.count;
+    }
+    RepeatedMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    RepeatedMemory.prototype.getByte = function (addr) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.getByte(addr % this.sizeI);
+    };
+    RepeatedMemory.prototype.setByte = function (addr, value) {
+        if (addr > this.size())
+            throw 'address out of bounds';
+        return this.memory.setByte(addr % this.sizeI, value);
+    };
+    return RepeatedMemory;
+})();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    ROM.fromBytes = function (memory) {
+        var res = new ROM(0);
+        res.memory = memory;
+        return res;
+    };
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    return ROM;
+})();
+///<reference path="memory/Memory.ts"/>
+///<reference path="memory/RAM.ts"/>
+///<reference path="memory/CompoundMemory.ts"/>
 var MMC1 = (function () {
     function MMC1(PRGBanks, VROMBanks) {
         this.PRGBanks = PRGBanks;
@@ -11211,2973 +10934,169 @@ var MMC1 = (function () {
     };
     return MMC1;
 })();
-///<reference path="Memory.ts"/>
-var Mos6502Old = (function () {
-    function Mos6502Old(memory) {
-        this.memory = memory;
-        this.t = 0;
-        this.tLim = 0;
-        this.addrRA = -1;
-        this.rA = 0;
-        this.rX = 0;
-        this.rY = 0;
-        this.addrReset = 0xfffc;
-        this.addrIRQ = 0xfffe;
-        this.addrNMI = 0xfffa;
-        this.flgCarry = 0;
-        this.flgZero = 0;
-        this.flgInterruptDisable = 0;
-        //private get flgInterruptDisable() {
-        //    return this._flgInterruptDisable;
-        //}
-        //private set flgInterruptDisable(v) {
-        //    //console.log('flgInterruptDisable', v);
-        //    this._flgInterruptDisable = v;
-        //}
-        this.number = 0;
-        this.flgDecimalMode = 0;
-        this.flgBreakCommand = 0;
-        this.flgOverflow = 0;
-        this.flgNegative = 0;
-        this.nmiLine = 1;
-        this.nmiLinePrev = 1;
-        this.irqRequested = false;
-        this.irqLine = 1;
-        /**
-        BRK - Force Interrupt
-    
-            The BRK instruction forces the generation of an interrupt request.
-            The program counter and processor status are pushed on the stack then the IRQ interrupt vector
-             at $FFFE/F is loaded into the PC and the break flag in the status set to one.
-    
-            C	Carry Flag	Not affected
-            Z	Zero Flag	Not affected
-            I	Interrupt Disable	Not affected
-            D	Decimal Mode Flag	Not affected
-            B	Break Command	Set to 1
-            V	Overflow Flag	Not affected
-            N	Negative Flag	Not affected
-    
-            http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
-    
-            No actual "B" flag exists inside the 6502's processor status register. The B
-            flag only exists in the status flag byte pushed to the stack. Naturally,
-            when the flags are restored (via PLP or RTI), the B bit is discarded.
-    
-            Depending on the means, the B status flag will be pushed to the stack as
-            either 0 or 1.
-    
-            software instructions BRK & PHP will push the B flag as being 1.
-            hardware interrupts IRQ & NMI will push the B flag as being 0.
-    
-            Regardless of what ANY 6502 documentation says, BRK is a 2 byte opcode. The
-            first is #$00, and the second is a padding byte. This explains why interrupt
-            routines called by BRK always return 2 bytes after the actual BRK opcode,
-            and not just 1.
-    
-       */
-        this.addrBrk = 0;
-        this.pageCross = 0;
-        this.jumpSucceed = 0;
-        this.jumpToNewPage = 0;
+var NesImage = (function () {
+    function NesImage(rawBytes) {
+        this.trainer = null;
+        for (var i = 0; i < 4; i++)
+            if (rawBytes[i] !== NesImage.magic[i])
+                throw 'invalid NES header';
+        this.ROMBanks = new Array(rawBytes[4]);
+        this.VRAMBanks = new Array(rawBytes[5]);
+        this.fVerticalMirroring = !!(rawBytes[6] & 1);
+        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
+        var fTrainer = !!(rawBytes[6] & 4);
+        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
+        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
+        this.fVSSystem = !!(rawBytes[7] & 1);
+        if ((rawBytes[7] & 0x0e) !== 0)
+            throw 'invalid NES header';
+        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
+        this.fPAL = (rawBytes[9] & 1) === 1;
+        if ((rawBytes[9] & 0xfe) !== 0)
+            throw 'invalid NES header';
+        for (var i = 0xa; i < 0x10; i++)
+            if (rawBytes[i] !== 0)
+                throw 'invalid NES header';
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
+            throw 'invalid NES format';
+        var idx = 0x10;
+        if (fTrainer) {
+            this.trainer = rawBytes.slice(idx, idx + 0x100);
+            idx += 0x100;
+        }
+        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
+            this.RAMBanks[ibank] = new RAM(0x2000);
+        }
+        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
+            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
+            idx += 0x4000;
+        }
+        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
+            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            idx += 0x2000;
+        }
     }
-    Mos6502Old.prototype.pollInterrupts = function () {
-        if (this.nmiDetected) {
-            this.nmiRequested = true;
-            this.nmiDetected = false;
-        }
-        if (this.irqDetected && !this.flgInterruptDisable) {
-            console.log('irq requested');
-            this.irqRequested = true;
-        }
-    };
-    Mos6502Old.prototype.DetectInterrupts = function () {
-        if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
-            this.nmiDetected = true;
-        }
-        this.nmiLinePrev = this.nmiLine;
-        this.irqDetected = this.irqLine === 0;
-    };
-    Mos6502Old.prototype.Reset = function () {
-        this.ip = this.getWord(this.addrReset);
-        this.sp = 0xfd;
-    };
-    Object.defineProperty(Mos6502Old.prototype, "rP", {
-        get: function () {
-            return (this.flgNegative << 7) +
-                (this.flgOverflow << 6) +
-                (1 << 5) +
-                (this.flgBreakCommand << 4) +
-                (this.flgDecimalMode << 3) +
-                (this.flgInterruptDisable << 2) +
-                (this.flgZero << 1) +
-                (this.flgCarry << 0);
-        },
-        set: function (byte) {
-            this.flgNegative = (byte >> 7) & 1;
-            this.flgOverflow = (byte >> 6) & 1;
-            //skip (byte >> 5) & 1;
-            //skip this.flgBreakCommand = (byte >> 4) & 1;
-            this.flgBreakCommand = 0;
-            this.flgDecimalMode = (byte >> 3) & 1;
-            this.flgInterruptDisable = (byte >> 2) & 1;
-            this.flgZero = (byte >> 1) & 1;
-            this.flgCarry = (byte >> 0) & 1;
-        },
-        enumerable: true,
-        configurable: true
-    });
     /*
-        ADC - Add with Carry
-
-        A,Z,C,N = A+M+C
-        This instruction adds the contents of a memory location to the accumulator together with the carry bit.
-        If overflow occurs the carry bit is set, this enables multiple byte addition to be performed.
-
-        Processor Status after use:
-
-        C	Carry Flag	        Set if overflow in bit 7
-        Z	Zero Flag	        Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	    Not affected
-        V	Overflow Flag	    Set if sign bit is incorrect
-        N	Negative Flag	    Set if bit 7 set
-    */
-    Mos6502Old.prototype.ADC = function (b) {
-        var sum = this.rA + b + this.flgCarry;
-        var bothPositive = b < 128 && this.rA < 128;
-        var bothNegative = b >= 128 && this.rA >= 128;
-        this.flgCarry = sum > 255 ? 1 : 0;
-        this.rA = sum % 256;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgOverflow = bothPositive && this.flgNegative || bothNegative && !this.flgNegative ? 1 : 0;
-    };
-    /**
-     * SBC - Subtract with Carry
-
-        A,Z,C,N = A-M-(1-C)
-
-        This instruction subtracts the contents of a memory location to the accumulator together with the not of the carry bit. If overflow occurs the carry bit is clear, this enables multiple byte subtraction to be performed.
-
-        Processor Status after use:
-
-        C	Carry Flag	        Clear if overflow in bit 7
-        Z	Zero Flag	        Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	    Not affected
-        V	Overflow Flag	    Set if sign bit is incorrect
-        N	Negative Flag	    Set if bit 7 set
+     * 0-3      String "NES^Z" used to recognize .NES files.
+        4        Number of 16kB ROM banks.
+        5        Number of 8kB VROM banks.
+        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
+                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
+                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
+                 bit 3     1 for a four-screen VRAM layout.
+                 bit 4-7   Four lower bits of ROM Mapper Type.
+        7        bit 0     1 for VS-System cartridges.
+                 bit 1-3   Reserved, must be zeroes!
+                 bit 4-7   Four higher bits of ROM Mapper Type.
+        8        Number of 8kB RAM banks. For compatibility with the previous
+                 versions of the .NES format, assume 1x8kB RAM page when this
+                 byte is zero.
+        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
+                 bit 1-7   Reserved, must be zeroes!
+        10-15    Reserved, must be zeroes!
+        16-...   ROM banks, in ascending order. If a trainer is present, its
+                 512 bytes precede the ROM bank contents.
+        ...-EOF  VROM banks, in ascending order.
      */
-    Mos6502Old.prototype.SBC = function (b) {
-        this.ADC(255 - b);
-    };
-    Mos6502Old.prototype.ISC = function (addr) {
-        this.SBC(this.INC(addr));
-    };
-    Mos6502Old.prototype.SLO = function (addr) {
-        this.ORA(this.ASL(addr));
-    };
-    Mos6502Old.prototype.RLA = function (addr) {
-        this.AND(this.ROL(addr));
-    };
-    Mos6502Old.prototype.SRE = function (addr) {
-        this.EOR(this.LSR(addr));
-    };
-    Mos6502Old.prototype.RRA = function (addr) {
-        this.ADC(this.ROR(addr));
-    };
-    /**
-     * AND - Logical AND
-       A,Z,N = A&M
-    
-       A logical AND is performed, bit by bit, on the accumulator contents using the contents of a byte of memory.
-       Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 set
-     */
-    Mos6502Old.prototype.AND = function (byte) {
-        this.rA &= byte;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /**
-    *EOR - Exclusive OR
-
-        A,Z,N = A^M
-
-        An exclusive OR is performed, bit by bit, on the accumulator contents using the contents of a byte of memory.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 set
-
-    */
-    Mos6502Old.prototype.EOR = function (byte) {
-        this.rA ^= byte;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /**
-    *BIT - Bit Test
-
-        A & M, N = M7, V = M6
-
-        This instructions is used to test if one or more bits are set in a target memory location.
-        The mask pattern in A is ANDed with the value in memory to set or clear the zero flag, but the result is not kept.
-        Bits 7 and 6 of the value from memory are copied into the N and V flags.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if the result if the AND is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Set to bit 6 of the memory value
-        N	Negative Flag	Set to bit 7 of the memory value
-
-    */
-    Mos6502Old.prototype.BIT = function (byte) {
-        var res = this.rA & byte;
-        this.flgZero = res === 0 ? 1 : 0;
-        this.flgNegative = byte & 128 ? 1 : 0;
-        this.flgOverflow = byte & 64 ? 1 : 0;
-    };
-    /**
-        ASL - Arithmetic Shift Left
-        A,Z,C,N = M*2 or M,Z,C,N = M*2
-
-        This operation shifts all the bits of the accumulator or memory contents one bit left.
-        Bit 0 is set to 0 and bit 7 is placed in the carry flag. The effect of this operation is
-        to multiply the memory contents by 2 (ignoring 2's complement considerations),
-        setting the carry if the result will not fit in 8 bits.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set to contents of old bit 7
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-    */
-    Mos6502Old.prototype.ASL = function (addr) {
-        var byte = this.getByte(addr);
-        var res = byte << 1;
-        this.flgCarry = res > 255 ? 1 : 0;
-        res &= 0xff;
-        this.flgZero = res === 0 ? 1 : 0;
-        this.flgNegative = res & 128 ? 1 : 0;
-        this.setByte(addr, res);
-        return res;
-    };
-    /* BCC - Branch if Carry Clear
-
-        If the carry flag is clear then add the relative displacement to the program counter to cause a branch to a new location.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Not affected
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Not affected
-    */
-    Mos6502Old.prototype.BCC = function (sbyte) {
-        if (!this.flgCarry) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BCS - Branch if Carry Set
-        If the carry flag is set then add the relative displacement to the program counter to cause a branch to a new location.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Not affected
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Not affected
-    */
-    Mos6502Old.prototype.BCS = function (sbyte) {
-        if (this.flgCarry) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BEQ - Branch if Equal
-
-        If the zero flag is set then add the relative displacement to the program counter to cause a branch to a new location.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Not affected
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Not affected
-
-    */
-    Mos6502Old.prototype.BEQ = function (sbyte) {
-        if (this.flgZero) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BMI -  Branch if Minus
-
-      If the negative flag is set then add the relative displacement to the program counter to cause a branch to a new location.
-      Processor Status after use:
-
-      C	Carry Flag	Not affected
-      Z	Zero Flag	Not affected
-      I	Interrupt Disable	Not affected
-      D	Decimal Mode Flag	Not affected
-      B	Break Command	Not affected
-      V	Overflow Flag	Not affected
-      N	Negative Flag	Not affected
-
-  */
-    Mos6502Old.prototype.BMI = function (sbyte) {
-        if (this.flgNegative) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BNE - Branch if Not Equal
-
-       If the zero flag is clear then add the relative displacement to the program counter to cause a branch to a new location.
-
-     C	Carry Flag	Not affected
-     Z	Zero Flag	Not affected
-     I	Interrupt Disable	Not affected
-     D	Decimal Mode Flag	Not affected
-     B	Break Command	Not affected
-     V	Overflow Flag	Not affected
-     N	Negative Flag	Not affected
-
- */
-    Mos6502Old.prototype.BNE = function (sbyte) {
-        if (!this.flgZero) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BPL - Branch if Positive
-
-       If the negative flag is clear then add the relative displacement to the program counter to cause a branch to a new location.
-
-     C	Carry Flag	Not affected
-     Z	Zero Flag	Not affected
-     I	Interrupt Disable	Not affected
-     D	Decimal Mode Flag	Not affected
-     B	Break Command	Not affected
-     V	Overflow Flag	Not affected
-     N	Negative Flag	Not affected
-
- */
-    Mos6502Old.prototype.BPL = function (sbyte) {
-        if (!this.flgNegative) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BVC - Branch if Overflow Clear
-
-       If the overflow flag is clear then add the relative displacement to the program counter to cause a branch to a new location.
-
-     C	Carry Flag	Not affected
-     Z	Zero Flag	Not affected
-     I	Interrupt Disable	Not affected
-     D	Decimal Mode Flag	Not affected
-     B	Break Command	Not affected
-     V	Overflow Flag	Not affected
-     N	Negative Flag	Not affected
-
- */
-    Mos6502Old.prototype.BVC = function (sbyte) {
-        if (!this.flgOverflow) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    /* BVS - Branch if Overflow Set
-    
-        If the overflow flag is clear then add the relative displacement to the program counter to cause a branch to a new location.
-
-           C	Carry Flag	Not affected
-           Z	Zero Flag	Not affected
-           I	Interrupt Disable	Not affected
-           D	Decimal Mode Flag	Not affected
-           B	Break Command	Not affected
-           V	Overflow Flag	Not affected
-           N	Negative Flag	Not affected
-
-*/
-    Mos6502Old.prototype.BVS = function (sbyte) {
-        if (this.flgOverflow) {
-            this.setJmpFlags(sbyte);
-            this.ip += sbyte;
-        }
-    };
-    Mos6502Old.prototype.CLC = function () {
-        this.flgCarry = 0;
-    };
-    Mos6502Old.prototype.CLD = function () {
-        this.flgDecimalMode = 0;
-    };
-    Mos6502Old.prototype.CLI = function () {
-        console.log('$' + this.ip.toString(16), 'CLI');
-        this.flgInterruptDisable = 0;
-    };
-    Mos6502Old.prototype.SEI = function () {
-        console.log('$' + this.ip.toString(16), 'SEI');
-        this.flgInterruptDisable = 1;
-    };
-    Mos6502Old.prototype.CLV = function () {
-        this.flgOverflow = 0;
-    };
-    /* CMP - Compare
-
-        Z,C,N = A-M
-
-        This instruction compares the contents of the accumulator with another memory held value and sets the zero and carry flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set if A >= M
-        Z	Zero Flag	Set if A = M
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affectedc
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-*/
-    Mos6502Old.prototype.CMP = function (byte) {
-        this.flgCarry = this.rA >= byte ? 1 : 0;
-        this.flgZero = this.rA === byte ? 1 : 0;
-        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.DCP = function (addr) {
-        var byte = this.getByte(addr);
-        byte = byte === 0 ? 255 : byte - 1;
-        this.setByte(addr, byte);
-        this.flgCarry = this.rA >= byte ? 1 : 0;
-        this.flgZero = this.rA === byte ? 1 : 0;
-        this.flgNegative = (this.rA - byte) & 128 ? 1 : 0;
-    };
-    /* CMP - Compare X Register
-
-        Z,C,N = X-M
-
-        This instruction compares the contents of the X register with another memory held value and sets the zero and carry flags as appropriate.
-        Processor Status after use:
-
-        C	Carry Flag	Set if X >= M
-        Z	Zero Flag	Set if X = M
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-*/
-    Mos6502Old.prototype.CPX = function (byte) {
-        this.flgCarry = this.rX >= byte ? 1 : 0;
-        this.flgZero = this.rX === byte ? 1 : 0;
-        this.flgNegative = (this.rX - byte) & 128 ? 1 : 0;
-    };
-    /* CMP - Compare Y Register
-
-        Z,C,N = Y-M
-
-        This instruction compares the contents of the Y register with another memory held value and sets the zero and carry flags as appropriate.
-        Processor Status after use:
-
-        C	Carry Flag	Set if Y >= M
-        Z	Zero Flag	Set if Y = M
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-    */
-    Mos6502Old.prototype.CPY = function (byte) {
-        this.flgCarry = this.rY >= byte ? 1 : 0;
-        this.flgZero = this.rY === byte ? 1 : 0;
-        this.flgNegative = (this.rY - byte) & 128 ? 1 : 0;
-    };
-    /**
-        DEC - Decrement Memory
-
-            M,Z,N = M-1
-
-            Subtracts one from the value held at a specified memory location setting the zero and negative flags as appropriate.
-
-            Processor Status after use:
-
-            C	Carry Flag	Not affected
-            Z	Zero Flag	Set if result is zero
-            I	Interrupt Disable	Not affected
-            D	Decimal Mode Flag	Not affected
-            B	Break Command	Not affected
-            V	Overflow Flag	Not affected
-            N	Negative Flag	Set if bit 7 of the result is set
-     */
-    Mos6502Old.prototype.DEC = function (addr) {
-        var byte = this.getByte(addr);
-        byte = byte === 0 ? 255 : byte - 1;
-        this.flgZero = byte === 0 ? 1 : 0;
-        this.flgNegative = byte >= 128 ? 1 : 0;
-        this.setByte(addr, byte);
-    };
-    /**
-      DEX - Decrement X Register
-
-        X,Z,N = X-1
-
-        Subtracts one from the X register setting the zero and negative flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if X is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of X is set
-
-    */
-    Mos6502Old.prototype.DEX = function () {
-        this.rX = this.rX === 0 ? 255 : this.rX - 1;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-        this.flgNegative = this.rX >= 128 ? 1 : 0;
-    };
-    /**
-      DEY - Decrement Y Register
-
-        Y,Z,N = Y-1
-
-        Subtracts one from the Y register setting the zero and negative flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if Y is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of Y is set
-
-    */
-    Mos6502Old.prototype.DEY = function () {
-        this.rY = this.rY === 0 ? 255 : this.rY - 1;
-        this.flgZero = this.rY === 0 ? 1 : 0;
-        this.flgNegative = this.rY >= 128 ? 1 : 0;
-    };
-    /**
-      INC - Increment Memory
-
-        M,Z,N = M+1
-
-        Adds one to the value held at a specified memory location setting the zero and negative flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if result is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-    */
-    Mos6502Old.prototype.INC = function (addr) {
-        var byte = this.getByte(addr);
-        byte = byte === 255 ? 0 : byte + 1;
-        this.flgZero = byte === 0 ? 1 : 0;
-        this.flgNegative = byte >= 128 ? 1 : 0;
-        this.setByte(addr, byte);
-        return byte;
-    };
-    /**
-        INX - Increment X Register
-
-        X,Z,N = X+1
-
-        Adds one to the X register setting the zero and negative flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if X is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of X is set
-
-    */
-    Mos6502Old.prototype.INX = function () {
-        this.rX = this.rX === 255 ? 0 : this.rX + 1;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-        this.flgNegative = this.rX >= 128 ? 1 : 0;
-    };
-    /**
-        INY - Increment Y Register
-
-        Y,Z,N = Y+1
-
-        Adds one to the Y register setting the zero and negative flags as appropriate.
-
-        Processor Status after use:
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if Y is zero
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of Y is set
-
-    */
-    Mos6502Old.prototype.INY = function () {
-        this.rY = this.rY === 255 ? 0 : this.rY + 1;
-        this.flgZero = this.rY === 0 ? 1 : 0;
-        this.flgNegative = this.rY >= 128 ? 1 : 0;
-    };
-    /*
-     LDA - Load Accumulator
-
-        A,Z,N = M
-
-        Loads a byte of memory into the accumulator setting the zero and negative flags as appropriate.
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of A is set
-
-     */
-    Mos6502Old.prototype.LDA = function (byte) {
-        this.rA = byte;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.LAX = function (byte) {
-        this.rA = byte;
-        this.rX = byte;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /*
-        LDX - Load X Register
-
-            X,Z,N = M
-
-            Loads a byte of memory into the X register setting the zero and negative flags as appropriate.
-
-            C	Carry Flag	Not affected
-            Z	Zero Flag	Set if X = 0
-            I	Interrupt Disable	Not affected
-            D	Decimal Mode Flag	Not affected
-            B	Break Command	Not affected
-            V	Overflow Flag	Not affected
-            N	Negative Flag	Set if bit 7 of X is set
-   */
-    Mos6502Old.prototype.LDX = function (byte) {
-        this.rX = byte;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-        this.flgNegative = this.rX >= 128 ? 1 : 0;
-    };
-    /*
-          LDY - Load Y Register
-   
-           Y,Z,N = M
-   
-           Loads a byte of memory into the Y register setting the zero and negative flags as appropriate.
-   
-           C	Carry Flag	Not affected
-           Z	Zero Flag	Set if Y = 0
-           I	Interrupt Disable	Not affected
-           D	Decimal Mode Flag	Not affected
-           B	Break Command	Not affected
-           V	Overflow Flag	Not affected
-           N	Negative Flag	Set if bit 7 of Y is set
-   
-       */
-    Mos6502Old.prototype.LDY = function (byte) {
-        this.rY = byte;
-        this.flgZero = this.rY === 0 ? 1 : 0;
-        this.flgNegative = this.rY >= 128 ? 1 : 0;
-    };
-    /*
-     LSR - Logical Shift Right
-
-        A,C,Z,N = A/2 or M,C,Z,N = M/2
-
-        Each of the bits in A or M is shift one place to the right. The bit that was in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set to contents of old bit 0
-        Z	Zero Flag	Set if result = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-    */
-    Mos6502Old.prototype.LSR = function (addr) {
-        var byte = this.getByte(addr);
-        this.flgCarry = byte % 2;
-        byte >>= 1;
-        this.flgZero = byte === 0 ? 1 : 0;
-        this.flgNegative = byte >= 128 ? 1 : 0;
-        this.setByte(addr, byte);
-        return byte;
-    };
-    /*
-       ORA - Logical Inclusive OR
-   
-           A,Z,N = A|M
-   
-           An inclusive OR is performed, bit by bit, on the accumulator contents using the contents of a byte of memory.
-   
-           Processor Status after use:
-   
-           C	Carry Flag	Not affected
-           Z	Zero Flag	Set if A = 0
-           I	Interrupt Disable	Not affected
-           D	Decimal Mode Flag	Not affected
-           B	Break Command	Not affected
-           V	Overflow Flag	Not affected
-           N	Negative Flag	Set if bit 7 set
-   
-   
-       */
-    Mos6502Old.prototype.ORA = function (byte) {
-        this.rA |= byte;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /*
-    ROL - Rotate Left
-
-        Move each of the bits in either A or M one place to the left. Bit 0 is filled with the current value of the carry flag whilst the old bit 7 becomes the new carry flag value.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set to contents of old bit 7
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-
-   */
-    Mos6502Old.prototype.ROL = function (addr) {
-        var byte = this.getByte(addr);
-        byte <<= 1;
-        byte |= this.flgCarry;
-        this.flgCarry = (byte & 256) === 256 ? 1 : 0;
-        byte &= 255;
-        this.flgZero = byte === 0 ? 1 : 0;
-        this.flgNegative = byte >= 128 ? 1 : 0;
-        this.setByte(addr, byte);
-        return byte;
-    };
-    /*
-          ROR - Rotate Right
-
-        Move each of the bits in either A or M one place to the right. Bit 7 is filled with the current value of the carry flag whilst the old bit 0 becomes the new carry flag value.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set to contents of old bit 0
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of the result is set
-
-  */
-    Mos6502Old.prototype.ROR = function (addr) {
-        var byte = this.getByte(addr);
-        byte |= (this.flgCarry << 8);
-        this.flgCarry = byte & 1;
-        byte >>= 1;
-        this.flgZero = byte === 0 ? 1 : 0;
-        this.flgNegative = byte >= 128 ? 1 : 0;
-        this.setByte(addr, byte);
-        return byte;
-    };
-    /*
-      STA - Store Accumulator
-
-            M = A
-
-            Stores the contents of the accumulator into memory.
-
-            Processor Status after use:
-
-            C	Carry Flag	Not affected
-            Z	Zero Flag	Not affected
-            I	Interrupt Disable	Not affected
-            D	Decimal Mode Flag	Not affected
-            B	Break Command	Not affected
-            V	Overflow Flag	Not affected
-            N	Negative Flag	Not affected
-
-     */
-    Mos6502Old.prototype.STA = function (addr) {
-        this.setByte(addr, this.rA);
-    };
-    Mos6502Old.prototype.STX = function (addr) {
-        this.setByte(addr, this.rX);
-    };
-    Mos6502Old.prototype.STY = function (addr) {
-        this.setByte(addr, this.rY);
-    };
-    Mos6502Old.prototype.SAX = function (addr) {
-        this.setByte(addr, this.rX & this.rA);
-    };
-    Mos6502Old.prototype.TAX = function () {
-        this.rX = this.rA;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-        this.flgNegative = this.rX >= 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.TAY = function () {
-        this.rY = this.rA;
-        this.flgZero = this.rY === 0 ? 1 : 0;
-        this.flgNegative = this.rY >= 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.TSX = function () {
-        this.rX = this.sp;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-        this.flgNegative = this.rX >= 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.TXA = function () {
-        this.rA = this.rX;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    Mos6502Old.prototype.TXS = function () {
-        this.sp = this.rX;
-    };
-    Mos6502Old.prototype.TYA = function () {
-        this.rA = this.rY;
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /*JSR - Jump to Subroutine
-        The JSR instruction pushes the address (minus one) of the return point on to the stack and then sets the program counter to the target memory address.
-     */
-    Mos6502Old.prototype.JSR = function (addr) {
-        // console.log('$' + this.ip.toString(16), 'JSR');
-        this.pushWord(this.ip + 3 - 1);
-        this.ip = addr;
-    };
-    /**
-     * RTS - Return from Subroutine
-        The RTS instruction is used at the end of a subroutine to return to the calling routine. It pulls the program counter (minus one) from the stack.
-     */
-    Mos6502Old.prototype.RTS = function () {
-        // console.log('$'+this.ip.toString(16), 'RTS');
-        this.ip = this.popWord() + 1;
-    };
-    /**
-         PHA - Push Accumulator
-
-        Pushes a copy of the accumulator on to the stack.
-     */
-    Mos6502Old.prototype.PHA = function () {
-        this.pushByte(this.rA);
-    };
-    /**
-     PLA  - Pull Accumulator
-     Pulls an 8 bit value from the stack and into the accumulator. The zero and negative flags are set as appropriate.
-
-        C	Carry Flag	Not affected
-        Z	Zero Flag	Set if A = 0
-        I	Interrupt Disable	Not affected
-        D	Decimal Mode Flag	Not affected
-        B	Break Command	Not affected
-        V	Overflow Flag	Not affected
-        N	Negative Flag	Set if bit 7 of A is set
-
- */
-    Mos6502Old.prototype.PLA = function () {
-        this.rA = this.popByte();
-        this.flgZero = this.rA === 0 ? 1 : 0;
-        this.flgNegative = this.rA >= 128 ? 1 : 0;
-    };
-    /**
-       PHP - Push Processor Status
-
-        Pushes a copy of the status flags on to the stack.
-   */
-    Mos6502Old.prototype.PHP = function () {
-        this.flgBreakCommand = 1;
-        this.pushByte(this.rP);
-        this.flgBreakCommand = 0;
-    };
-    /**
-      PLP - Pull Processor Status
-
-        Pulls an 8 bit value from the stack and into the processor flags.
-        The flags will take on new states as determined by the value pulled.
-
-   */
-    Mos6502Old.prototype.PLP = function () {
-        var v = this.popByte();
-        this.rP = v;
-        console.log('plp', 'irq dsiabled:', this.flgInterruptDisable, 'v:', v.toString(2));
-    };
-    Mos6502Old.prototype.BRK = function () {
-        switch (this.t) {
+    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
+    return NesImage;
+})();
+///<reference path="memory/CompoundMemory.ts"/>
+///<reference path="memory/RAM.ts"/>
+///<reference path="NesImage.ts"/>
+///<reference path="cpu/Mos6502.ts"/>
+var NesEmulator = (function () {
+    function NesEmulator(nesImage, canvas, driver) {
+        var _this = this;
+        this.dmaRequested = false;
+        this.idma = 0;
+        this.icycle = 0;
+        if (nesImage.fPAL)
+            throw 'only NTSC images are supported';
+        switch (nesImage.mapperType) {
             case 0:
-                //console.log('process BRK');
-                this.tLim = 7;
+                if (nesImage.ROMBanks.length === 1) {
+                    this.memory = new CompoundMemory(new RAM(0xc000), nesImage.ROMBanks[0]);
+                }
+                else if (nesImage.ROMBanks.length === 2) {
+                    this.memory = new CompoundMemory(new RAM(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
+                }
+                if (nesImage.VRAMBanks.length > 1)
+                    throw 'unknown VRAMBanks';
+                if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
+                    throw 'unknown VRAMBanks';
+                var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new RAM(0x2000);
+                var nameTableA = new RAM(0x400);
+                var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new RAM(0x400) : nameTableA;
+                var nameTableD = nesImage.fFourScreenVRAM ? new RAM(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
+                var rest = new RAM(0x1000);
+                this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
                 break;
             case 1:
-                this.getByte(this.ip + 1);
-                break;
-            case 2:
-                this.pushHi(this.ip + 2);
-                break;
-            case 3:
-                this.pushLo(this.ip + 2);
-                break;
-            case 4:
-                this.pollInterrupts();
-                var nmi = this.nmiRequested;
-                var irq = this.irqRequested;
-                this.addrBrk = nmi ? this.addrNMI : this.addrIRQ;
-                this.flgBreakCommand = 1;
-                this.PHP();
-                break;
-            case 5:
-                this.ip = this.getByte(this.addrBrk);
-                this.flgInterruptDisable = 1;
-                break;
-            case 6:
-                //  this.pollInterrupts();
-                //   this.nmiRequested = this.irqRequested = false;
-                this.ip += this.getByte(this.addrBrk + 1) << 8;
-                break;
+                var mmc1 = new MMC1(nesImage.ROMBanks, nesImage.VRAMBanks);
+                this.memory = mmc1.memory;
+                this.vmemory = mmc1.vmemory;
         }
-    };
-    Mos6502Old.prototype.NMI = function () {
-        // console.log('process NMI');
-        this.pushWord(this.ip);
-        this.pushByte(this.rP);
-        this.flgInterruptDisable = 1;
-        this.ip = this.getWord(this.addrNMI);
-    };
-    Mos6502Old.prototype.IRQ = function () {
-        if (!this.irqRequested)
-            console.log('wtf');
-        console.log('process irq');
-        this.pushWord(this.ip);
-        this.pushByte(this.rP);
-        this.flgInterruptDisable = 1;
-        this.ip = this.getWord(this.addrIRQ);
-    };
-    /**
-     * RTI - Return from Interrupt
-
-        The RTI instruction is used at the end of an interrupt processing routine. It pulls the processor flags from the stack followed
-        by the program counter.
-
-        Processor Status after use:
-
-        C	Carry Flag	Set from stack
-        Z	Zero Flag	Set from stack
-        I	Interrupt Disable	Set from stack
-        D	Decimal Mode Flag	Set from stack
-        B	Break Command	Set from stack
-        V	Overflow Flag	Set from stack
-        N	Negative Flag	Set from stack
-
-     */
-    Mos6502Old.prototype.RTI = function () {
-        console.log('rti');
-        this.PLP();
-        this.ip = this.popWord();
-    };
-    Mos6502Old.prototype.ALR = function (byte) {
-        //ALR #i($4B ii; 2 cycles)
-        //Equivalent to AND #i then LSR A.
-        this.AND(byte);
-        this.LSR(this.addrRA);
-    };
-    Mos6502Old.prototype.ANC = function (byte) {
-        //Does AND #i, setting N and Z flags based on the result. 
-        //Then it copies N (bit 7) to C.ANC #$FF could be useful for sign- extending, much like CMP #$80.ANC #$00 acts like LDA #$00 followed by CLC.
-        this.AND(byte);
-        this.flgCarry = this.flgNegative;
-    };
-    Mos6502Old.prototype.ARR = function (byte) {
-        //Similar to AND #i then ROR A, except sets the flags differently. N and Z are normal, but C is bit 6 and V is bit 6 xor bit 5.
-        this.AND(byte);
-        this.ROR(this.addrRA);
-        this.flgCarry = (this.rA & (1 << 6)) !== 0 ? 1 : 0;
-        this.flgOverflow = ((this.rA & (1 << 6)) >> 6) ^ ((this.rA & (1 << 5)) >> 5);
-    };
-    Mos6502Old.prototype.AXS = function (byte) {
-        // Sets X to {(A AND X) - #value without borrow}, and updates NZC. 
-        var res = (this.rA & this.rX) + 256 - byte;
-        this.rX = res & 0xff;
-        this.flgNegative = (this.rX & 128) !== 0 ? 1 : 0;
-        this.flgCarry = res > 255 ? 1 : 0;
-        this.flgZero = this.rX === 0 ? 1 : 0;
-    };
-    Mos6502Old.prototype.SYA = function (addr) {
-        //not implemented
-    };
-    Mos6502Old.prototype.SXA = function (addr) {
-        //not implemented
-    };
-    Mos6502Old.prototype.XAA = function (byte) {
-        //not implemented
-    };
-    Mos6502Old.prototype.AXA = function (byte) {
-        //not implemented
-    };
-    Mos6502Old.prototype.XAS = function (byte) {
-        //not implemented
-    };
-    Mos6502Old.prototype.LAR = function (byte) {
-        //not implemented
-    };
-    Mos6502Old.prototype.getByte = function (addr) {
-        if (addr === this.addrRA)
-            return this.rA;
-        else
-            return this.memory.getByte(addr);
-    };
-    Mos6502Old.prototype.setByte = function (addr, byte) {
-        if (addr === this.addrRA)
-            this.rA = byte;
-        else
-            this.memory.setByte(addr, byte);
-    };
-    Mos6502Old.prototype.getWord = function (addr) {
-        return this.memory.getByte(addr) + 256 * this.memory.getByte(addr + 1);
-    };
-    Mos6502Old.prototype.getSByteRelative = function () { var b = this.memory.getByte(this.ip + 1); return b >= 128 ? b - 256 : b; };
-    Mos6502Old.prototype.getByteImmediate = function () { return this.memory.getByte(this.ip + 1); };
-    Mos6502Old.prototype.getWordImmediate = function () {
-        //if ((this.ip & 0xff) === 0xff)
-        //    this.pageCross = 1;
-        return this.getWord(this.ip + 1);
-    };
-    Mos6502Old.prototype.getAddrZeroPage = function () { return this.getByteImmediate(); };
-    Mos6502Old.prototype.getByteZeroPage = function () { return this.memory.getByte(this.getAddrZeroPage()); };
-    Mos6502Old.prototype.getWordZeroPage = function () { return this.getWord(this.getAddrZeroPage()); };
-    Mos6502Old.prototype.getAddrZeroPageX = function () { return (this.rX + this.getByteImmediate()) & 0xff; };
-    Mos6502Old.prototype.getByteZeroPageX = function () { return this.memory.getByte(this.getAddrZeroPageX()); };
-    Mos6502Old.prototype.getWordZeroPageX = function () { return this.getWord(this.getAddrZeroPageX()); };
-    Mos6502Old.prototype.getAddrZeroPageY = function () { return (this.rY + this.getByteImmediate()) & 0xff; };
-    Mos6502Old.prototype.getByteZeroPageY = function () { return this.memory.getByte(this.getAddrZeroPageY()); };
-    Mos6502Old.prototype.getWordZeroPageY = function () { return this.getWord(this.getAddrZeroPageY()); };
-    Mos6502Old.prototype.getAddrAbsolute = function () { return this.getWordImmediate(); };
-    Mos6502Old.prototype.getByteAbsolute = function () { return this.memory.getByte(this.getAddrAbsolute()); };
-    Mos6502Old.prototype.getWordAbsolute = function () { return this.getWord(this.getAddrAbsolute()); };
-    Mos6502Old.prototype.getAddrAbsoluteX = function () {
-        // For example, in the instruction LDA 1234, X, where the value in the X register is added 
-        // to address 1234 to get the effective address to load the accumulator from, the operand's low' +
-        // ' byte is fetched before the high byte, so the processor can start adding the X register's 
-        // value before it has the high byte.If there is no carry operation, the entire indexed operation 
-        // takes only four clocks, which is one microsecond at 4MHz. (I don't think there are any 65c02's 
-        //  being made today that won't do at least 4MHz.) If there is a carry requiring the high byte to be ' +
-        // 'incremented, it takes one additional clock.
-        var w = this.getWordImmediate();
-        var addr = (this.rX + w) & 0xffff;
-        if (this.rX + (w & 0xff) > 0xff)
-            this.pageCross = 1;
-        return addr;
-    };
-    Mos6502Old.prototype.getByteAbsoluteX = function () { return this.memory.getByte(this.getAddrAbsoluteX()); };
-    Mos6502Old.prototype.getWordAbsoluteX = function () { return this.getWord(this.getAddrAbsoluteX()); };
-    Mos6502Old.prototype.getAddrAbsoluteY = function () {
-        var w = this.getWordImmediate();
-        var addr = (this.rY + w) & 0xffff;
-        if (this.rY + (w & 0xff) > 0xff)
-            this.pageCross = 1;
-        return addr;
-    };
-    Mos6502Old.prototype.getByteAbsoluteY = function () { return this.memory.getByte(this.getAddrAbsoluteY()); };
-    Mos6502Old.prototype.getWordAbsoluteY = function () { return this.getWord(this.getAddrAbsoluteY()); };
-    Mos6502Old.prototype.getWordIndirect = function () {
-        /*
-         The 6502's memory indirect jump instruction, JMP (<address>), is partially broken.
-         If <address> is hex xxFF (i.e., any word ending in FF), the processor will not jump to the address
-         stored in xxFF and xxFF+1 as expected, but rather the one defined by xxFF and xx00 (for example,
-         JMP ($10FF) would jump to the address stored in 10FF and 1000, instead of the one stored in 10FF and 1100).
-         This defect continued through the entire NMOS line, but was corrected in the CMOS derivatives.
-        */
-        var addrLo = this.getWordImmediate();
-        var addrHi = (addrLo & 0xff00) + ((addrLo + 1) & 0x00ff);
-        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
-    };
-    Mos6502Old.prototype.getAddrIndirectX = function () {
-        //The 6502's Indirect-Indexed-X ((Ind,X)) addressing mode is also partially broken 
-        //if the zero- page address was hex FF (i.e.last address of zero- page FF), again a case of address wrap.
-        var addrLo = (this.getByteImmediate() + this.rX) & 0xff;
-        var addrHi = (addrLo + 1) & 0xff;
-        return this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi);
-    };
-    Mos6502Old.prototype.getByteIndirectX = function () { return this.memory.getByte(this.getAddrIndirectX()); };
-    Mos6502Old.prototype.getWordIndirectX = function () { return this.getWord(this.getAddrIndirectX()); };
-    Mos6502Old.prototype.getAddrIndirectY = function () {
-        //The 6502's Indirect-Indexed-Y ((Ind),Y) addressing mode is also partially broken.
-        //If the zero- page address was hex FF (i.e.last address of zero- page FF), the processor 
-        //would not fetch data from the address pointed to by 00FF and 0100 + Y, but rather the one in 00FF and 0000 + Y.
-        //This defect continued through the entire NMOS line, but was fixed in some of the CMOS derivatives.
-        var addrLo = this.getByteImmediate() & 0xff;
-        var addrHi = (addrLo + 1) & 0xff;
-        if (addrLo + this.rY > 0xff)
-            this.pageCross = 1;
-        return (this.memory.getByte(addrLo) + 256 * this.memory.getByte(addrHi) + this.rY) & 0xffff;
-    };
-    Mos6502Old.prototype.getByteIndirectY = function () { return this.memory.getByte(this.getAddrIndirectY()); };
-    Mos6502Old.prototype.getWordIndirectY = function () { return this.getWord(this.getAddrIndirectY()); };
-    Mos6502Old.prototype.pushByte = function (byte) {
-        this.memory.setByte(0x100 + this.sp, byte & 0xff);
-        this.sp = this.sp === 0 ? 0xff : this.sp - 1;
-    };
-    Mos6502Old.prototype.pushHi = function (word) {
-        this.pushByte(word >> 8);
-    };
-    Mos6502Old.prototype.pushLo = function (word) {
-        this.pushByte(word & 0xff);
-    };
-    Mos6502Old.prototype.popByte = function () {
-        this.sp = this.sp === 0xff ? 0 : this.sp + 1;
-        return this.memory.getByte(0x100 + this.sp);
-    };
-    Mos6502Old.prototype.pushWord = function (word) {
-        this.pushByte((word >> 8) & 0xff);
-        this.pushByte(word & 0xff);
-    };
-    Mos6502Old.prototype.popWord = function () {
-        return this.popByte() + (this.popByte() << 8);
-    };
-    Mos6502Old.prototype.setJmpFlags = function (sbyte) {
-        this.jumpSucceed = 1;
-        var addrDstLow = (this.ip & 0xff) + sbyte + 2; // +2 because we increment the IP with 2 anyway
-        this.jumpToNewPage = addrDstLow < 0 || addrDstLow > 0xff ? 1 : 0;
-    };
-    Mos6502Old.prototype.step = function () {
-        if (this.t === this.tLim - 1)
-            this.pollInterrupts();
-        if (this.t === this.tLim)
-            this.t = 0;
-        if (this.t === 0) {
-            var nmiWasRequested = this.nmiRequested;
-            var irqWasRequested = this.irqRequested;
-            this.irqRequested = false;
-            this.nmiRequested = false;
-            if (nmiWasRequested) {
-                this.NMI();
-                this.t = this.tLim = 0;
-                return;
-            }
-            if (irqWasRequested) {
-                this.IRQ();
-                this.t = this.tLim = 0;
-                return;
-            }
-        }
-        this.processInstruction();
-        this.DetectInterrupts();
-        this.t++;
-    };
-    Mos6502Old.prototype.processInstruction = function () {
-        this.pageCross = this.jumpSucceed = this.jumpToNewPage = 0;
-        var ipPrev = this.ip;
-        if (this.t === 0)
-            this.currentOpcode = this.memory.getByte(this.ip);
-        switch (this.currentOpcode) {
-            case 0x69:
-                if (this.t === 0) {
-                    this.ADC(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x65:
-                if (this.t === 0) {
-                    this.ADC(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x75:
-                if (this.t === 0) {
-                    this.ADC(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x6d:
-                if (this.t === 0) {
-                    this.ADC(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x7d:
-                if (this.t === 0) {
-                    this.ADC(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x79:
-                if (this.t === 0) {
-                    this.ADC(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x61:
-                if (this.t === 0) {
-                    this.ADC(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x71:
-                if (this.t === 0) {
-                    this.ADC(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x29:
-                if (this.t === 0) {
-                    this.AND(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x25:
-                if (this.t === 0) {
-                    this.AND(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x35:
-                if (this.t === 0) {
-                    this.AND(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x2D:
-                if (this.t === 0) {
-                    this.AND(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x3D:
-                if (this.t === 0) {
-                    this.AND(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x39:
-                if (this.t === 0) {
-                    this.AND(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x21:
-                if (this.t === 0) {
-                    this.AND(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x31:
-                if (this.t === 0) {
-                    this.AND(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x0a:
-                if (this.t === 0) {
-                    this.ASL(this.addrRA);
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x06:
-                if (this.t === 0) {
-                    this.ASL(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x16:
-                if (this.t === 0) {
-                    this.ASL(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x0e:
-                if (this.t === 0) {
-                    this.ASL(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x1e:
-                if (this.t === 0) {
-                    this.ASL(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x90:
-                if (this.t === 0) {
-                    this.BCC(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0xb0:
-                if (this.t === 0) {
-                    this.BCS(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0xf0:
-                if (this.t === 0) {
-                    this.BEQ(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0x30:
-                if (this.t === 0) {
-                    this.BMI(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0xd0:
-                if (this.t === 0) {
-                    this.BNE(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0x10:
-                if (this.t === 0) {
-                    this.BPL(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0x50:
-                if (this.t === 0) {
-                    this.BVC(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0x70:
-                if (this.t === 0) {
-                    this.BVS(this.getSByteRelative());
-                    this.ip += 2;
-                    this.tLim = 2 + this.jumpSucceed + this.jumpToNewPage;
-                }
-                break;
-            case 0x24:
-                if (this.t === 0) {
-                    this.BIT(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x2c:
-                //if (this.t === 0) { this.BIT(this.getByteAbsolute()); this.ip += 3; this.tLim = 4; } break;
-                switch (this.t) {
-                    case 0:
-                        this.tLim = 4;
-                        break;
-                    case 3:
-                        this.BIT(this.getByteAbsolute());
-                        this.ip += 3;
-                        break;
-                }
-                break;
-            case 0x18:
-                if (this.t === 0) {
-                    this.CLC();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xd8:
-                if (this.t === 0) {
-                    this.CLD();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x58:
-                //if (this.t === 0) { this.CLI(); this.ip += 1; this.tLim = 2; } break;
-                switch (this.t) {
-                    case 0:
-                        this.ip += 1;
-                        this.tLim = 2;
-                        break;
-                    case 1:
-                        this.CLI();
-                        break;
-                }
-                break;
-            case 0xb8:
-                if (this.t === 0) {
-                    this.CLV();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc9:
-                if (this.t === 0) {
-                    this.CMP(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc5:
-                if (this.t === 0) {
-                    this.CMP(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xd5:
-                if (this.t === 0) {
-                    this.CMP(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xcd:
-                if (this.t === 0) {
-                    this.CMP(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xdd:
-                if (this.t === 0) {
-                    this.CMP(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xd9:
-                if (this.t === 0) {
-                    this.CMP(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xc1:
-                if (this.t === 0) {
-                    this.CMP(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xd1:
-                if (this.t === 0) {
-                    this.CMP(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0xe0:
-                if (this.t === 0) {
-                    this.CPX(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xe4:
-                if (this.t === 0) {
-                    this.CPX(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xec:
-                if (this.t === 0) {
-                    this.CPX(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xc0:
-                if (this.t === 0) {
-                    this.CPY(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc4:
-                if (this.t === 0) {
-                    this.CPY(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xcc:
-                if (this.t === 0) {
-                    this.CPY(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xc6:
-                if (this.t === 0) {
-                    this.DEC(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0xd6:
-                if (this.t === 0) {
-                    this.DEC(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xce:
-                if (this.t === 0) {
-                    this.DEC(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xde:
-                if (this.t === 0) {
-                    this.DEC(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xca:
-                if (this.t === 0) {
-                    this.DEX();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x88:
-                if (this.t === 0) {
-                    this.DEY();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xe6:
-                if (this.t === 0) {
-                    this.INC(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0xf6:
-                if (this.t === 0) {
-                    this.INC(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xee:
-                if (this.t === 0) {
-                    this.INC(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xfe:
-                if (this.t === 0) {
-                    this.INC(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xe8:
-                if (this.t === 0) {
-                    this.INX();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc8:
-                if (this.t === 0) {
-                    this.INY();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x49:
-                if (this.t === 0) {
-                    this.EOR(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x45:
-                if (this.t === 0) {
-                    this.EOR(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x55:
-                if (this.t === 0) {
-                    this.EOR(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x4D:
-                if (this.t === 0) {
-                    this.EOR(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x5D:
-                if (this.t === 0) {
-                    this.EOR(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x59:
-                if (this.t === 0) {
-                    this.EOR(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x41:
-                if (this.t === 0) {
-                    this.EOR(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x51:
-                if (this.t === 0) {
-                    this.EOR(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x4c:
-                if (this.t === 0) {
-                    this.ip = this.getAddrAbsolute();
-                    this.tLim = 3;
-                }
-                break;
-            case 0x6c:
-                if (this.t === 0) {
-                    this.ip = this.getWordIndirect();
-                    this.tLim = 5;
-                }
-                break;
-            case 0xa9:
-                if (this.t === 0) {
-                    this.LDA(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xa5:
-                if (this.t === 0) {
-                    this.LDA(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xb5:
-                if (this.t === 0) {
-                    this.LDA(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xad:
-                if (this.t === 0) {
-                    this.LDA(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xbd:
-                if (this.t === 0) {
-                    this.LDA(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xb9:
-                if (this.t === 0) {
-                    this.LDA(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xa1:
-                if (this.t === 0) {
-                    this.LDA(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xb1:
-                if (this.t === 0) {
-                    this.LDA(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0xa2:
-                if (this.t === 0) {
-                    this.LDX(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xa6:
-                if (this.t === 0) {
-                    this.LDX(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xb6:
-                if (this.t === 0) {
-                    this.LDX(this.getByteZeroPageY());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xae:
-                if (this.t === 0) {
-                    this.LDX(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xbe:
-                if (this.t === 0) {
-                    this.LDX(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xa0:
-                if (this.t === 0) {
-                    this.LDY(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xa4:
-                if (this.t === 0) {
-                    this.LDY(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xb4:
-                if (this.t === 0) {
-                    this.LDY(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xac:
-                if (this.t === 0) {
-                    this.LDY(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xbc:
-                if (this.t === 0) {
-                    this.LDY(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x4a:
-                if (this.t === 0) {
-                    this.LSR(this.addrRA);
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x46:
-                if (this.t === 0) {
-                    this.LSR(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x56:
-                if (this.t === 0) {
-                    this.LSR(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x4e:
-                if (this.t === 0) {
-                    this.LSR(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x5e:
-                if (this.t === 0) {
-                    this.LSR(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xea:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x09:
-                if (this.t === 0) {
-                    this.ORA(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x05:
-                if (this.t === 0) {
-                    this.ORA(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x15:
-                if (this.t === 0) {
-                    this.ORA(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x0d:
-                if (this.t === 0) {
-                    this.ORA(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x1d:
-                if (this.t === 0) {
-                    this.ORA(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x19:
-                if (this.t === 0) {
-                    this.ORA(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x01:
-                if (this.t === 0) {
-                    this.ORA(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x11:
-                if (this.t === 0) {
-                    this.ORA(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x48:
-                if (this.t === 0) {
-                    this.PHA();
-                    this.ip += 1;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x08:
-                if (this.t === 0) {
-                    this.PHP();
-                    this.ip += 1;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x68:
-                if (this.t === 0) {
-                    this.PLA();
-                    this.ip += 1;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x28:
-                //if (this.t === 0) { this.PLP(); this.ip += 1; this.tLim = 4; } break;
-                switch (this.t) {
-                    case 0:
-                        this.ip += 1;
-                        this.tLim = 4;
-                        break;
-                    case 3:
-                        this.PLP();
-                        break;
-                }
-                break;
-            case 0x2a:
-                if (this.t === 0) {
-                    this.ROL(this.addrRA);
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x26:
-                if (this.t === 0) {
-                    this.ROL(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x36:
-                if (this.t === 0) {
-                    this.ROL(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x2e:
-                if (this.t === 0) {
-                    this.ROL(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x3e:
-                if (this.t === 0) {
-                    this.ROL(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x6a:
-                if (this.t === 0) {
-                    this.ROR(this.addrRA);
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x66:
-                if (this.t === 0) {
-                    this.ROR(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x76:
-                if (this.t === 0) {
-                    this.ROR(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x6e:
-                if (this.t === 0) {
-                    this.ROR(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x7e:
-                if (this.t === 0) {
-                    this.ROR(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x00:
-                this.BRK();
-                break;
-            case 0x40:
-                if (this.t === 0) {
-                    this.RTI();
-                    this.tLim = 6;
-                }
-                break;
-            case 0xe9:
-                if (this.t === 0) {
-                    this.SBC(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xe5:
-                if (this.t === 0) {
-                    this.SBC(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xf5:
-                if (this.t === 0) {
-                    this.SBC(this.getByteZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xed:
-                if (this.t === 0) {
-                    this.SBC(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xfd:
-                if (this.t === 0) {
-                    this.SBC(this.getByteAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xf9:
-                if (this.t === 0) {
-                    this.SBC(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xe1:
-                if (this.t === 0) {
-                    this.SBC(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xf1:
-                if (this.t === 0) {
-                    this.SBC(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x38:
-                if (this.t === 0) {
-                    this.flgCarry = 1;
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xf8:
-                if (this.t === 0) {
-                    this.flgDecimalMode = 1;
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x78:
-                //if (this.t === 0) {/*SED*/ this.SEI(); this.ip += 1; this.tLim = 2; } break;
-                switch (this.t) {
-                    case 0:
-                        this.ip += 1;
-                        this.tLim = 2;
-                        break;
-                    case 1:
-                        this.SEI();
-                        break;
-                }
-                break;
-            case 0x85:
-                if (this.t === 0) {
-                    this.STA(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x95:
-                if (this.t === 0) {
-                    this.STA(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x8d:
-                if (this.t === 0) {
-                    this.STA(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x9d:
-                if (this.t === 0) {
-                    this.STA(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x99:
-                if (this.t === 0) {
-                    this.STA(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x81:
-                if (this.t === 0) {
-                    this.STA(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x91:
-                if (this.t === 0) {
-                    this.STA(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x86:
-                if (this.t === 0) {
-                    this.STX(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x96:
-                if (this.t === 0) {
-                    this.STX(this.getAddrZeroPageY());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x8e:
-                if (this.t === 0) {
-                    this.STX(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x84:
-                if (this.t === 0) {
-                    this.STY(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x94:
-                if (this.t === 0) {
-                    this.STY(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x8c:
-                if (this.t === 0) {
-                    this.STY(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xaa:
-                if (this.t === 0) {
-                    this.TAX();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xa8:
-                if (this.t === 0) {
-                    this.TAY();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xba:
-                if (this.t === 0) {
-                    this.TSX();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x8a:
-                if (this.t === 0) {
-                    this.TXA();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x9a:
-                if (this.t === 0) {
-                    this.TXS();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x98:
-                if (this.t === 0) {
-                    this.TYA();
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x20:
-                if (this.t === 0) {
-                    this.JSR(this.getAddrAbsolute());
-                    this.tLim = 6;
-                }
-                break;
-            case 0x60:
-                if (this.t === 0) {
-                    this.RTS();
-                    this.tLim = 6;
-                }
-                break;
-            //unofficial opcodes below
-            case 0x1a:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x3a:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x5a:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x7a:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xda:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xfa:
-                if (this.t === 0) {
-                    this.ip += 1;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x04:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x14:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x34:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x44:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x54:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x64:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x74:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xd4:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xf4:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x80:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x82:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc2:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xe2:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x89:
-                if (this.t === 0) {
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x0c:
-                if (this.t === 0) {
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x1c:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x3c:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x5c:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0x7c:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xdc:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xfc:
-                if (this.t === 0) {
-                    this.getAddrAbsoluteX();
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xeb:
-                if (this.t === 0) {
-                    this.SBC(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xc3:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0xc7:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0xcf:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xd3:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0xd7:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xdb:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xdf:
-                if (this.t === 0) {
-                    this.DCP(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xe3:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0xe7:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0xef:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xf3:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0xf7:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xfb:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xff:
-                if (this.t === 0) {
-                    this.ISC(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0xab:
-                if (this.t === 0) {
-                    this.LAX(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xa7:
-                if (this.t === 0) {
-                    this.LAX(this.getByteZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0xb7:
-                if (this.t === 0) {
-                    this.LAX(this.getByteZeroPageY());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xaf:
-                if (this.t === 0) {
-                    this.LAX(this.getByteAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0xbf:
-                if (this.t === 0) {
-                    this.LAX(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            case 0xa3:
-                if (this.t === 0) {
-                    this.LAX(this.getByteIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0xb3:
-                if (this.t === 0) {
-                    this.LAX(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 5 + this.pageCross;
-                }
-                break;
-            case 0x83:
-                if (this.t === 0) {
-                    this.SAX(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x87:
-                if (this.t === 0) {
-                    this.SAX(this.getAddrZeroPage());
-                    this.ip += 2;
-                    this.tLim = 3;
-                }
-                break;
-            case 0x8f:
-                if (this.t === 0) {
-                    this.SAX(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x97:
-                if (this.t === 0) {
-                    this.SAX(this.getAddrZeroPageY());
-                    this.ip += 2;
-                    this.tLim = 4;
-                }
-                break;
-            case 0x03:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x07:
-                if (this.t === 0) {
-                    this.SLO(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x0f:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x13:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x17:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x1b:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x1f:
-                if (this.t === 0) {
-                    this.SLO(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x23:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x27:
-                if (this.t === 0) {
-                    this.RLA(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x2f:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x33:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x37:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x3b:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x3f:
-                if (this.t === 0) {
-                    this.RLA(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x63:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x67:
-                if (this.t === 0) {
-                    this.RRA(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x6f:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x73:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x77:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x7b:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x7f:
-                if (this.t === 0) {
-                    this.RRA(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x43:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrIndirectX());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x47:
-                if (this.t === 0) {
-                    this.SRE(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x4f:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrAbsolute());
-                    this.ip += 3;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x53:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrIndirectY());
-                    this.ip += 2;
-                    this.tLim = 8;
-                }
-                break;
-            case 0x57:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrZeroPageX());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x5b:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x5f:
-                if (this.t === 0) {
-                    this.SRE(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 7;
-                }
-                break;
-            case 0x0b:
-                if (this.t === 0) {
-                    this.ANC(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x2b:
-                if (this.t === 0) {
-                    this.ANC(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x4b:
-                if (this.t === 0) {
-                    this.ALR(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x6b:
-                if (this.t === 0) {
-                    this.ARR(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0xcb:
-                if (this.t === 0) {
-                    this.AXS(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x9c:
-                if (this.t === 0) {
-                    this.SYA(this.getAddrAbsoluteX());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x9e:
-                if (this.t === 0) {
-                    this.SXA(this.getAddrAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x8b:
-                if (this.t === 0) {
-                    this.XAA(this.getByteImmediate());
-                    this.ip += 2;
-                    this.tLim = 2;
-                }
-                break;
-            case 0x93:
-                if (this.t === 0) {
-                    this.AXA(this.getByteIndirectY());
-                    this.ip += 2;
-                    this.tLim = 6;
-                }
-                break;
-            case 0x9b:
-                if (this.t === 0) {
-                    this.XAS(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0x9f:
-                if (this.t === 0) {
-                    this.AXA(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 5;
-                }
-                break;
-            case 0xbb:
-                if (this.t === 0) {
-                    this.LAR(this.getByteAbsoluteY());
-                    this.ip += 3;
-                    this.tLim = 4 + this.pageCross;
-                }
-                break;
-            default:
-                throw 'unkown opcode $' + (this.memory.getByte(this.ip)).toString(16);
-        }
-        if (this.tLim === 0) {
-            throw 'sleep not set';
-        }
-        this.ip &= 0xffff;
-    };
-    return Mos6502Old;
-})();
-///<reference path="NesEmulator.ts"/>
-///<reference path="NesRunnerBase.ts"/>
-var NesRunner = (function (_super) {
-    __extends(NesRunner, _super);
-    function NesRunner(container, url) {
-        _super.call(this, container, url);
-        this.callback = this.renderFrame.bind(this);
-        this.iFrameStart = 0;
-        this.hpcStart = 0;
+        if (!this.memory)
+            throw 'unkown mapper ' + nesImage.mapperType;
+        this.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
+            _this.dmaRequested = true;
+            _this.addrDma = v << 8;
+        });
+        this.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
+        this.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
+        this.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
+        this.cpu = new Mos6502(this.memory);
+        this.apu = new APU(this.memory, this.cpu);
+        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
+        this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
+        this.ppu.setDriver(driver);
+        this.cpu.reset();
+        this.controller = new Controller(canvas);
+        window['nesemulator'] = this;
     }
-    NesRunner.prototype.runI = function () {
-        this.hpcStart = window.performance.now();
-        this.iFrameStart = this.nesEmulator.ppu.iFrame;
-        this.fpsElement = document.createElement("span");
-        this.headerElement.innerText += " ";
-        this.headerElement.appendChild(this.fpsElement);
-        requestAnimationFrame(this.callback);
-    };
-    NesRunner.prototype.renderFrame = function (hpcNow) {
-        var nesEmulator = this.nesEmulator;
-        var ppu = nesEmulator.ppu;
-        var dt = hpcNow - this.hpcStart;
-        if (dt > 1000) {
-            var fps = (ppu.iFrame - this.iFrameStart) / dt * 1000;
-            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
-            this.iFrameStart = ppu.iFrame;
-            this.hpcStart = hpcNow;
+    NesEmulator.prototype.step = function () {
+        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
+            if ((this.icycle & 3) === 0) {
+                var nmiBefore = this.cpu.nmiLine;
+                this.ppu.step();
+                var nmiAfter = this.cpu.nmiLine;
+                if (nmiBefore > nmiAfter && this.icycle === 4)
+                    this.cpu.detectInterrupts();
+            }
+            if (this.icycle === 0) {
+                if (this.dmaRequested) {
+                    if (!(this.cpu.icycle & 1)) {
+                        this.dmaRequested = false;
+                        this.idma = 512;
+                    }
+                    this.cpu.icycle++;
+                }
+                else if (this.idma > 512) {
+                    this.idma--;
+                    this.cpu.icycle++;
+                }
+                else if (this.idma > 0) {
+                    this.cpu.icycle++;
+                    if (!(this.idma & 1)) {
+                        this.bDma = this.memory.getByte(this.addrDma++);
+                        this.addrDma &= 0xffff;
+                    }
+                    else {
+                        this.memory.setByte(0x2004, this.bDma);
+                    }
+                    this.idma--;
+                }
+                else {
+                    this.cpu.step();
+                }
+            }
+            this.apu.step();
         }
-        var frameCurrent = ppu.iFrame;
-        while (frameCurrent === ppu.iFrame)
-            nesEmulator.step();
-        requestAnimationFrame(this.callback);
     };
-    return NesRunner;
-})(NesRunnerBase);
+    return NesEmulator;
+})();
 var SpriteRenderingInfo = (function () {
     function SpriteRenderingInfo() {
         this.flgZeroSprite = false;
@@ -14340,7 +11259,7 @@ var PPU = (function () {
         enumerable: true,
         configurable: true
     });
-    PPU.prototype.setRenderer = function (renderer) {
+    PPU.prototype.setDriver = function (renderer) {
         this.renderer = renderer;
         this.data = this.renderer.getBuffer();
     };
@@ -14941,49 +11860,201 @@ var PPU = (function () {
     PPU.sxMax = 340;
     return PPU;
 })();
-///<reference path="Memory.ts"/>
-var RepeatedMemory = (function () {
-    function RepeatedMemory(count, memory) {
-        this.count = count;
-        this.memory = memory;
-        this.sizeI = this.memory.size() * this.count;
+var NesRunnerBase = (function () {
+    function NesRunnerBase(container, url) {
+        this.container = container;
+        this.url = url;
+        var containerT = document.createElement('div');
+        this.container.appendChild(containerT);
+        this.container = containerT;
+        this.onEndCallback = function () { };
     }
-    RepeatedMemory.prototype.size = function () {
-        return this.sizeI;
+    NesRunnerBase.prototype.log = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
     };
-    RepeatedMemory.prototype.getByte = function (addr) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.getByte(addr % this.sizeI);
+    NesRunnerBase.prototype.logError = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.classList.add("error");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
     };
-    RepeatedMemory.prototype.setByte = function (addr, value) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.setByte(addr % this.sizeI, value);
+    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
+        var _this = this;
+        this.headerElement = document.createElement("h2");
+        this.container.appendChild(this.headerElement);
+        var canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 240;
+        canvas.style.zoom = "2";
+        this.container.appendChild(canvas);
+        var driver = new DriverFactory().createRenderer(canvas);
+        this.headerElement.innerText = this.url + " " + driver.tsto();
+        this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
+        this.container.appendChild(this.logElement);
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", this.url, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function (_) {
+            if (xhr.status > 99 && xhr.status < 299) {
+                var blob = new Uint8Array(xhr.response);
+                onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+            }
+            else {
+                _this.logError("http error " + xhr.status);
+                onLoad(null);
+            }
+        };
+        xhr.send();
     };
-    return RepeatedMemory;
+    NesRunnerBase.prototype.onEnd = function (callback) {
+        this.onEndCallback = callback;
+    };
+    NesRunnerBase.prototype.run = function () {
+        var _this = this;
+        this.loadEmulator(function (nesEmulator) {
+            _this.nesEmulator = nesEmulator;
+            if (!nesEmulator)
+                _this.onEndCallback();
+            else
+                _this.runI();
+        });
+    };
+    NesRunnerBase.prototype.runI = function () {
+        this.onEndCallback();
+    };
+    return NesRunnerBase;
 })();
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(size) {
-        this.memory = new Uint8Array(size);
+///<reference path="NesRunnerBase.ts"/>
+var CpuTestRunner = (function (_super) {
+    __extends(CpuTestRunner, _super);
+    function CpuTestRunner(container, url, checkForString) {
+        var _this = this;
+        _super.call(this, container, url);
+        this.checkForString = checkForString;
+        this.callback = this.renderFrame.bind(this);
+        this.container.classList.add('test-case');
+        var collapseButton = document.createElement('div');
+        collapseButton.className = 'collapse-button';
+        collapseButton.onclick = function (e) {
+            $(_this.container).toggleClass('collapsed');
+        };
+        this.container.appendChild(collapseButton);
     }
-    ROM.fromBytes = function (memory) {
-        var res = new ROM(0);
-        res.memory = memory;
-        return res;
+    CpuTestRunner.prototype.testFinished = function (nesEmulator) {
+        if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
+            nesEmulator.cpu.getByte(0x6001) === 0xde &&
+            nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
+            nesEmulator.cpu.getByte(0x6003) === 0x61) {
+            var resultCode = nesEmulator.cpu.getByte(0x6000);
+            if (resultCode !== 0) {
+                this.log('res: ' + resultCode.toString(16));
+                this.container.classList.add('failed');
+            }
+            else {
+                this.container.classList.add('passed');
+            }
+            var res = "";
+            var i = 0x6004;
+            while (nesEmulator.cpu.getByte(i) !== 0) {
+                res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+                i++;
+            }
+            this.log(res);
+            return true;
+        }
+        if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
+            nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
+            nesEmulator.cpu.flgInterruptDisable &&
+            !nesEmulator.ppu.nmi_output) {
+            var out = nesEmulator.ppu.getNameTable(0);
+            this.log(out);
+            if (out.indexOf(this.checkForString) >= 0) {
+                this.container.classList.add('passed');
+            }
+            else {
+                this.container.classList.add('failed');
+            }
+            return true;
+        }
+        return false;
     };
-    ROM.prototype.size = function () {
-        return this.memory.length;
+    CpuTestRunner.prototype.runI = function () {
+        requestAnimationFrame(this.callback);
     };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
+    CpuTestRunner.prototype.renderFrame = function () {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        if (this.testFinished(nesEmulator)) {
+            this.container.classList.add('collapsed');
+            this.onEndCallback();
+            return;
+        }
+        try {
+            var frameCurrent = ppu.iFrame;
+            while (frameCurrent === ppu.iFrame)
+                nesEmulator.step();
+        }
+        catch (e) {
+            this.container.classList.add('collapsed');
+            this.logError(e);
+            this.onEndCallback();
+            return;
+        }
+        requestAnimationFrame(this.callback);
     };
-    ROM.prototype.setByte = function (addr, value) {
+    return CpuTestRunner;
+})(NesRunnerBase);
+///<reference path="NesRunnerBase.ts"/>
+var NesRunner = (function (_super) {
+    __extends(NesRunner, _super);
+    function NesRunner(container, url) {
+        _super.call(this, container, url);
+        this.callback = this.renderFrame.bind(this);
+        this.iFrameStart = 0;
+        this.hpcStart = 0;
+    }
+    NesRunner.prototype.runI = function () {
+        this.hpcStart = window.performance.now();
+        this.iFrameStart = this.nesEmulator.ppu.iFrame;
+        this.fpsElement = document.createElement("span");
+        this.headerElement.innerText += " ";
+        this.headerElement.appendChild(this.fpsElement);
+        requestAnimationFrame(this.callback);
     };
-    return ROM;
-})();
-///<reference path="NesEmulator.ts"/>
+    NesRunner.prototype.renderFrame = function (hpcNow) {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        var dt = hpcNow - this.hpcStart;
+        if (dt > 1000) {
+            var fps = (ppu.iFrame - this.iFrameStart) / dt * 1000;
+            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
+            this.iFrameStart = ppu.iFrame;
+            this.hpcStart = hpcNow;
+        }
+        var frameCurrent = ppu.iFrame;
+        while (frameCurrent === ppu.iFrame)
+            nesEmulator.step();
+        requestAnimationFrame(this.callback);
+    };
+    return NesRunner;
+})(NesRunnerBase);
 var StepTestRunner = (function () {
     function StepTestRunner() {
         this.ich = 0;

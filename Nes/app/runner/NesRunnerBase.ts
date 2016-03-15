@@ -1,5 +1,4 @@
-﻿///<reference path="NesEmulator.ts"/>
-
+﻿
 class NesRunnerBase {
     onEndCallback: () => void;
     logElement: HTMLElement;
@@ -38,14 +37,18 @@ class NesRunnerBase {
 
     private loadEmulator(onLoad) {
         this.headerElement = document.createElement("h2");
-        this.headerElement.innerText = this.url;
         this.container.appendChild(this.headerElement);
 
         var canvas = document.createElement("canvas");
         canvas.width = 256;
         canvas.height = 240;
         canvas.style.zoom = "2";
+
         this.container.appendChild(canvas);
+        const driver = new DriverFactory().createRenderer(canvas);
+
+        this.headerElement.innerText = `${this.url} ${driver.tsto()}`;
+
         this.logElement = document.createElement("div");
         this.logElement.classList.add('log');
         this.container.appendChild(this.logElement);
@@ -53,10 +56,10 @@ class NesRunnerBase {
         var xhr = new XMLHttpRequest();
         xhr.open("GET", this.url, true);
         xhr.responseType = "arraybuffer";
-        xhr.onload = e => {
+        xhr.onload = _ => {
             if (xhr.status > 99 && xhr.status < 299) {
                 const blob = new Uint8Array(xhr.response);
-                onLoad(new NesEmulator(new NesImage(blob), canvas));
+                onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
             } else {
                 this.logError("http error " + xhr.status);
                 onLoad(null);

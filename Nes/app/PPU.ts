@@ -158,7 +158,7 @@ class PPU {
        
     }
 
-    setRenderer(renderer: IDriver) {
+    setDriver(renderer: IDriver) {
         this.renderer = renderer;
         this.data = this.renderer.getBuffer();
     }

@@ -1,6 +1,6 @@
-///<reference path="Memory.ts"/>
-///<reference path="RAM.ts"/>
-///<reference path="CompoundMemory.ts"/>
+///<reference path="memory/Memory.ts"/>
+///<reference path="memory/RAM.ts"/>
+///<reference path="memory/CompoundMemory.ts"/>
 class MMC1 {
 
     iWrite: number = 0;

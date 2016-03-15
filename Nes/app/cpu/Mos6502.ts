@@ -1,5 +1,4 @@
-﻿///<reference path="Memory.ts"/>
-///<reference path="Mos6502Base.ts"/>
+﻿///<reference path="Mos6502Base.ts"/>
 
 class Mos6502 extends Most6502Base {
   

@@ -1,5 +1,4 @@
-﻿///<reference path="NesEmulator.ts"/>
-///<reference path="NesRunnerBase.ts"/>
+﻿///<reference path="NesRunnerBase.ts"/>
 
 class NesRunner extends NesRunnerBase {
 

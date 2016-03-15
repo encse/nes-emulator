@@ -1,5 +1,4 @@
-﻿///<reference path="NesEmulator.ts"/>
-///<reference path="NesRunnerBase.ts"/>
+﻿///<reference path="NesRunnerBase.ts"/>
 
 class CpuTestRunner extends NesRunnerBase{
     callback = this.renderFrame.bind(this);

@@ -1,5 +1,3 @@
-///<reference path="Memory.ts"/>
-
 class Most6502Base {
 
     addrReset = 0xfffc;

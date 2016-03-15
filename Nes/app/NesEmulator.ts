@@ -1,7 +1,7 @@
-﻿///<reference path="CompoundMemory.ts"/>
-///<reference path="RAM.ts"/>
+﻿///<reference path="memory/CompoundMemory.ts"/>
+///<reference path="memory/RAM.ts"/>
 ///<reference path="NesImage.ts"/>
-///<reference path="Mos6502.ts"/>
+///<reference path="cpu/Mos6502.ts"/>
 class NesEmulator {
     cpu: Mos6502;
     memory: CompoundMemory;
@@ -10,7 +10,7 @@ class NesEmulator {
     apu: APU;
     controller: Controller;
 
-    public constructor(nesImage: NesImage, canvas:HTMLCanvasElement) {
+    public constructor(nesImage: NesImage, canvas:HTMLCanvasElement, driver:IDriver) {
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         switch (nesImage.mapperType)
@@ -65,7 +65,7 @@ class NesEmulator {
         this.apu = new APU(this.memory, this.cpu);
        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.ppu.setRenderer(new RendererFactory().createRenderer(canvas));
+        this.ppu.setDriver(driver);
         this.cpu.reset();
         this.controller = new Controller(canvas);
 
