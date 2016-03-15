@@ -9,3 +9,4 @@ codegen/mos6502gen.js
 codegen/mos6502gen.js.map
 Mario/obj/
 Mario/bin/
+Nes/wwwroot/roms/
