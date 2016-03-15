@@ -229,23 +229,24 @@ var NesRunnerBase = (function () {
     NesRunnerBase.prototype.loadEmulator = function (onLoad) {
         var _this = this;
         this.headerElement = document.createElement("h2");
-        this.headerElement.innerText = this.url;
         this.container.appendChild(this.headerElement);
         var canvas = document.createElement("canvas");
         canvas.width = 256;
         canvas.height = 240;
         canvas.style.zoom = "2";
         this.container.appendChild(canvas);
+        var driver = new DriverFactory().createRenderer(canvas);
+        this.headerElement.innerText = this.url + " " + driver.tsto();
         this.logElement = document.createElement("div");
         this.logElement.classList.add('log');
         this.container.appendChild(this.logElement);
         var xhr = new XMLHttpRequest();
         xhr.open("GET", this.url, true);
         xhr.responseType = "arraybuffer";
-        xhr.onload = function (e) {
+        xhr.onload = function (_) {
             if (xhr.status > 99 && xhr.status < 299) {
                 var blob = new Uint8Array(xhr.response);
-                onLoad(new NesEmulator(new NesImage(blob), canvas));
+                onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
             }
             else {
                 _this.logError("http error " + xhr.status);
@@ -357,6 +358,7 @@ var CpuTestRunner = (function (_super) {
     };
     return CpuTestRunner;
 })(NesRunnerBase);
+///<reference path="IDriver.ts"/>
 var CanvasDriver = (function () {
     function CanvasDriver(canvas) {
         this.ctx = canvas.getContext("2d");
@@ -371,6 +373,9 @@ var CanvasDriver = (function () {
     CanvasDriver.prototype.render = function () {
         this.imageData.data.set(this.buf8);
         this.ctx.putImageData(this.imageData, 0, 0);
+    };
+    CanvasDriver.prototype.tsto = function () {
+        return "Canvas driver";
     };
     return CanvasDriver;
 })();
@@ -388,6 +393,7 @@ var DriverFactory = (function () {
     };
     return DriverFactory;
 })();
+///<reference path="IDriver.ts"/>
 var WebGlDriver = (function () {
     function WebGlDriver(canvas) {
         _a = [canvas.width, canvas.height], this.width = _a[0], this.height = _a[1];
@@ -484,6 +490,9 @@ var WebGlDriver = (function () {
         this.glContext.texImage2D(this.glContext.TEXTURE_2D, 0, this.glContext.RGBA, this.width, this.height, 0, this.glContext.RGBA, this.glContext.UNSIGNED_BYTE, this.buf8);
         this.glContext.drawArrays(this.glContext.TRIANGLES, 0, WebGlDriver.NUM_VIEWPORT_VERTICES);
         this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
+    };
+    WebGlDriver.prototype.tsto = function () {
+        return "WebGL driver";
     };
     // vertices representing entire viewport as two triangles which make up the whole
     // rectangle, in post-projection/clipspace coordinates
@@ -10948,7 +10957,7 @@ var PPU = (function () {
         enumerable: true,
         configurable: true
     });
-    PPU.prototype.setRenderer = function (renderer) {
+    PPU.prototype.setDriver = function (renderer) {
         this.renderer = renderer;
         this.data = this.renderer.getBuffer();
     };
@@ -11955,7 +11964,7 @@ var NesImage = (function () {
 ///<reference path="NesImage.ts"/>
 ///<reference path="cpu/Mos6502.ts"/>
 var NesEmulator = (function () {
-    function NesEmulator(nesImage, canvas) {
+    function NesEmulator(nesImage, canvas, driver) {
         var _this = this;
         this.dmaRequested = false;
         this.idma = 0;
@@ -12000,7 +12009,7 @@ var NesEmulator = (function () {
         this.apu = new APU(this.memory, this.cpu);
         // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.ppu.setRenderer(new DriverFactory().createRenderer(canvas));
+        this.ppu.setDriver(driver);
         this.cpu.reset();
         this.controller = new Controller(canvas);
         window['nesemulator'] = this;

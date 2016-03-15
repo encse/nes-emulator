@@ -2009,30 +2009,29 @@ op0x${statement.opcode.toString(16)}() {`);
             new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross())
 
         ];
-        var res = `///<reference path="Memory.ts"/>
-
+        var res = `
 class Most6502Base {
 
-    public addrReset = 0xfffc;
-    public addrIRQ = 0xfffe;
-    public addrNMI = 0xfffa;
+    addrReset = 0xfffc;
+    addrIRQ = 0xfffe;
+    addrNMI = 0xfffa;
 
-    public opcode: number;
-    public ip: number = 0;
-    public ipCur: number = 0;
-    public sp: number = 0;
-    public t: number = 0;
-    public b: number = 0;
-    public rA: number = 0;
-    public rX: number = 0;
-    public rY: number = 0;
+    opcode: number;
+    ip: number = 0;
+    ipCur: number = 0;
+    sp: number = 0;
+    t: number = 0;
+    b: number = 0;
+    rA: number = 0;
+    rX: number = 0;
+    rY: number = 0;
     
-    public nmiLine = 1;
+    nmiLine = 1;
     private nmiLinePrev = 1;
     private nmiRequested = false;
     private nmiDetected: boolean;
    
-    public irqLine = 1;
+    irqLine = 1;
     private irqRequested = false;
     private irqDetected: boolean;
 
@@ -2057,12 +2056,7 @@ class Most6502Base {
     private canSetFlgBreak = true;
     private addrBrk : number;
 
-    private bDma:number;
-    private dmaRequested = false;
-    private addrDma:number;
-    private idma = -1;
-
-    private icycle = 0;
+    icycle = 0;
 
     private opcodes: (()=>void)[] = [];
     public constructor(public memory: Memory) {
@@ -2074,12 +2068,7 @@ class Most6502Base {
         res+=`
     }
 
-    public dma(addrDma:number) {
-        this.dmaRequested = true;
-        this.addrDma = addrDma;
-    }
-
-    private pollInterrupts() {
+    pollInterrupts() {
         if (this.nmiDetected) {
             this.nmiRequested = true;
             this.nmiDetected = false;
@@ -2091,7 +2080,7 @@ class Most6502Base {
         }
     }
 
-    private detectInterrupts() {
+    detectInterrupts() {
 
         if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
             this.nmiDetected = true;
@@ -2110,7 +2099,7 @@ class Most6502Base {
         return this.memory.getByte(0x100 + this.sp);
     }
 
-    public get rP(): number {
+    get rP(): number {
         return (this.flgNegative << 7) +
             (this.flgOverflow << 6) +
             (1 << 5) +
@@ -2121,7 +2110,7 @@ class Most6502Base {
             (this.flgCarry << 0);
     }
 
-    public set rP(byte: number) {
+    set rP(byte: number) {
         this.flgNegative = (byte >> 7) & 1;
         this.flgOverflow = (byte >> 6) & 1;
         //skip (byte >> 5) & 1;
@@ -2133,29 +2122,13 @@ class Most6502Base {
         this.flgCarry = (byte >> 0) & 1;
     }
 
-    public trace(opcode){
+    trace(opcode){
     
     }
    
-    public clk() {
+    clk() {
         this.icycle++;
-        if (this.dmaRequested) {
-            this.dmaRequested = false;
-            this.idma = 513 + (this.icycle & 1);
-            return;
-        } else if (this.idma > 0) {
-            if (this.idma === 514 || this.idma === 513) {
-                //nop
-            } else if (!(this.idma & 1)) {
-                this.bDma = this.memory.getByte(this.addrDma ++);
-                this.addrDma &= 0xffff;
-            } else {
-                this.memory.setByte(0x2004, this.bDma);
-            }
-            this.idma--;
-            return;
-        }
-
+      
         if (this.t === 0) {
 
             if (this.nmiRequested || this.irqRequested) {
@@ -2191,7 +2164,7 @@ class Most6502Base {
         }
 
         res +=`
-    public opcodeToMnemonic(opcode:number){
+    opcodeToMnemonic(opcode:number){
         ${(() => {
                 let res = ``;
                 for (let i = 0; i < statements.length; i++) {
@@ -2202,7 +2175,7 @@ class Most6502Base {
             })()}
     }
 
-    public sizeFromOpcode(opcode:number){
+    sizeFromOpcode(opcode:number){
         ${(() => {
                 let res = ``;
                 for (let i = 0; i < statements.length; i++) {

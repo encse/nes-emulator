@@ -1,3 +1,4 @@
+
 class Most6502Base {
 
     addrReset = 0xfffc;
@@ -43,7 +44,6 @@ class Most6502Base {
     private enableInterruptPoll = true;
     private canSetFlgBreak = true;
     private addrBrk : number;
-
 
     icycle = 0;
 
@@ -356,7 +356,7 @@ this.opcodes[187] = this.op0xbb;
    
     clk() {
         this.icycle++;
-
+      
         if (this.t === 0) {
 
             if (this.nmiRequested || this.irqRequested) {
@@ -374,6 +374,7 @@ this.opcodes[187] = this.op0xbb;
         }
 
         this.opcodes[this.opcode].call(this);
+
 
         if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll)
