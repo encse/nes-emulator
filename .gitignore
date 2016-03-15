@@ -7,3 +7,4 @@ codegen/obj/
 codegen/mos6502gen.js
 codegen/mos6502gen.js.map
 Nes/wwwroot/roms/
+codegen/.ntvs_analysis.dat
