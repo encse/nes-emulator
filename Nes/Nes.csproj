@@ -25,6 +25,7 @@
     <Content Include="web.config">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="wwwroot\index2.html" />
     <Content Include="wwwroot\test\ppu\color_test\color_test.s" />
     <Content Include="wwwroot\test\ppu\color_test\color_test.txt" />
     <Content Include="wwwroot\test\cpu\cpu_interrupts\readme.txt" />
@@ -407,10 +408,9 @@
     <TypeScriptCompile Include="app\NesImage.ts" />
     <TypeScriptCompile Include="app\StepTestRunner.ts" />
     <TypeScriptCompile Include="Scripts\typings\jquery\jquery.d.ts" />
+    <Content Include="wwwroot\js\webgl-utils.js" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="wwwroot\js\" />
-  </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

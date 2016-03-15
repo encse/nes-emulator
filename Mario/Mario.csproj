@@ -26,7 +26,6 @@
     <Content Include="wwwroot\index.html" />
     <Content Include="web.config" />
     <Content Include="wwwroot\app.js" />
-    <Content Include="wwwroot\bg.jpg" />
   </ItemGroup>
   <ItemGroup>
     <None Include="web.Debug.config">
