@@ -89,10 +89,7 @@ class PPU {
     sy = PPU.syFirstVisible;
     sx = PPU.sxMin;
 
-    private ctx:CanvasRenderingContext2D;
-    private imageData: ImageData;
-    private buf: ArrayBuffer;
-    private buf8: Uint8ClampedArray;
+    private renderer:IRenderer;
     private data: Uint32Array;
     private dataAddr = 0;
 
@@ -161,16 +158,9 @@ class PPU {
        
     }
 
-    setCtx(ctx: CanvasRenderingContext2D) {
-        this.ctx = ctx;
-        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
-        //this.imageData = this.ctx.getImageData(0, 0, 300, 300);
-
-        //var dummy =  this.imageData.data;
-    
-        this.buf = new ArrayBuffer(this.imageData.data.length);
-        this.buf8 = new Uint8ClampedArray(this.buf);
-        this.data = new Uint32Array(this.buf);
+    setRenderer(renderer: IRenderer) {
+        this.renderer = renderer;
+        this.data = this.renderer.getBuffer();
     }
 
     private nameTableSetter(addr: number, value: number)
@@ -822,8 +812,7 @@ class PPU {
             }
         } else if (this.sy === 240) {
             if (this.sx === 0) {
-                (<any>this.imageData.data).set(this.buf8);
-                this.ctx.putImageData(this.imageData, 0, 0);
+                this.renderer.render();
                 this.iFrame++;
                 this.dataAddr = 0;
             }

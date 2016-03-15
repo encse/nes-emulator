@@ -65,7 +65,7 @@ class NesEmulator {
         this.apu = new APU(this.memory, this.cpu);
        // this.ppu = <any> new PPUOld(this.memory, this.vmemory, this.cpu);
         this.ppu = new PPU(this.memory, this.vmemory, this.cpu);
-        this.ppu.setCtx(canvas.getContext('2d'));
+        this.ppu.setRenderer(new CanvasRenderer(canvas));
         this.cpu.reset();
         this.controller = new Controller(canvas);
 
