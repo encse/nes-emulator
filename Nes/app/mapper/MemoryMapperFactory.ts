@@ -1,0 +1,13 @@
+﻿class MemoryMapperFactory {
+
+    create(nesImage: NesImage):IMemoryMapper {
+        switch (nesImage.mapperType) {
+            case 0:
+                return new Mmc0(nesImage);
+            case 1:
+                return new Mmc1(nesImage);
+            default:
+                throw 'unkown mapper ' + nesImage.mapperType;
+        }
+    }
+}

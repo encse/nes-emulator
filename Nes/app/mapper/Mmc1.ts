@@ -1,7 +1,5 @@
-///<reference path="memory/Memory.ts"/>
-///<reference path="memory/RAM.ts"/>
-///<reference path="memory/CompoundMemory.ts"/>
-class MMC1 {
+///<reference path="IMemoryMapper.ts"/>
+class Mmc1 implements IMemoryMapper {
 
     iWrite: number = 0;
     rTemp: number = 0;
@@ -62,20 +60,25 @@ class MMC1 {
     private nametable:CompoundMemory;
     private nametableA:RAM;
     private nametableB:RAM;
+    private PRGBanks: Memory[];
+    private VROMBanks: Memory[];
 
-    constructor(private PRGBanks: Memory[], private VROMBanks: Memory[]) {
-        while (PRGBanks.length < 2)
-            PRGBanks.push(new RAM(0x4000));
+    constructor(nesImage: NesImage) {
+        this.PRGBanks = nesImage.ROMBanks;
+        this.VROMBanks = nesImage.VRAMBanks;
 
-        while (VROMBanks.length < 2)
-            VROMBanks.push(new RAM(0x1000));
+        while (this.PRGBanks.length < 2)
+            this.PRGBanks.push(new RAM(0x4000));
+
+        while (this.VROMBanks.length < 2)
+            this.VROMBanks.push(new RAM(0x1000));
 
         this.memory = new CompoundMemory(
             new RepeatedMemory(4, new RAM(0x800)),
             new RAM(0x2000),
             new RAM(0x8000),
-            PRGBanks[0],
-            PRGBanks[1]
+            this.PRGBanks[0],
+            this.PRGBanks[1]
         );
 
         this.nametableA = new RAM(0x400);
@@ -83,8 +86,8 @@ class MMC1 {
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
         
         this.vmemory = new CompoundMemory(
-            VROMBanks[0],
-            VROMBanks[1],
+            this.VROMBanks[0],
+            this.VROMBanks[1],
             this.nametable,
             new RAM(0x1000)
         );
