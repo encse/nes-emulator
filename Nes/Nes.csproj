@@ -487,6 +487,8 @@
     <TypeScriptCompile Include="app\mapper\IMemoryMapper.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc0.ts" />
     <TypeScriptCompile Include="app\mapper\MemoryMapperFactory.ts" />
+    <TypeScriptCompile Include="app\mapper\Mmc3.ts" />
+    <TypeScriptCompile Include="app\memory\MaskableRam.ts" />
     <TypeScriptCompile Include="app\runner\CpuTestRunner.ts" />
     <TypeScriptCompile Include="app\driver\CanvasDriver.ts" />
     <TypeScriptCompile Include="app\driver\DriverFactory.ts" />
@@ -501,8 +503,8 @@
     <TypeScriptCompile Include="app\memory\RepeatedMemory.ts" />
     <TypeScriptCompile Include="app\memory\CompoundMemory.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc1.ts" />
-    <TypeScriptCompile Include="app\memory\ROM.ts" />
-    <TypeScriptCompile Include="app\memory\RAM.ts" />
+    <TypeScriptCompile Include="app\memory\Rom.ts" />
+    <TypeScriptCompile Include="app\memory\Ram.ts" />
     <TypeScriptCompile Include="app\memory\Memory.ts" />
     <TypeScriptCompile Include="app\NesEmulator.ts" />
     <TypeScriptCompile Include="app\NesImage.ts" />

@@ -21,4 +21,8 @@ class ROM implements Memory {
 
     setByte(addr: number, value: number): void {
     }
+
+    subArray(addr: number, size: number) {
+        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
+    }
 }

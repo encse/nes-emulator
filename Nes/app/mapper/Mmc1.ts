@@ -58,38 +58,38 @@ class Mmc1 implements IMemoryMapper {
     memory: CompoundMemory;
     vmemory: CompoundMemory;
     private nametable:CompoundMemory;
-    private nametableA:RAM;
-    private nametableB:RAM;
+    private nametableA:Ram;
+    private nametableB:Ram;
     private PRGBanks: Memory[];
-    private VROMBanks: Memory[];
+    private CHRBanks: Memory[];
 
     constructor(nesImage: NesImage) {
         this.PRGBanks = nesImage.ROMBanks;
-        this.VROMBanks = nesImage.VRAMBanks;
+        this.CHRBanks = nesImage.VRAMBanks;
 
         while (this.PRGBanks.length < 2)
-            this.PRGBanks.push(new RAM(0x4000));
+            this.PRGBanks.push(new Ram(0x4000));
 
-        while (this.VROMBanks.length < 2)
-            this.VROMBanks.push(new RAM(0x1000));
+        while (this.CHRBanks.length < 2)
+            this.CHRBanks.push(new Ram(0x1000));
 
         this.memory = new CompoundMemory(
-            new RepeatedMemory(4, new RAM(0x800)),
-            new RAM(0x2000),
-            new RAM(0x8000),
+            new RepeatedMemory(4, new Ram(0x800)),
+            new Ram(0x2000),
+            new Ram(0x8000),
             this.PRGBanks[0],
             this.PRGBanks[1]
         );
 
-        this.nametableA = new RAM(0x400);
-        this.nametableB = new RAM(0x400);
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
         
         this.vmemory = new CompoundMemory(
-            this.VROMBanks[0],
-            this.VROMBanks[1],
+            this.CHRBanks[0],
+            this.CHRBanks[1],
             this.nametable,
-            new RAM(0x1000)
+            new Ram(0x1000)
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
@@ -183,12 +183,12 @@ class Mmc1 implements IMemoryMapper {
         */
         if (this.C === 0) {
             console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0 >> 1];
-            this.vmemory.rgmemory[1] = this.VROMBanks[(this.CHR0 >> 1) + 1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 >> 1];
+            this.vmemory.rgmemory[1] = this.CHRBanks[(this.CHR0 >> 1) + 1];
         } else {
             console.log('chr mode 2:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.VROMBanks[this.CHR0];
-            this.vmemory.rgmemory[1] = this.VROMBanks[this.CHR1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
         }
 
         if (this.M === 0) {

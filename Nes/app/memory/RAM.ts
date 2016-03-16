@@ -1,12 +1,13 @@
 ///<reference path="Memory.ts"/>
-class RAM implements Memory {
+class Ram implements Memory {
     private memory: Uint8Array;
+
     constructor(size: number) {
         this.memory = new Uint8Array(size);
     }
 
     static fromBytes(memory: Uint8Array) {
-        var res = new RAM(0);
+        var res = new Ram(0);
         res.memory = memory;
         return res;
     }

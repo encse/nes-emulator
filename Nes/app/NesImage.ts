@@ -26,7 +26,7 @@
 
     ROMBanks:ROM[];
     VRAMBanks: ROM[];
-    RAMBanks: RAM[];
+    RAMBanks: Ram[];
     fVerticalMirroring:boolean;
     fBatteryPackedRAM:boolean;
     trainer: Uint8Array = null;
@@ -72,7 +72,7 @@
         }
 
         for (let ibank = 0; ibank < this.RAMBanks.length; ibank++) {
-            this.RAMBanks[ibank] = new RAM(0x2000);
+            this.RAMBanks[ibank] = new Ram(0x2000);
         }
 
         for (let ibank = 0; ibank < this.ROMBanks.length; ibank++) {
