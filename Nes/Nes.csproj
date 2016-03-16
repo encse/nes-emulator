@@ -135,6 +135,29 @@
     <Content Include="mapper_docs\246.txt" />
     <Content Include="mapper_docs\changes.txt" />
     <Content Include="mapper_docs\__ READ THIS FIRST __.txt" />
+    <Content Include="wwwroot\test\mmc\mmc3\readme.txt" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\1-clocking.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\2-details.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\3-A12_clocking.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\4-scanline_timing.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\5-MMC3.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\6-MMC3_alt.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\build_rom.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\console.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\crc.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\delay.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\macros.inc" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\neshw.inc" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\ppu.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\print.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\shell.inc" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\shell.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\shell_misc.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\sync_vbl.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\testing.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\test_mmc3.inc" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\text_out.s" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\readme.txt" />
     <Content Include="wwwroot\web.config">
       <SubType>Designer</SubType>
     </Content>
@@ -236,6 +259,15 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\1-clocking.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\2-details.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\3-A12_clocking.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\4-scanline_timing.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\5-MMC3.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\rom_singles\6-MMC3_alt.nes" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\ascii.chr" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\common\devcart.bin" />
+    <Content Include="wwwroot\test\mmc\mmc3\source\nes.cfg" />
     <None Include="wwwroot\web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
       <SubType>Designer</SubType>
