@@ -2,8 +2,8 @@
 class Ram implements Memory {
     private memory: Uint8Array;
 
-    constructor(size: number) {
-        this.memory = new Uint8Array(size);
+    constructor(private sizeI: number) {
+        this.memory = new Uint8Array(sizeI);
     }
 
     static fromBytes(memory: Uint8Array) {
@@ -13,7 +13,7 @@ class Ram implements Memory {
     }
 
     size() {
-        return this.memory.length;
+        return this.memory.length ;
     }
 
     getByte(addr: number): number {
@@ -21,6 +21,7 @@ class Ram implements Memory {
     }
 
     setByte(addr: number, value: number): void {
-        this.memory[addr] = value & 0xff;
+         this.memory[addr] = value & 0xff;
     }
+
 }

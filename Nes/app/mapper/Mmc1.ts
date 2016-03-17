@@ -74,9 +74,9 @@ class Mmc1 implements IMemoryMapper {
             this.CHRBanks.push(new Ram(0x1000));
 
         this.memory = new CompoundMemory(
-            new RepeatedMemory(4, new Ram(0x800)),
+            new CleverRam(0x800, 4),
             new Ram(0x2000),
-            new Ram(0x8000),
+            new Ram(0x4000),
             this.PRGBanks[0],
             this.PRGBanks[1]
         );

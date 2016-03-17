@@ -10404,6 +10404,8 @@ var Mos6502 = (function (_super) {
     function Mos6502(memory) {
         _super.call(this, memory);
         this.memory = memory;
+        if (memory.size() !== 0x10000)
+            throw 'invalid memory size';
     }
     Mos6502.prototype.trace = function (opcode) {
         //  console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode), 'ra:', this.rA.toString(16));
@@ -10669,7 +10671,7 @@ var Mmc1 = (function () {
             this.PRGBanks.push(new Ram(0x4000));
         while (this.CHRBanks.length < 2)
             this.CHRBanks.push(new Ram(0x1000));
-        this.memory = new CompoundMemory(new RepeatedMemory(4, new Ram(0x800)), new Ram(0x2000), new Ram(0x8000), this.PRGBanks[0], this.PRGBanks[1]);
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[1]);
         this.nametableA = new Ram(0x400);
         this.nametableB = new Ram(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
@@ -10846,7 +10848,30 @@ var Mmc1 = (function () {
     };
     return Mmc1;
 })();
+///<reference path="Memory.ts"/>
+var Ram = (function () {
+    function Ram(sizeI) {
+        this.sizeI = sizeI;
+        this.memory = new Uint8Array(sizeI);
+    }
+    Ram.fromBytes = function (memory) {
+        var res = new Ram(0);
+        res.memory = memory;
+        return res;
+    };
+    Ram.prototype.size = function () {
+        return this.memory.length;
+    };
+    Ram.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    Ram.prototype.setByte = function (addr, value) {
+        this.memory[addr] = value & 0xff;
+    };
+    return Ram;
+})();
 ///<reference path="IMemoryMapper.ts"/>
+///<reference path="../memory/Ram.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
         this.horizontalMirroring = 0;
@@ -10854,9 +10879,10 @@ var Mmc3 = (function () {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.prgRam = new MaskableRam(0x2000);
-        this.memory = new CompoundMemory(new RepeatedMemory(4, new Ram(0x800)), //0x2000
-        new Ram(0x4000), this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.prgRam = new CleverRam(0x2000);
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), //0x2000
+        new Ram(0x4000), //0x2000
+        this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
         this.nametableA = new Ram(0x400);
         this.nametableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
         this.nametableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
@@ -10900,16 +10926,16 @@ var Mmc3 = (function () {
                          +-------+-------+-------+-------+
         */
         if (!this.prgMode) {
-            this.memory.rgmemory[2] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[3] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
         }
         else {
-            this.memory.rgmemory[2] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[3] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[4] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
         }
         /*
                            $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
@@ -10920,10 +10946,10 @@ var Mmc3 = (function () {
                          +-------+-------+-------+-------+---------------+---------------+
        */
         if (!this.chrMode) {
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] >> 1];
-            this.vmemory.rgmemory[1] = this.CHRBanks[(this.r[0] >> 1) + 1];
-            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] >> 1];
-            this.vmemory.rgmemory[3] = this.CHRBanks[(this.r[1] >> 1) + 1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[1] | 1];
             this.vmemory.rgmemory[4] = this.CHRBanks[this.r[2]];
             this.vmemory.rgmemory[5] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[6] = this.CHRBanks[this.r[4]];
@@ -10934,25 +10960,24 @@ var Mmc3 = (function () {
             this.vmemory.rgmemory[1] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[2] = this.CHRBanks[this.r[4]];
             this.vmemory.rgmemory[3] = this.CHRBanks[this.r[5]];
-            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] >> 1];
-            this.vmemory.rgmemory[5] = this.CHRBanks[(this.r[0] >> 1) + 1];
-            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] >> 1];
-            this.vmemory.rgmemory[7] = this.CHRBanks[(this.r[1] >> 1) + 1];
+            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
         }
-        if (!this.fourScreenVram) {
-            if (this.horizontalMirroring) {
-                this.nametable[0] = this.nametableA;
-                this.nametable[1] = this.nametableA;
-                this.nametable[2] = this.nametableB;
-                this.nametable[3] = this.nametableB;
-            }
-            else {
-                this.nametable[0] = this.nametableA;
-                this.nametable[1] = this.nametableB;
-                this.nametable[2] = this.nametableA;
-                this.nametable[3] = this.nametableB;
-            }
-        }
+        //if (!this.fourScreenVram) {
+        //    if (this.horizontalMirroring) {
+        //        this.nametable.rgmemory[0] = this.nametableB;
+        //        this.nametable.rgmemory[1] = this.nametableA;
+        //        this.nametable.rgmemory[2] = this.nametableB;
+        //        this.nametable.rgmemory[3] = this.nametableA;
+        //    } else {
+        //        this.nametable.rgmemory[0] = this.nametableA;
+        //        this.nametable.rgmemory[1] = this.nametableB;
+        //        this.nametable.rgmemory[2] = this.nametableA;
+        //        this.nametable.rgmemory[3] = this.nametableB;
+        //    }
+        //}
     };
     Mmc3.prototype.splitMemory = function (romBanks, size) {
         var result = [];
@@ -10969,6 +10994,35 @@ var Mmc3 = (function () {
         return result;
     };
     return Mmc3;
+})();
+///<reference path="Memory.ts"/>
+var CleverRam = (function () {
+    function CleverRam(sizeI, repeat) {
+        if (repeat === void 0) { repeat = 1; }
+        this.sizeI = sizeI;
+        this.writeEnable = true;
+        this.readEnable = true;
+        this.memory = new Uint8Array(sizeI);
+        this.sizeI *= repeat;
+    }
+    CleverRam.fromBytes = function (memory) {
+        var res = new CleverRam(0);
+        res.memory = memory;
+        return res;
+    };
+    CleverRam.prototype.size = function () {
+        return this.sizeI;
+    };
+    CleverRam.prototype.getByte = function (addr) {
+        if (!this.readEnable)
+            return 0;
+        return this.memory[addr > this.sizeI ? addr % this.sizeI : addr];
+    };
+    CleverRam.prototype.setByte = function (addr, value) {
+        if (this.writeEnable)
+            this.memory[addr > this.sizeI ? addr % this.sizeI : addr] = value & 0xff;
+    };
+    return CleverRam;
 })();
 ///<reference path="Memory.ts"/>
 var CompoundMemory = (function () {
@@ -11032,68 +11086,6 @@ var CompoundMemory = (function () {
         }
     };
     return CompoundMemory;
-})();
-///<reference path="Memory.ts"/>
-var Ram = (function () {
-    function Ram(size) {
-        this.memory = new Uint8Array(size);
-    }
-    Ram.fromBytes = function (memory) {
-        var res = new Ram(0);
-        res.memory = memory;
-        return res;
-    };
-    Ram.prototype.size = function () {
-        return this.memory.length;
-    };
-    Ram.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    Ram.prototype.setByte = function (addr, value) {
-        this.memory[addr] = value & 0xff;
-    };
-    return Ram;
-})();
-///<reference path="Ram.ts"/>
-var MaskableRam = (function (_super) {
-    __extends(MaskableRam, _super);
-    function MaskableRam(size) {
-        _super.call(this, size);
-        this.writeEnable = true;
-        this.readEnable = true;
-    }
-    MaskableRam.prototype.getByte = function (addr) {
-        if (!this.readEnable)
-            return 0;
-        return _super.prototype.getByte.call(this, addr);
-    };
-    MaskableRam.prototype.setByte = function (addr, value) {
-        if (this.writeEnable)
-            _super.prototype.setByte.call(this, addr, value);
-    };
-    return MaskableRam;
-})(Ram);
-///<reference path="Memory.ts"/>
-var RepeatedMemory = (function () {
-    function RepeatedMemory(count, memory) {
-        this.count = count;
-        this.memory = memory;
-        this.sizeI = this.memory.size() * this.count;
-    }
-    RepeatedMemory.prototype.size = function () {
-        return this.sizeI;
-    };
-    RepeatedMemory.prototype.getByte = function (addr) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.getByte(addr % this.sizeI);
-    };
-    RepeatedMemory.prototype.setByte = function (addr, value) {
-        if (addr > this.size())
-            throw 'address out of bounds';
-        return this.memory.setByte(addr % this.sizeI, value);
-    };
-    return RepeatedMemory;
 })();
 ///<reference path="Memory.ts"/>
 var ROM = (function () {

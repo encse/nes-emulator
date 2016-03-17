@@ -5,6 +5,8 @@ class Mos6502 extends Most6502Base {
 
     public constructor(public memory: Memory) {
         super(memory);
+        if (memory.size() !== 0x10000)
+            throw 'invalid memory size';
     }
     public trace(opcode: number) {
       //  console.log(this.ip.toString(16), this.opcodeToMnemonic(opcode), 'ra:', this.rA.toString(16));

@@ -1,4 +1,5 @@
 ///<reference path="IMemoryMapper.ts"/>
+///<reference path="../memory/Ram.ts"/>
 class Mmc3 implements IMemoryMapper {
 
 
@@ -21,25 +22,24 @@ class Mmc3 implements IMemoryMapper {
     private nametableC: Ram;
     private nametableD: Ram;
 
-    private prgRam: MaskableRam;
-
+    private prgRam: CleverRam;
     constructor(nesImage: NesImage) {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
 
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
 
-        this.prgRam = new MaskableRam(0x2000);
+        this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(
-            new RepeatedMemory(4, new Ram(0x800)), //0x2000
-            new Ram(0x4000),
+            new CleverRam(0x800, 4), //0x2000
+            new Ram(0x4000), //0x2000
             this.prgRam,
             this.PRGBanks[0],
             this.PRGBanks[1],
             this.PRGBanks[this.PRGBanks.length - 2],
             this.PRGBanks[this.PRGBanks.length - 1]
         );
-        
+
         this.nametableA = new Ram(0x400);
         this.nametableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
         this.nametableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
@@ -99,16 +99,16 @@ class Mmc3 implements IMemoryMapper {
                          +-------+-------+-------+-------+
         */
         if (!this.prgMode) {
-            this.memory.rgmemory[2] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[3] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
         }
         else {
-            this.memory.rgmemory[2] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[3] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[4] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 1];
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
         }
 
         /*
@@ -120,10 +120,10 @@ class Mmc3 implements IMemoryMapper {
                          +-------+-------+-------+-------+---------------+---------------+
        */
         if (!this.chrMode) {
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] >> 1];
-            this.vmemory.rgmemory[1] = this.CHRBanks[(this.r[0] >> 1) + 1];
-            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] >> 1];
-            this.vmemory.rgmemory[3] = this.CHRBanks[(this.r[1] >> 1) + 1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[1] | 1];
             this.vmemory.rgmemory[4] = this.CHRBanks[this.r[2]];
             this.vmemory.rgmemory[5] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[6] = this.CHRBanks[this.r[4]];
@@ -134,25 +134,25 @@ class Mmc3 implements IMemoryMapper {
             this.vmemory.rgmemory[1] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[2] = this.CHRBanks[this.r[4]];
             this.vmemory.rgmemory[3] = this.CHRBanks[this.r[5]];
-            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] >> 1];
-            this.vmemory.rgmemory[5] = this.CHRBanks[(this.r[0] >> 1) + 1];
-            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] >> 1];
-            this.vmemory.rgmemory[7] = this.CHRBanks[(this.r[1] >> 1) + 1];
+            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
         }
 
-        if (!this.fourScreenVram) {
-            if (this.horizontalMirroring) {
-                this.nametable[0] = this.nametableA;
-                this.nametable[1] = this.nametableA;
-                this.nametable[2] = this.nametableB;
-                this.nametable[3] = this.nametableB;
-            } else {
-                this.nametable[0] = this.nametableA;
-                this.nametable[1] = this.nametableB;
-                this.nametable[2] = this.nametableA;
-                this.nametable[3] = this.nametableB;
-            }
-        }
+        //if (!this.fourScreenVram) {
+        //    if (this.horizontalMirroring) {
+        //        this.nametable.rgmemory[0] = this.nametableB;
+        //        this.nametable.rgmemory[1] = this.nametableA;
+        //        this.nametable.rgmemory[2] = this.nametableB;
+        //        this.nametable.rgmemory[3] = this.nametableA;
+        //    } else {
+        //        this.nametable.rgmemory[0] = this.nametableA;
+        //        this.nametable.rgmemory[1] = this.nametableB;
+        //        this.nametable.rgmemory[2] = this.nametableA;
+        //        this.nametable.rgmemory[3] = this.nametableB;
+        //    }
+        //}
     }
 
     splitMemory(romBanks: ROM[], size: number): Memory[] {
