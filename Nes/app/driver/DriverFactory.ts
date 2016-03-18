@@ -1,6 +1,7 @@
 class DriverFactory {
 
     createRenderer(canvas:HTMLCanvasElement): IDriver {
+        //return new CanvasDriver(canvas);
         try {
             return new WebGlDriver(canvas);
         }

@@ -460,13 +460,33 @@ class PPU {
     }
 
     private fetchSpriteTileLo(yTop, nt, flipVert) {
-        const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop ;
-        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + y);
+
+        if (this.spriteHeight === 8) {
+            const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
+            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + y);
+        } else {
+            let y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
+            let addrBase = nt & 1 ? 0x1000 : 0;
+            if (y > 7)
+                addrBase += 8;
+            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 0 + y);
+        }
+
     }
 
     private fetchSpriteTileHi(yTop, nt, flipVert) {
-        const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
-        return this.vmemory.getByte(this.addrSpriteBase + nt * 16 + 8 + y);
+
+        if (this.spriteHeight === 8) {
+            const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
+            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + 8 + y);
+        } else {
+            
+            let y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
+            let addrBase = nt & 1 ? 0x1000 : 0;
+            if (y > 7)
+                addrBase += 8;
+            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 8 + y);
+        }
     }
 
     private fetchBgTileLo() {
