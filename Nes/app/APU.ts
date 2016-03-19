@@ -67,7 +67,7 @@
     * is non-zero, it is decremented.
     * 
     */
-    constructor(memory: CompoundMemory, private irqManager:IrqManager) {
+    constructor(memory: CompoundMemory, private irqManager:IrqLine) {
 
         memory.shadowSetter(0x4000, 0x4017, this.setter.bind(this));
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));

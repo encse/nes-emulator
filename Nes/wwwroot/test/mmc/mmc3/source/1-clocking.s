@@ -11,11 +11,11 @@ main:
 	jsr should_be_clear     ; counter shouldn't be zero yet
 	
 	set_test 3,"Should decrement when A12 is toggled via PPUADDR"
-	ldx #2
-	jsr begin_counter_test
-	ldx #9                  ; counter = 2
-	jsr clock_counter_x     ; clock 9 times
-	jsr should_be_set       ; should have hit zero at least once by now
+	ldx #2					; $e2f5
+	jsr begin_counter_test	; $e2f7
+	ldx #9                  ; $e2fa counter = 2
+	jsr clock_counter_x     ; $e2fc clock 9 times 
+	jsr should_be_set       ; $e2ff should have hit zero at least once by now 
 	
 	set_test 4,"Writing to $C000 shouldn't cause reload"
 	ldx #2
@@ -71,18 +71,18 @@ main:
 	jsr should_be_clear
 	
 	set_test 10,"Should reload when clocked when counter is 0"
-	ldx #1
-	jsr begin_counter_test
-	jsr clock_counter       ; 1
+	ldx #1					;$e3e9
+	jsr begin_counter_test	;$e3eb
+	jsr clock_counter       ;$e3ee 1
 	lda #10
-	jsr set_reload
-	jsr clock_counter       ; 0
-	lda #2
+	jsr set_reload			; $e3f3
+	jsr clock_counter       ; $e3f6 0
+	lda #2					; $e3f9
 	jsr set_reload
 	jsr clock_counter       ; 2
 	jsr clock_counter       ; 1
-	jsr clear_irq
-	jsr clock_counter       ; 0
-	jsr should_be_set
+	jsr clear_irq			; 
+	jsr clock_counter       ; $e407 0
+	jsr should_be_set		; $e40a
 
 	jmp tests_passed

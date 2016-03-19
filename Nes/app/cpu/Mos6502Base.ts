@@ -369,7 +369,8 @@ this.opcodes[187] = this.op0xbb;
             }
             this.ipCur = this.ip;
             this.trace(this.opcode);
-    
+            if (this.ipCur >= 0xe3e9 && this.ipCur <= 0xe40a)
+                console.log(this.ipCur.toString(16));
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 

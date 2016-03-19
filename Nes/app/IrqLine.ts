@@ -1,4 +1,4 @@
-﻿class IrqManager {
+﻿class IrqLine {
     private _isRequested = false;
 
     public constructor(private cpu: Mos6502) {

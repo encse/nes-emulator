@@ -50,12 +50,12 @@ class PPU {
     t: number = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
     x: number = 0; // Fine X scroll (3 bits)
     w: number = 0; // First or second write toggle (1 bit)
-    nt:number; // current nametable byte;
-    at:number; // current attribute table byte;
-    p2:number; // current palette table byte;
-    p3: number; // current palette table byte;
-    bgTileLo:number; //low background tile byte
-    bgTileHi:number; //high background tile byte;
+    nt:number = 0; // current nametable byte;
+    at:number  = 0; // current attribute table byte;
+    p2:number = 0; // current palette table byte;
+    p3: number = 0; // current palette table byte;
+    bgTileLo:number = 0; //low background tile byte
+    bgTileHi:number = 0; //high background tile byte;
 
     daddrWrite: number = 0;
     addrSpriteBase: number = 0;
@@ -341,6 +341,10 @@ class PPU {
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
+                //http://wiki.nesdev.com/w/index.php/MMC3
+                //The counter is clocked on each rising edge of PPU A12, no matter what caused it, 
+                //so it is possible to (intentionally or not) clock the counter by writing to $2006.
+                this.vmemory.getByte(this.v);
             }
             this.w = 1 - this.w;
             break;
@@ -725,6 +729,7 @@ class PPU {
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
             var icolorBg: number;
             var bgTransparent = true;
+
             if (this.showBg) {
                 let tileCol = 17 - this.x;
 
@@ -747,8 +752,7 @@ class PPU {
                 icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
 
             } else {
-
-                if (this.v >= 0x3f00 && this.v <= 0x3fff)
+                if ((this.v & 0x3f00) === 0x3f00)
                     icolorBg = this.vmemory.getByte(this.v);
                 else
                     icolorBg = this.vmemory.getByte(0x3f00);

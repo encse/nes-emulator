@@ -1,8 +1,9 @@
 ///<reference path="IMemoryMapper.ts"/>
 ///<reference path="../memory/Ram.ts"/>
+///<reference path="../memory/Rom.ts"/>
 class Mmc3 implements IMemoryMapper {
 
-    lastA12 = 0;
+    lastA12 = false;
 
     memory: CompoundMemory;
     vmemory: CompoundMemory;
@@ -27,7 +28,7 @@ class Mmc3 implements IMemoryMapper {
     private scanLineCounterRestartRequested = false;
     private scanLineCounter = 0;
     private irqEnabled = true;
-    private irqManager: IrqManager;
+    private irqLine: IrqLine;
 
     private prgRam: CleverRam;
 
@@ -74,6 +75,10 @@ class Mmc3 implements IMemoryMapper {
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
     }
 
+    setCpu(cpu: Mos6502) {
+        this.irqLine = new IrqLine(cpu);
+    }
+
     private setByte(addr: number, value: number): void {
         if (addr <= 0x9ffe) {
             if (addr & 1) { //bank data
@@ -98,21 +103,19 @@ class Mmc3 implements IMemoryMapper {
 
             if (addr & 1) { //IRQ reload 
                 this.scanLineCounterRestartRequested = true;
-                this.scanLineCounter = 0;
-                //if(this.irqEnabled)
-                //    this.irqManager.request();
+               
                 console.log('irqCounterRestartRequested');
             } else { //IRQ latch
                 this.scanLineCounterStartValue = value & 0xff;
                 console.log('irqCounterStartValue', value);
             }
         }
-        else if (addr <= 0xdffe) {
+        else if (addr <= 0xffff) {
             if (addr & 1) { //irq enable
                 this.irqEnabled = true;
                 console.log('irqEnabled', true);
             } else { //irq disable
-                this.irqManager.ack();
+                this.irqLine.ack();
                 this.irqEnabled = false;
                 console.log('irqEnabled', false);
             }
@@ -201,24 +204,24 @@ class Mmc3 implements IMemoryMapper {
     }
 
     onVMemoryAccess(addr: number) {
-        const a12 = addr & (1 << 12);
+        const a12 = (addr & 0x3000) === 0x1000; //don't count the memory access above $2000
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
+                if (this.scanLineCounter && !this.scanLineCounterStartValue && this.irqEnabled)
+                    this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled) {
-                    this.irqManager.request();
-                }
+                if (!this.scanLineCounter && this.irqEnabled) 
+                    this.irqLine.request();
+                
             } 
         }
         this.lastA12 = a12;
     }
 
-    setCpu(cpu: Mos6502) {
-        this.irqManager = new IrqManager(cpu);
-    }
+  
 
 }

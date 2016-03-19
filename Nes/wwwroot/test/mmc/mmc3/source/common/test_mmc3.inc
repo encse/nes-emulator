@@ -96,11 +96,11 @@ clock_counter:
 	sta PPUADDR
 	sta PPUADDR
 	lda #$10
-	sta PPUADDR
-	sta PPUADDR
+	sta PPUADDR 	
+	sta PPUADDR 	;$e2a1
 	lda #0
 	sta PPUADDR
-	sta PPUADDR
+	sta PPUADDR 	;$e2a9
 	pla
 	rts
 
@@ -111,12 +111,12 @@ clock_counter:
 ; Preserved: X, Y
 get_pending:
 	setb irq_flag,1
-	cli
+	cli 	;e2b3
 	nop
 	; If IRQ was pending, it will occur here
 	; and shift irq_flag left
 	sei
-	nop
+	nop 	;$e2b5
 	lda irq_flag
 	lsr a
 	rts

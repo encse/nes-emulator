@@ -652,6 +652,8 @@ var Most6502Base = (function () {
             }
             this.ipCur = this.ip;
             this.trace(this.opcode);
+            if (this.ipCur >= 0xe3e9 && this.ipCur <= 0xe40a)
+                console.log(this.ipCur.toString(16));
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
         this.opcodes[this.opcode].call(this);
@@ -10600,27 +10602,27 @@ var WebGlDriver = (function () {
         1.0, 0.0]);
     return WebGlDriver;
 })();
-var IrqManager = (function () {
-    function IrqManager(cpu) {
+var IrqLine = (function () {
+    function IrqLine(cpu) {
         this.cpu = cpu;
         this._isRequested = false;
     }
-    IrqManager.prototype.request = function () {
+    IrqLine.prototype.request = function () {
         if (!this._isRequested) {
             this.cpu.irqLine--;
             this._isRequested = true;
         }
     };
-    IrqManager.prototype.ack = function () {
+    IrqLine.prototype.ack = function () {
         if (this._isRequested) {
             this.cpu.irqLine++;
             this._isRequested = false;
         }
     };
-    IrqManager.prototype.isRequested = function () {
+    IrqLine.prototype.isRequested = function () {
         return this._isRequested;
     };
-    return IrqManager;
+    return IrqLine;
 })();
 var MemoryMapperFactory = (function () {
     function MemoryMapperFactory() {
@@ -10894,11 +10896,35 @@ var Ram = (function () {
     };
     return Ram;
 })();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    ROM.fromBytes = function (memory) {
+        var res = new ROM(0);
+        res.memory = memory;
+        return res;
+    };
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    ROM.prototype.subArray = function (addr, size) {
+        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
+    };
+    return ROM;
+})();
 ///<reference path="IMemoryMapper.ts"/>
 ///<reference path="../memory/Ram.ts"/>
+///<reference path="../memory/Rom.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
-        this.lastA12 = 0;
+        this.lastA12 = false;
         this.horizontalMirroring = 0;
         this.fourScreenVram = 0;
         this.scanLineCounterStartValue = 0;
@@ -10922,6 +10948,9 @@ var Mmc3 = (function () {
         this.vmemory = new CompoundMemoryWithAccessCheck(this.onVMemoryAccess.bind(this), this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
     }
+    Mmc3.prototype.setCpu = function (cpu) {
+        this.irqLine = new IrqLine(cpu);
+    };
     Mmc3.prototype.setByte = function (addr, value) {
         if (addr <= 0x9ffe) {
             if (addr & 1) {
@@ -10947,9 +10976,6 @@ var Mmc3 = (function () {
         else if (addr <= 0xdffe) {
             if (addr & 1) {
                 this.scanLineCounterRestartRequested = true;
-                this.scanLineCounter = 0;
-                //if(this.irqEnabled)
-                //    this.irqManager.request();
                 console.log('irqCounterRestartRequested');
             }
             else {
@@ -10957,13 +10983,13 @@ var Mmc3 = (function () {
                 console.log('irqCounterStartValue', value);
             }
         }
-        else if (addr <= 0xdffe) {
+        else if (addr <= 0xffff) {
             if (addr & 1) {
                 this.irqEnabled = true;
                 console.log('irqEnabled', true);
             }
             else {
-                this.irqManager.ack();
+                this.irqLine.ack();
                 this.irqEnabled = false;
                 console.log('irqEnabled', false);
             }
@@ -11048,23 +11074,21 @@ var Mmc3 = (function () {
         return result;
     };
     Mmc3.prototype.onVMemoryAccess = function (addr) {
-        var a12 = addr & (1 << 12);
+        var a12 = (addr & 0x3000) === 0x1000; //don't count the memory access above $2000
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
+                if (this.scanLineCounter && !this.scanLineCounterStartValue && this.irqEnabled)
+                    this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled) {
-                    this.irqManager.request();
-                }
+                if (!this.scanLineCounter && this.irqEnabled)
+                    this.irqLine.request();
             }
         }
         this.lastA12 = a12;
-    };
-    Mmc3.prototype.setCpu = function (cpu) {
-        this.irqManager = new IrqManager(cpu);
     };
     return Mmc3;
 })();
@@ -11181,29 +11205,6 @@ var CompoundMemoryWithAccessCheck = (function (_super) {
     };
     return CompoundMemoryWithAccessCheck;
 })(CompoundMemory);
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(size) {
-        this.memory = new Uint8Array(size);
-    }
-    ROM.fromBytes = function (memory) {
-        var res = new ROM(0);
-        res.memory = memory;
-        return res;
-    };
-    ROM.prototype.size = function () {
-        return this.memory.length;
-    };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    ROM.prototype.setByte = function (addr, value) {
-    };
-    ROM.prototype.subArray = function (addr, size) {
-        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
-    };
-    return ROM;
-})();
 var NesEmulator = (function () {
     function NesEmulator(nesImage, canvas, driver) {
         var _this = this;
@@ -11222,7 +11223,7 @@ var NesEmulator = (function () {
         this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
         this.cpu = new Mos6502(this.memoryMapper.memory);
         this.memoryMapper.setCpu(this.cpu);
-        this.apu = new APU(this.memoryMapper.memory, new IrqManager(this.cpu));
+        this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
         this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
         this.ppu.setDriver(driver);
         this.cpu.reset();
@@ -11391,6 +11392,12 @@ var PPU = (function () {
         this.t = 0; // Temporary VRAM address (15 bits); can also be thought of as the address of the top left onscreen tile.
         this.x = 0; // Fine X scroll (3 bits)
         this.w = 0; // First or second write toggle (1 bit)
+        this.nt = 0; // current nametable byte;
+        this.at = 0; // current attribute table byte;
+        this.p2 = 0; // current palette table byte;
+        this.p3 = 0; // current palette table byte;
+        this.bgTileLo = 0; //low background tile byte
+        this.bgTileHi = 0; //high background tile byte;
         this.daddrWrite = 0;
         this.addrSpriteBase = 0;
         this.addrTileBase = 0;
@@ -11659,6 +11666,10 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
+                    //http://wiki.nesdev.com/w/index.php/MMC3
+                    //The counter is clocked on each rising edge of PPU A12, no matter what caused it, 
+                    //so it is possible to (intentionally or not) clock the counter by writing to $2006.
+                    this.vmemory.getByte(this.v);
                 }
                 this.w = 1 - this.w;
                 break;
@@ -11996,7 +12007,7 @@ var PPU = (function () {
                 icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
             }
             else {
-                if (this.v >= 0x3f00 && this.v <= 0x3fff)
+                if ((this.v & 0x3f00) === 0x3f00)
                     icolorBg = this.vmemory.getByte(this.v);
                 else
                     icolorBg = this.vmemory.getByte(0x3f00);

@@ -515,7 +515,7 @@
     <Content Include="wwwroot\test\ppu\sprite_overflow_tests\source\validation.a" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="app\Irq.ts" />
+    <TypeScriptCompile Include="app\IrqLine.ts" />
     <TypeScriptCompile Include="app\APU.ts" />
     <TypeScriptCompile Include="app\mapper\IMemoryMapper.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc0.ts" />
