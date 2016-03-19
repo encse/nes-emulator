@@ -460,6 +460,8 @@ class PPU {
     }
 
     private fetchSpriteTileLo(yTop, nt, flipVert) {
+        if (!this.showSprites)
+            return 0;
 
         if (this.spriteHeight === 8) {
             const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
@@ -475,6 +477,8 @@ class PPU {
     }
 
     private fetchSpriteTileHi(yTop, nt, flipVert) {
+        if (!this.showSprites)
+            return 0;
 
         if (this.spriteHeight === 8) {
             const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
