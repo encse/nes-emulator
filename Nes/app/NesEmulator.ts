@@ -20,10 +20,12 @@
         this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4016; });
 
         this.cpu = new Mos6502(this.memoryMapper.memory);
-        this.memoryMapper.setCpu(this.cpu);
         this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
         this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
         this.ppu.setDriver(driver);
+
+        this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
+
         this.cpu.reset();
         this.controller = new Controller(canvas);
 

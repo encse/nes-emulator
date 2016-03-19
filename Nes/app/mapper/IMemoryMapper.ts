@@ -2,5 +2,5 @@
     memory: CompoundMemory;
     vmemory: CompoundMemory;
 
-    setCpu(cpu:Mos6502);
+    setCpuAndPpu(cpu:Mos6502, ppu:PPU);
 }

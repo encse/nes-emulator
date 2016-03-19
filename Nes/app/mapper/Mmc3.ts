@@ -41,7 +41,7 @@ class Mmc3 implements IMemoryMapper {
         this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(
             new CleverRam(0x800, 4), //0x2000
-            new Ram(0x4000), //0x2000
+            new Ram(0x4000), 
             this.prgRam,
             this.PRGBanks[0],
             this.PRGBanks[1],
@@ -50,16 +50,15 @@ class Mmc3 implements IMemoryMapper {
         );
 
         this.nametableA = new Ram(0x400);
-        this.nametableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
-        this.nametableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
-        this.nametableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? this.nametableB : this.nametableC;
+        this.nametableB = new Ram(0x400);
+        this.nametableC = new Ram(0x400);
+        this.nametableD = new Ram(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
 
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
 
-        this.vmemory = new CompoundMemoryWithAccessCheck(
-            this.onVMemoryAccess.bind(this),
+        this.vmemory = new CompoundMemory(
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.CHRBanks[2],
@@ -73,10 +72,12 @@ class Mmc3 implements IMemoryMapper {
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.update();
     }
 
-    setCpu(cpu: Mos6502) {
+    setCpuAndPpu(cpu: Mos6502, ppu:PPU) {
         this.irqLine = new IrqLine(cpu);
+        ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     }
 
     private setByte(addr: number, value: number): void {
@@ -175,12 +176,13 @@ class Mmc3 implements IMemoryMapper {
         }
 
         if (!this.fourScreenVram) {
-            if (!this.horizontalMirroring) {
-                this.nametable.rgmemory[0] = this.nametableB;
+            if (this.horizontalMirroring) {
+                this.nametable.rgmemory[0] = this.nametableA;
                 this.nametable.rgmemory[1] = this.nametableA;
                 this.nametable.rgmemory[2] = this.nametableB;
-                this.nametable.rgmemory[3] = this.nametableA;
-            } else {
+                this.nametable.rgmemory[3] = this.nametableB;
+            }
+            else {
                 this.nametable.rgmemory[0] = this.nametableA;
                 this.nametable.rgmemory[1] = this.nametableB;
                 this.nametable.rgmemory[2] = this.nametableA;
@@ -203,12 +205,12 @@ class Mmc3 implements IMemoryMapper {
         return result;
     }
 
-    onVMemoryAccess(addr: number) {
-        const a12 = (addr & 0x3000) === 0x1000; //don't count the memory access above $2000
+    addrBusListener(addr: number) {
+        const a12 = (addr & 0x1000) === 0x1000; 
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
-                if (this.scanLineCounter && !this.scanLineCounterStartValue && this.irqEnabled)
+                if (!this.scanLineCounterStartValue && this.irqEnabled)
                     this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
@@ -217,7 +219,8 @@ class Mmc3 implements IMemoryMapper {
                 if (!this.scanLineCounter && this.irqEnabled) 
                     this.irqLine.request();
                 
-            } 
+            }
+            console.log('xxx scanLineCounter', this.scanLineCounter);
         }
         this.lastA12 = a12;
     }

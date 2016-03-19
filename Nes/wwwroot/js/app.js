@@ -10662,7 +10662,7 @@ var Mmc0 = (function () {
         var rest = new Ram(0x1000);
         this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
     }
-    Mmc0.prototype.setCpu = function (cpu) {
+    Mmc0.prototype.setCpuAndPpu = function (cpu) {
     };
     return Mmc0;
 })();
@@ -10870,7 +10870,7 @@ var Mmc1 = (function () {
             this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
         }
     };
-    Mmc1.prototype.setCpu = function (cpu) {
+    Mmc1.prototype.setCpuAndPpu = function (cpu) {
     };
     return Mmc1;
 })();
@@ -10936,20 +10936,21 @@ var Mmc3 = (function () {
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
         this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(new CleverRam(0x800, 4), //0x2000
-        new Ram(0x4000), //0x2000
-        this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
+        new Ram(0x4000), this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
         this.nametableA = new Ram(0x400);
-        this.nametableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
-        this.nametableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : this.nametableA;
-        this.nametableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? this.nametableB : this.nametableC;
+        this.nametableB = new Ram(0x400);
+        this.nametableC = new Ram(0x400);
+        this.nametableD = new Ram(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
-        this.vmemory = new CompoundMemoryWithAccessCheck(this.onVMemoryAccess.bind(this), this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.update();
     }
-    Mmc3.prototype.setCpu = function (cpu) {
+    Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
         this.irqLine = new IrqLine(cpu);
+        ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     };
     Mmc3.prototype.setByte = function (addr, value) {
         if (addr <= 0x9ffe) {
@@ -11045,11 +11046,11 @@ var Mmc3 = (function () {
             this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
         }
         if (!this.fourScreenVram) {
-            if (!this.horizontalMirroring) {
-                this.nametable.rgmemory[0] = this.nametableB;
+            if (this.horizontalMirroring) {
+                this.nametable.rgmemory[0] = this.nametableA;
                 this.nametable.rgmemory[1] = this.nametableA;
                 this.nametable.rgmemory[2] = this.nametableB;
-                this.nametable.rgmemory[3] = this.nametableA;
+                this.nametable.rgmemory[3] = this.nametableB;
             }
             else {
                 this.nametable.rgmemory[0] = this.nametableA;
@@ -11073,12 +11074,12 @@ var Mmc3 = (function () {
         }
         return result;
     };
-    Mmc3.prototype.onVMemoryAccess = function (addr) {
-        var a12 = (addr & 0x3000) === 0x1000; //don't count the memory access above $2000
+    Mmc3.prototype.addrBusListener = function (addr) {
+        var a12 = (addr & 0x1000) === 0x1000;
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
-                if (this.scanLineCounter && !this.scanLineCounterStartValue && this.irqEnabled)
+                if (!this.scanLineCounterStartValue && this.irqEnabled)
                     this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
@@ -11087,6 +11088,7 @@ var Mmc3 = (function () {
                 if (!this.scanLineCounter && this.irqEnabled)
                     this.irqLine.request();
             }
+            console.log('xxx scanLineCounter', this.scanLineCounter);
         }
         this.lastA12 = a12;
     };
@@ -11222,10 +11224,10 @@ var NesEmulator = (function () {
         this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
         this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
         this.cpu = new Mos6502(this.memoryMapper.memory);
-        this.memoryMapper.setCpu(this.cpu);
         this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
         this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
         this.ppu.setDriver(driver);
+        this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
         this.cpu.reset();
         this.controller = new Controller(canvas);
         window['nesemulator'] = this;
@@ -11666,10 +11668,6 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
-                    //http://wiki.nesdev.com/w/index.php/MMC3
-                    //The counter is clocked on each rising edge of PPU A12, no matter what caused it, 
-                    //so it is possible to (intentionally or not) clock the counter by writing to $2006.
-                    this.vmemory.getByte(this.v);
                 }
                 this.w = 1 - this.w;
                 break;
@@ -11857,12 +11855,15 @@ var PPU = (function () {
         }
         console.log(st);
     };
+    PPU.prototype.attachAddrBusListener = function (listener) { this.addrBusListener = listener; };
     PPU.prototype.step = function () {
         this.stepDraw();
         this.stepOam();
         this.stepBg();
         this.stepS();
         this.flgVblankSuppress = false;
+        if (this.addrBusListener)
+            this.addrBusListener(this.v);
     };
     PPU.prototype.stepOam = function () {
         //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation

@@ -341,10 +341,7 @@ class PPU {
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-                //http://wiki.nesdev.com/w/index.php/MMC3
-                //The counter is clocked on each rising edge of PPU A12, no matter what caused it, 
-                //so it is possible to (intentionally or not) clock the counter by writing to $2006.
-                this.vmemory.getByte(this.v);
+               
             }
             this.w = 1 - this.w;
             break;
@@ -466,7 +463,6 @@ class PPU {
     private fetchSpriteTileLo(yTop, nt, flipVert) {
         if (!this.showSprites)
             return 0;
-
         if (this.spriteHeight === 8) {
             const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
             return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + y);
@@ -578,6 +574,8 @@ class PPU {
     }
     icycle = 0;
 
+    addrBusListener:(addr:number)=>void;
+    attachAddrBusListener(listener) { this.addrBusListener = listener; }
   
     step() {
         this.stepDraw();
@@ -588,6 +586,9 @@ class PPU {
         this.stepS();
 
         this.flgVblankSuppress = false;
+
+        if (this.addrBusListener)
+            this.addrBusListener(this.v);
     }
 
     oamB: number;

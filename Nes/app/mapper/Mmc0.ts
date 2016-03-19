@@ -31,7 +31,7 @@ class Mmc0 implements IMemoryMapper{
         this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
     }
 
-    setCpu(cpu: Mos6502) {
+    setCpuAndPpu(cpu: Mos6502) {
         
     }
 }
