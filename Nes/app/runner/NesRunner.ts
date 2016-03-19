@@ -19,24 +19,28 @@ class NesRunner extends NesRunnerBase {
         this.headerElement.appendChild(this.fpsElement);
 
         requestAnimationFrame(this.callback);
+        //setInterval(this.printFps.bind(this), 1000);
+    }
+    private printFps() {
+        var hpcNow = Date.now();
+        const dt = hpcNow - this.hpcStart;
+        if (dt > 1000) {
+            const fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
+            this.fpsElement.innerText = `${Math.round(fps * 100) / 100} fps`;
+            this.iFrameStart = this.nesEmulator.ppu.iFrame;
+            this.hpcStart = hpcNow;
+        }
     }
 
     private renderFrame(hpcNow) {
         const nesEmulator = this.nesEmulator;
         const ppu = nesEmulator.ppu;
-
-        const dt = hpcNow - this.hpcStart;
-        if (dt > 1000) {
-            const fps = (ppu.iFrame - this.iFrameStart) / dt * 1000;
-            this.fpsElement.innerText = `${Math.round(fps * 100) / 100} fps`;
-            this.iFrameStart = ppu.iFrame;
-            this.hpcStart = hpcNow;
-        }
-
+        
         const frameCurrent = ppu.iFrame;
         while (frameCurrent === ppu.iFrame)
             nesEmulator.step();
       
+        this.printFps();
         requestAnimationFrame(this.callback);
     }
 }

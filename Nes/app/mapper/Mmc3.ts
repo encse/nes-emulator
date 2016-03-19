@@ -2,6 +2,7 @@
 ///<reference path="../memory/Ram.ts"/>
 class Mmc3 implements IMemoryMapper {
 
+    lastA12 = 0;
 
     memory: CompoundMemory;
     vmemory: CompoundMemory;
@@ -22,7 +23,14 @@ class Mmc3 implements IMemoryMapper {
     private nametableC: Ram;
     private nametableD: Ram;
 
+    private scanLineCounterStartValue = 0;
+    private scanLineCounterRestartRequested = false;
+    private scanLineCounter = 0;
+    private irqEnabled = true;
+    private irqManager: IrqManager;
+
     private prgRam: CleverRam;
+
     constructor(nesImage: NesImage) {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
@@ -47,9 +55,10 @@ class Mmc3 implements IMemoryMapper {
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
 
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
-        this.fourScreenVram = nesImage.fFourScreenVRAM ? 0 : 1;
+        this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
 
-        this.vmemory = new CompoundMemory(
+        this.vmemory = new CompoundMemoryWithAccessCheck(
+            this.onVMemoryAccess.bind(this),
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.CHRBanks[2],
@@ -85,7 +94,29 @@ class Mmc3 implements IMemoryMapper {
                 this.update();
             }
         }
-       
+        else if (addr <= 0xdffe) {
+
+            if (addr & 1) { //IRQ reload 
+                this.scanLineCounterRestartRequested = true;
+                this.scanLineCounter = 0;
+                //if(this.irqEnabled)
+                //    this.irqManager.request();
+                console.log('irqCounterRestartRequested');
+            } else { //IRQ latch
+                this.scanLineCounterStartValue = value & 0xff;
+                console.log('irqCounterStartValue', value);
+            }
+        }
+        else if (addr <= 0xdffe) {
+            if (addr & 1) { //irq enable
+                this.irqEnabled = true;
+                console.log('irqEnabled', true);
+            } else { //irq disable
+                this.irqManager.ack();
+                this.irqEnabled = false;
+                console.log('irqEnabled', false);
+            }
+        }
     }
 
     private update() {
@@ -140,19 +171,19 @@ class Mmc3 implements IMemoryMapper {
             this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
         }
 
-        //if (!this.fourScreenVram) {
-        //    if (this.horizontalMirroring) {
-        //        this.nametable.rgmemory[0] = this.nametableB;
-        //        this.nametable.rgmemory[1] = this.nametableA;
-        //        this.nametable.rgmemory[2] = this.nametableB;
-        //        this.nametable.rgmemory[3] = this.nametableA;
-        //    } else {
-        //        this.nametable.rgmemory[0] = this.nametableA;
-        //        this.nametable.rgmemory[1] = this.nametableB;
-        //        this.nametable.rgmemory[2] = this.nametableA;
-        //        this.nametable.rgmemory[3] = this.nametableB;
-        //    }
-        //}
+        if (!this.fourScreenVram) {
+            if (!this.horizontalMirroring) {
+                this.nametable.rgmemory[0] = this.nametableB;
+                this.nametable.rgmemory[1] = this.nametableA;
+                this.nametable.rgmemory[2] = this.nametableB;
+                this.nametable.rgmemory[3] = this.nametableA;
+            } else {
+                this.nametable.rgmemory[0] = this.nametableA;
+                this.nametable.rgmemory[1] = this.nametableB;
+                this.nametable.rgmemory[2] = this.nametableA;
+                this.nametable.rgmemory[3] = this.nametableB;
+            }
+        }
     }
 
     splitMemory(romBanks: ROM[], size: number): Memory[] {
@@ -168,4 +199,26 @@ class Mmc3 implements IMemoryMapper {
         }
         return result;
     }
+
+    onVMemoryAccess(addr: number) {
+        const a12 = addr & (1 << 12);
+        if (!this.lastA12 && a12) {
+            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
+                this.scanLineCounterRestartRequested = false;
+                this.scanLineCounter = this.scanLineCounterStartValue;
+            }
+            else if (this.scanLineCounter > 0) {
+                this.scanLineCounter--;
+                if (!this.scanLineCounter && this.irqEnabled) {
+                    this.irqManager.request();
+                }
+            } 
+        }
+        this.lastA12 = a12;
+    }
+
+    setCpu(cpu: Mos6502) {
+        this.irqManager = new IrqManager(cpu);
+    }
+
 }

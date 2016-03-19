@@ -67,7 +67,7 @@
     * is non-zero, it is decremented.
     * 
     */
-    constructor(memory: CompoundMemory, private cpu: Mos6502) {
+    constructor(memory: CompoundMemory, private irqManager:IrqManager) {
 
         memory.shadowSetter(0x4000, 0x4017, this.setter.bind(this));
         memory.shadowGetter(0x4000, 0x4017, this.getter.bind(this));
@@ -76,17 +76,16 @@
     private tsto(label) {
         //console.log('APU', label, this.cpu.status());
     }
+   
+
     private getter(addr: number) {
 
         switch(addr) {
             case 0x4015:
-                var res = ((!this.cpu.irqLine ? 1 :0) << 6) +
+                var res = ((this.irqManager.isRequested() ? 1 : 0) << 6) +
                     (this.lc0 > 0 ? 1 : 0);
 
-                if (this.cpu.irqLine === 0) {
-                    this.cpu.irqLine = 1;
-                    this.tsto('get $4015');
-                }
+                this.irqManager.ack();
                 return res;
         }
          // When $4015 is read, the status of the channels' length counters and bytes
@@ -191,7 +190,7 @@
              
                 // Interrupt inhibit flag. If set, the frame interrupt flag is cleared, otherwise it is unaffected.
                 if (this.frameIRQDisabled)
-                    this.cpu.irqLine = 1;
+                    this.irqManager.ack();
                
                 break;
         }
@@ -226,8 +225,8 @@
 
         if (!this.mode && !this.frameIRQDisabled) {
 
-            if (this.cpu.irqLine && this.isequencerStep === 3)
-                this.cpu.irqLine = 0;
+            if (!this.irqManager.isRequested() && this.isequencerStep === 3)
+                this.irqManager.request();
 
             this.tsto('clockSequencer ' + this.isequencerStep);
         }

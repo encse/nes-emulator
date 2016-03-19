@@ -314,7 +314,7 @@ this.opcodes[187] = this.op0xbb;
             this.nmiDetected = true;
         }
         this.nmiLinePrev = this.nmiLine;
-        this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
+        this.irqDetected = this.irqLine !== 1 && !this.flgInterruptDisable;
     }
  
     private pushByte(byte: number) {

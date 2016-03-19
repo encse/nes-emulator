@@ -203,4 +203,8 @@ class Mmc1 implements IMemoryMapper {
             this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
         }
     }
+
+    setCpu(cpu: Mos6502) {
+
+    }
 }

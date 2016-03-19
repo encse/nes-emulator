@@ -51,8 +51,8 @@ var APU = (function () {
      * is non-zero, it is decremented.
      *
      */
-    function APU(memory, cpu) {
-        this.cpu = cpu;
+    function APU(memory, irqManager) {
+        this.irqManager = irqManager;
         this.mode = 0;
         this.frameIRQDisabled = 0;
         this.idividerStep = 0;
@@ -74,12 +74,9 @@ var APU = (function () {
     APU.prototype.getter = function (addr) {
         switch (addr) {
             case 0x4015:
-                var res = ((!this.cpu.irqLine ? 1 : 0) << 6) +
+                var res = ((this.irqManager.isRequested() ? 1 : 0) << 6) +
                     (this.lc0 > 0 ? 1 : 0);
-                if (this.cpu.irqLine === 0) {
-                    this.cpu.irqLine = 1;
-                    this.tsto('get $4015');
-                }
+                this.irqManager.ack();
                 return res;
         }
         // When $4015 is read, the status of the channels' length counters and bytes
@@ -161,7 +158,7 @@ var APU = (function () {
                 this.frameIRQDisabled = (value >> 6) & 1;
                 // Interrupt inhibit flag. If set, the frame interrupt flag is cleared, otherwise it is unaffected.
                 if (this.frameIRQDisabled)
-                    this.cpu.irqLine = 1;
+                    this.irqManager.ack();
                 break;
         }
         this.tsto('set $' + addr.toString(16));
@@ -184,8 +181,8 @@ var APU = (function () {
             }
         }
         if (!this.mode && !this.frameIRQDisabled) {
-            if (this.cpu.irqLine && this.isequencerStep === 3)
-                this.cpu.irqLine = 0;
+            if (!this.irqManager.isRequested() && this.isequencerStep === 3)
+                this.irqManager.request();
             this.tsto('clockSequencer ' + this.isequencerStep);
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
@@ -604,7 +601,7 @@ var Most6502Base = (function () {
             this.nmiDetected = true;
         }
         this.nmiLinePrev = this.nmiLine;
-        this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
+        this.irqDetected = this.irqLine !== 1 && !this.flgInterruptDisable;
     };
     Most6502Base.prototype.pushByte = function (byte) {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
@@ -10603,6 +10600,28 @@ var WebGlDriver = (function () {
         1.0, 0.0]);
     return WebGlDriver;
 })();
+var IrqManager = (function () {
+    function IrqManager(cpu) {
+        this.cpu = cpu;
+        this._isRequested = false;
+    }
+    IrqManager.prototype.request = function () {
+        if (!this._isRequested) {
+            this.cpu.irqLine--;
+            this._isRequested = true;
+        }
+    };
+    IrqManager.prototype.ack = function () {
+        if (this._isRequested) {
+            this.cpu.irqLine++;
+            this._isRequested = false;
+        }
+    };
+    IrqManager.prototype.isRequested = function () {
+        return this._isRequested;
+    };
+    return IrqManager;
+})();
 var MemoryMapperFactory = (function () {
     function MemoryMapperFactory() {
     }
@@ -10641,6 +10660,8 @@ var Mmc0 = (function () {
         var rest = new Ram(0x1000);
         this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
     }
+    Mmc0.prototype.setCpu = function (cpu) {
+    };
     return Mmc0;
 })();
 ///<reference path="IMemoryMapper.ts"/>
@@ -10847,6 +10868,8 @@ var Mmc1 = (function () {
             this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
         }
     };
+    Mmc1.prototype.setCpu = function (cpu) {
+    };
     return Mmc1;
 })();
 ///<reference path="Memory.ts"/>
@@ -10875,8 +10898,13 @@ var Ram = (function () {
 ///<reference path="../memory/Ram.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
+        this.lastA12 = 0;
         this.horizontalMirroring = 0;
         this.fourScreenVram = 0;
+        this.scanLineCounterStartValue = 0;
+        this.scanLineCounterRestartRequested = false;
+        this.scanLineCounter = 0;
+        this.irqEnabled = true;
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -10890,8 +10918,8 @@ var Mmc3 = (function () {
         this.nametableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? this.nametableB : this.nametableC;
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
-        this.fourScreenVram = nesImage.fFourScreenVRAM ? 0 : 1;
-        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
+        this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
+        this.vmemory = new CompoundMemoryWithAccessCheck(this.onVMemoryAccess.bind(this), this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
     }
     Mmc3.prototype.setByte = function (addr, value) {
@@ -10914,6 +10942,30 @@ var Mmc3 = (function () {
             else {
                 this.horizontalMirroring = value & 1;
                 this.update();
+            }
+        }
+        else if (addr <= 0xdffe) {
+            if (addr & 1) {
+                this.scanLineCounterRestartRequested = true;
+                this.scanLineCounter = 0;
+                //if(this.irqEnabled)
+                //    this.irqManager.request();
+                console.log('irqCounterRestartRequested');
+            }
+            else {
+                this.scanLineCounterStartValue = value & 0xff;
+                console.log('irqCounterStartValue', value);
+            }
+        }
+        else if (addr <= 0xdffe) {
+            if (addr & 1) {
+                this.irqEnabled = true;
+                console.log('irqEnabled', true);
+            }
+            else {
+                this.irqManager.ack();
+                this.irqEnabled = false;
+                console.log('irqEnabled', false);
             }
         }
     };
@@ -10966,19 +11018,20 @@ var Mmc3 = (function () {
             this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] & 0xfe];
             this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
         }
-        //if (!this.fourScreenVram) {
-        //    if (this.horizontalMirroring) {
-        //        this.nametable.rgmemory[0] = this.nametableB;
-        //        this.nametable.rgmemory[1] = this.nametableA;
-        //        this.nametable.rgmemory[2] = this.nametableB;
-        //        this.nametable.rgmemory[3] = this.nametableA;
-        //    } else {
-        //        this.nametable.rgmemory[0] = this.nametableA;
-        //        this.nametable.rgmemory[1] = this.nametableB;
-        //        this.nametable.rgmemory[2] = this.nametableA;
-        //        this.nametable.rgmemory[3] = this.nametableB;
-        //    }
-        //}
+        if (!this.fourScreenVram) {
+            if (!this.horizontalMirroring) {
+                this.nametable.rgmemory[0] = this.nametableB;
+                this.nametable.rgmemory[1] = this.nametableA;
+                this.nametable.rgmemory[2] = this.nametableB;
+                this.nametable.rgmemory[3] = this.nametableA;
+            }
+            else {
+                this.nametable.rgmemory[0] = this.nametableA;
+                this.nametable.rgmemory[1] = this.nametableB;
+                this.nametable.rgmemory[2] = this.nametableA;
+                this.nametable.rgmemory[3] = this.nametableB;
+            }
+        }
     };
     Mmc3.prototype.splitMemory = function (romBanks, size) {
         var result = [];
@@ -10993,6 +11046,25 @@ var Mmc3 = (function () {
             }
         }
         return result;
+    };
+    Mmc3.prototype.onVMemoryAccess = function (addr) {
+        var a12 = addr & (1 << 12);
+        if (!this.lastA12 && a12) {
+            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
+                this.scanLineCounterRestartRequested = false;
+                this.scanLineCounter = this.scanLineCounterStartValue;
+            }
+            else if (this.scanLineCounter > 0) {
+                this.scanLineCounter--;
+                if (!this.scanLineCounter && this.irqEnabled) {
+                    this.irqManager.request();
+                }
+            }
+        }
+        this.lastA12 = a12;
+    };
+    Mmc3.prototype.setCpu = function (cpu) {
+        this.irqManager = new IrqManager(cpu);
     };
     return Mmc3;
 })();
@@ -11088,6 +11160,27 @@ var CompoundMemory = (function () {
     };
     return CompoundMemory;
 })();
+///<reference path="CompoundMemory.ts"/>
+var CompoundMemoryWithAccessCheck = (function (_super) {
+    __extends(CompoundMemoryWithAccessCheck, _super);
+    function CompoundMemoryWithAccessCheck(onAccess) {
+        var rgmemory = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            rgmemory[_i - 1] = arguments[_i];
+        }
+        _super.apply(this, rgmemory);
+        this.onAccess = onAccess;
+    }
+    CompoundMemoryWithAccessCheck.prototype.getByte = function (addr) {
+        this.onAccess(addr);
+        return _super.prototype.getByte.call(this, addr);
+    };
+    CompoundMemoryWithAccessCheck.prototype.setByte = function (addr, value) {
+        this.onAccess(addr);
+        return _super.prototype.setByte.call(this, addr, value);
+    };
+    return CompoundMemoryWithAccessCheck;
+})(CompoundMemory);
 ///<reference path="Memory.ts"/>
 var ROM = (function () {
     function ROM(size) {
@@ -11128,7 +11221,8 @@ var NesEmulator = (function () {
         this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
         this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
         this.cpu = new Mos6502(this.memoryMapper.memory);
-        this.apu = new APU(this.memoryMapper.memory, this.cpu);
+        this.memoryMapper.setCpu(this.cpu);
+        this.apu = new APU(this.memoryMapper.memory, new IrqManager(this.cpu));
         this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
         this.ppu.setDriver(driver);
         this.cpu.reset();
@@ -11656,6 +11750,8 @@ var PPU = (function () {
         this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
     };
     PPU.prototype.fetchSpriteTileLo = function (yTop, nt, flipVert) {
+        if (!this.showSprites)
+            return 0;
         if (this.spriteHeight === 8) {
             var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
             return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + y);
@@ -11669,6 +11765,8 @@ var PPU = (function () {
         }
     };
     PPU.prototype.fetchSpriteTileHi = function (yTop, nt, flipVert) {
+        if (!this.showSprites)
+            return 0;
         if (this.spriteHeight === 8) {
             var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
             return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + 8 + y);
@@ -12200,20 +12298,25 @@ var NesRunner = (function (_super) {
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
         requestAnimationFrame(this.callback);
+        //setInterval(this.printFps.bind(this), 1000);
+    };
+    NesRunner.prototype.printFps = function () {
+        var hpcNow = Date.now();
+        var dt = hpcNow - this.hpcStart;
+        if (dt > 1000) {
+            var fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
+            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
+            this.iFrameStart = this.nesEmulator.ppu.iFrame;
+            this.hpcStart = hpcNow;
+        }
     };
     NesRunner.prototype.renderFrame = function (hpcNow) {
         var nesEmulator = this.nesEmulator;
         var ppu = nesEmulator.ppu;
-        var dt = hpcNow - this.hpcStart;
-        if (dt > 1000) {
-            var fps = (ppu.iFrame - this.iFrameStart) / dt * 1000;
-            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
-            this.iFrameStart = ppu.iFrame;
-            this.hpcStart = hpcNow;
-        }
         var frameCurrent = ppu.iFrame;
         while (frameCurrent === ppu.iFrame)
             nesEmulator.step();
+        this.printFps();
         requestAnimationFrame(this.callback);
     };
     return NesRunner;
