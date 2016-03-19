@@ -3,7 +3,7 @@
 ///<reference path="../memory/Rom.ts"/>
 class Mmc3 implements IMemoryMapper {
 
-    lastA12 = false;
+    lastA12 = 0;
 
     memory: CompoundMemory;
     vmemory: CompoundMemory;
@@ -58,7 +58,8 @@ class Mmc3 implements IMemoryMapper {
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
 
-        this.vmemory = new CompoundMemory(
+        this.vmemory = new CompoundMemoryWithAccessCheck(
+            this.onMemoryAccess.bind(this), 
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.CHRBanks[2],
@@ -77,7 +78,7 @@ class Mmc3 implements IMemoryMapper {
 
     setCpuAndPpu(cpu: Mos6502, ppu:PPU) {
         this.irqLine = new IrqLine(cpu);
-        ppu.attachAddrBusListener(this.addrBusListener.bind(this));
+       // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     }
 
     private setByte(addr: number, value: number): void {
@@ -205,8 +206,8 @@ class Mmc3 implements IMemoryMapper {
         return result;
     }
 
-    addrBusListener(addr: number) {
-        const a12 = (addr & 0x1000) === 0x1000; 
+    onMemoryAccess(addr: number) {
+        const a12 = addr & 0x1000; 
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
@@ -220,11 +221,8 @@ class Mmc3 implements IMemoryMapper {
                     this.irqLine.request();
                 
             }
-            console.log('xxx scanLineCounter', this.scanLineCounter);
+            //console.log('xxx scanLineCounter', this.scanLineCounter);
         }
         this.lastA12 = a12;
     }
-
-  
-
 }

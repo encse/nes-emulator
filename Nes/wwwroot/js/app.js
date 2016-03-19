@@ -10924,7 +10924,7 @@ var ROM = (function () {
 ///<reference path="../memory/Rom.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
-        this.lastA12 = false;
+        this.lastA12 = 0;
         this.horizontalMirroring = 0;
         this.fourScreenVram = 0;
         this.scanLineCounterStartValue = 0;
@@ -10944,13 +10944,13 @@ var Mmc3 = (function () {
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
-        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
+        this.vmemory = new CompoundMemoryWithAccessCheck(this.onMemoryAccess.bind(this), this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
         this.update();
     }
     Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
         this.irqLine = new IrqLine(cpu);
-        ppu.attachAddrBusListener(this.addrBusListener.bind(this));
+        // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     };
     Mmc3.prototype.setByte = function (addr, value) {
         if (addr <= 0x9ffe) {
@@ -11074,8 +11074,8 @@ var Mmc3 = (function () {
         }
         return result;
     };
-    Mmc3.prototype.addrBusListener = function (addr) {
-        var a12 = (addr & 0x1000) === 0x1000;
+    Mmc3.prototype.onMemoryAccess = function (addr) {
+        var a12 = addr & 0x1000;
         if (!this.lastA12 && a12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
@@ -11088,7 +11088,6 @@ var Mmc3 = (function () {
                 if (!this.scanLineCounter && this.irqEnabled)
                     this.irqLine.request();
             }
-            console.log('xxx scanLineCounter', this.scanLineCounter);
         }
         this.lastA12 = a12;
     };
@@ -11422,6 +11421,10 @@ var PPU = (function () {
         this.dataAddr = 0;
         this.iFrame = 0;
         this.ispriteNext = 0;
+        this.palette = [
+            0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
+            0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
+        ];
         this.lastWrittenStuff = 0;
         this.vramReadBuffer = 0;
         this.icycle = 0;
@@ -11444,28 +11447,20 @@ var PPU = (function () {
             0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298,
             0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
         ]);
-        this.initialPaletteValues = [
-            0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
-            0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
-        ];
         if (vmemory.size() !== 0x4000)
             throw 'insufficient Vmemory size';
         memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
         memory.shadowGetter(0x2000, 0x3fff, this.ppuRegistersGetter.bind(this));
         vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
         vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
-        vmemory.shadowSetter(0x3f10, 0x3f10, this.paletteSetter.bind(this));
-        vmemory.shadowGetter(0x3f10, 0x3f10, this.paletteGetter.bind(this));
-        vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
-        vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
+        vmemory.shadowSetter(0x3f00, 0x3fff, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f00, 0x3fff, this.paletteGetter.bind(this));
         this.secondaryOam = new Uint8Array(32);
         this.secondaryOamISprite = new Int8Array(8);
         this.oam = new Uint8Array(256);
         this.rgspriteRenderingInfo = [];
         for (var isprite = 0; isprite < 8; isprite++)
             this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
-        for (var i = 0; i < 32; i++)
-            this.vmemory.setByte(0x3f00 + i, this.initialPaletteValues[i]);
     }
     Object.defineProperty(PPU.prototype, "y", {
         /**
@@ -11520,17 +11515,17 @@ var PPU = (function () {
     };
     PPU.prototype.paletteSetter = function (addr, value) {
         if (addr === 0x3f10)
-            addr = 0x3f00;
+            addr = 0;
         else
-            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
-        return this.vmemory.setByte(addr, value);
+            addr &= 0x1f;
+        return this.palette[addr] = value & 0xff;
     };
     PPU.prototype.paletteGetter = function (addr) {
         if (addr === 0x3f10)
-            addr = 0x3f00;
+            addr = 0;
         else
-            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
-        return this.vmemory.getByte(addr);
+            addr &= 0x1f;
+        return this.palette[addr];
     };
     PPU.prototype.ppuRegistersGetter = function (addr) {
         addr = (addr - 0x2000) % 8;
@@ -11587,7 +11582,7 @@ var PPU = (function () {
                     this.v &= 0x3fff;
                     var res;
                     if (this.v >= 0x3f00) {
-                        res = this.vmemory.getByte(this.v);
+                        res = this.paletteGetter(this.v);
                         this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
                     }
                     else {
@@ -11668,6 +11663,7 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
+                    this.vmemory.getByte(this.v);
                 }
                 this.w = 1 - this.w;
                 break;
@@ -11829,7 +11825,7 @@ var PPU = (function () {
                         var icol = 128 * t + (a & 15) * 8 + x;
                         var b1 = (this.vmemory.getByte(t * 0x1000 + a * 16 + y) >> (7 - x)) & 1;
                         var b2 = (this.vmemory.getByte(t * 0x1000 + a * 16 + y + 8) >> (7 - x)) & 1;
-                        data[irow * 256 + icol] = this.colors[this.vmemory.getByte(0x3f00 + (b2 << 1) + b1)];
+                        data[irow * 256 + icol] = this.colors[this.paletteGetter(0x3f00 | (b2 << 1) | b1)];
                     }
                 }
             }
@@ -11855,15 +11851,12 @@ var PPU = (function () {
         }
         console.log(st);
     };
-    PPU.prototype.attachAddrBusListener = function (listener) { this.addrBusListener = listener; };
     PPU.prototype.step = function () {
         this.stepDraw();
         this.stepOam();
         this.stepBg();
         this.stepS();
         this.flgVblankSuppress = false;
-        if (this.addrBusListener)
-            this.addrBusListener(this.v);
     };
     PPU.prototype.stepOam = function () {
         //http://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
@@ -12005,13 +11998,13 @@ var PPU = (function () {
                 // 0 in each palette means the default background color -> ipalette = 0
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
-                icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
+                icolorBg = this.paletteGetter(0x3f00 | ipalette);
             }
             else {
                 if ((this.v & 0x3f00) === 0x3f00)
-                    icolorBg = this.vmemory.getByte(this.v);
+                    icolorBg = this.paletteGetter(this.v & 0x3fff);
                 else
-                    icolorBg = this.vmemory.getByte(0x3f00);
+                    icolorBg = this.paletteGetter(0x3f00);
             }
             var icolorSprite = -1;
             var spriteTransparent = true;
@@ -12031,7 +12024,7 @@ var PPU = (function () {
                             var ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
                             if ((ipalette & 3) === 0)
                                 ipalette = 0;
-                            icolorSprite = this.vmemory.getByte(0x3f10 | ipalette);
+                            icolorSprite = this.paletteGetter(0x3f10 | ipalette);
                         }
                     }
                     spriteRenderingInfo.xCounter--;

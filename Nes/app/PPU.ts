@@ -100,6 +100,10 @@ class PPU {
     oam:Uint8Array;
     private rgspriteRenderingInfo: SpriteRenderingInfo[];
     private ispriteNext = 0;
+    private palette = [
+        0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
+        0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
+    ];
     /**
      * yyy NN YYYYY XXXXX
         ||| || ||||| +++++-- coarse X scroll
@@ -140,11 +144,8 @@ class PPU {
         vmemory.shadowSetter(0x3000, 0x3eff, this.nameTableSetter.bind(this));
         vmemory.shadowGetter(0x3000, 0x3eff, this.nameTableGetter.bind(this));
 
-        vmemory.shadowSetter(0x3f10, 0x3f10, this.paletteSetter.bind(this));
-        vmemory.shadowGetter(0x3f10, 0x3f10, this.paletteGetter.bind(this));
-
-        vmemory.shadowSetter(0x3f20, 0x3fff, this.paletteSetter.bind(this));
-        vmemory.shadowGetter(0x3f20, 0x3fff, this.paletteGetter.bind(this));
+        vmemory.shadowSetter(0x3f00, 0x3fff, this.paletteSetter.bind(this));
+        vmemory.shadowGetter(0x3f00, 0x3fff, this.paletteGetter.bind(this));
 
         this.secondaryOam = new Uint8Array(32);
         this.secondaryOamISprite = new Int8Array(8);
@@ -152,10 +153,6 @@ class PPU {
         this.rgspriteRenderingInfo = [];
         for (let isprite = 0; isprite < 8; isprite++)
             this.rgspriteRenderingInfo.push(new SpriteRenderingInfo());
-
-        for (let i = 0; i < 32; i++) 
-            this.vmemory.setByte(0x3f00 + i, this.initialPaletteValues[i]);
-       
     }
 
     setDriver(renderer: IDriver) {
@@ -174,18 +171,18 @@ class PPU {
 
     private paletteSetter(addr: number, value: number) {
         if (addr === 0x3f10)
-            addr = 0x3f00;
+            addr = 0;
         else 
-            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
-        return this.vmemory.setByte(addr, value);
+            addr &= 0x1f;
+        return this.palette[addr] = value & 0xff;
     }
 
     private paletteGetter(addr: number) {
         if(addr === 0x3f10)
-            addr = 0x3f00;
+            addr = 0;
         else 
-            addr = 0x3f00 + (addr - 0x3f20) % 0x20;
-        return this.vmemory.getByte(addr);
+            addr &= 0x1f;
+        return this.palette[addr];
 
     }
 
@@ -250,7 +247,7 @@ class PPU {
             this.v &= 0x3fff;
             let res;
             if (this.v >= 0x3f00) {
-                res = this.vmemory.getByte(this.v);
+                res = this.paletteGetter(this.v);
                 this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
             } else {
                 res = this.vramReadBuffer;
@@ -341,7 +338,9 @@ class PPU {
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-               
+
+                this.vmemory.getByte(this.v);
+
             }
             this.w = 1 - this.w;
             break;
@@ -541,7 +540,7 @@ class PPU {
                         
                         var b1 = (this.vmemory.getByte(t* 0x1000 + a * 16 + y) >> (7-x)) & 1;
                         var b2 = (this.vmemory.getByte(t* 0x1000 + a * 16 + y + 8) >> (7-x)) & 1;
-                        data[ irow * 256 + icol] = this.colors[this.vmemory.getByte(0x3f00 + (b2 << 1) + b1)] ;
+                        data[ irow * 256 + icol] = this.colors[this.paletteGetter(0x3f00 | (b2 << 1) | b1)] ;
                     }
                 }
             }
@@ -573,9 +572,6 @@ class PPU {
         console.log(st);
     }
     icycle = 0;
-
-    addrBusListener:(addr:number)=>void;
-    attachAddrBusListener(listener) { this.addrBusListener = listener; }
   
     step() {
         this.stepDraw();
@@ -586,9 +582,6 @@ class PPU {
         this.stepS();
 
         this.flgVblankSuppress = false;
-
-        if (this.addrBusListener)
-            this.addrBusListener(this.v);
     }
 
     oamB: number;
@@ -750,13 +743,13 @@ class PPU {
                 if ((ipalette & 3) === 0)
                     ipalette = 0;
 
-                icolorBg = this.vmemory.getByte(0x3f00 | ipalette);
+                icolorBg = this.paletteGetter(0x3f00 | ipalette);
 
             } else {
                 if ((this.v & 0x3f00) === 0x3f00)
-                    icolorBg = this.vmemory.getByte(this.v);
+                    icolorBg = this.paletteGetter(this.v & 0x3fff);
                 else
-                    icolorBg = this.vmemory.getByte(0x3f00);
+                    icolorBg = this.paletteGetter(0x3f00);
             }
 
             let icolorSprite = -1;
@@ -778,7 +771,7 @@ class PPU {
                             let ipalette = spriteRenderingInfo.ipaletteBase + ipalette0 + (ipalette1 << 1);
                             if ((ipalette & 3) === 0)
                                 ipalette = 0;
-                            icolorSprite = this.vmemory.getByte(0x3f10 | ipalette);
+                            icolorSprite = this.paletteGetter(0x3f10 | ipalette);
                         }
                     }
 
@@ -896,9 +889,5 @@ class PPU {
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ]);
     
-    private initialPaletteValues = [
-          0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
-          0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
-    ];
-
+   
 }
