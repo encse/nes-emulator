@@ -11870,7 +11870,8 @@ var PPU = (function () {
         else if (this.sy === 261 || (this.sy >= 0 && this.sy <= 239)) {
             if (!this.showSprites && !this.showBg)
                 return;
-            if (this.sx >= 1 && this.sx <= 64) {
+            //secondary oam clear and sprite evaluation do not occor on the pre-render line, sprite tile fetches still do
+            if (this.sy !== 261 && this.sx >= 1 && this.sx <= 64) {
                 // Cycles 1- 64: Secondary OAM (32 - byte buffer for current sprites on scanline) is
                 // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
                 // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
@@ -11884,7 +11885,7 @@ var PPU = (function () {
                     this.copyToSecondaryOam = 0;
                 }
             }
-            else if (this.sx >= 65 && this.sx <= 256) {
+            else if (this.sy !== 261 && this.sx >= 65 && this.sx <= 256) {
                 // Cycles 65- 256: Sprite evaluation
                 //  On odd cycles, data is read from (primary) OAM
                 //  On even cycles, data is written to secondary OAM (unless writes are inhibited, in which case it will read the value in secondary OAM instead)
