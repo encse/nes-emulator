@@ -256,7 +256,7 @@ class PPU {
               
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
-
+            this.triggerMemoryAccess();
             return res;
         }
         default:
@@ -280,8 +280,6 @@ class PPU {
             this.spriteHeight = value & 0x20 ? 16 : 8;
             this.nmi_output = !!(value & 0x80);
 
-            if (this.addrSpriteBase === 0x1000 && this.addrTileBase === 0x0)
-                window['alma'] = 1;
             if (!this.nmi_output)
                 this.cpu.nmiLine = 1;
 
@@ -339,7 +337,7 @@ class PPU {
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-                this.foo();
+                this.triggerMemoryAccess();
             }
             this.w = 1 - this.w;
 
@@ -348,8 +346,8 @@ class PPU {
 
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
-
             this.v &= 0x3fff;
+            this.triggerMemoryAccess();
             break;
         }
     }
@@ -891,7 +889,7 @@ class PPU {
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ]);
 
-    foo() {
+    triggerMemoryAccess() {
          this.vmemory.getByte(this.v & 0x3fff);
     }
 }

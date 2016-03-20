@@ -43,6 +43,7 @@
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
 
             if ((this.icycle & 3) === 0) {
+
                 const nmiBefore = this.cpu.nmiLine;
                 this.ppu.step();
                 const nmiAfter = this.cpu.nmiLine;
@@ -51,6 +52,7 @@
             }
 
             if (this.icycle === 0) {
+                this.memoryMapper.clk();
                     
                 if (this.dmaRequested) {
 

@@ -10664,6 +10664,7 @@ var Mmc0 = (function () {
     }
     Mmc0.prototype.setCpuAndPpu = function (cpu) {
     };
+    Mmc0.prototype.clk = function () { };
     return Mmc0;
 })();
 ///<reference path="IMemoryMapper.ts"/>
@@ -10872,6 +10873,7 @@ var Mmc1 = (function () {
     };
     Mmc1.prototype.setCpuAndPpu = function (cpu) {
     };
+    Mmc1.prototype.clk = function () { };
     return Mmc1;
 })();
 ///<reference path="Memory.ts"/>
@@ -10924,13 +10926,16 @@ var ROM = (function () {
 ///<reference path="../memory/Rom.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
-        this.lastA12 = 0;
+        this.wasDown = true;
+        this.curA12 = 0;
+        this.prevA12 = 0;
         this.horizontalMirroring = 0;
         this.fourScreenVram = 0;
         this.scanLineCounterStartValue = 0;
         this.scanLineCounterRestartRequested = false;
         this.scanLineCounter = 0;
         this.irqEnabled = true;
+        this.postponeRequest = -1;
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -11075,21 +11080,30 @@ var Mmc3 = (function () {
         return result;
     };
     Mmc3.prototype.onMemoryAccess = function (addr) {
-        var a12 = addr & 0x1000;
-        if (!this.lastA12 && a12) {
+        this.prevA12 = this.curA12;
+        this.curA12 = addr & 0x1000;
+        this.wasDown = this.wasDown || !this.curA12;
+        var d = 1;
+        if (this.postponeRequest < 0 && !this.prevA12 && this.curA12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.irqLine.request();
+                    this.postponeRequest = d;
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
                 if (!this.scanLineCounter && this.irqEnabled)
-                    this.irqLine.request();
+                    this.postponeRequest = d;
             }
         }
-        this.lastA12 = a12;
+    };
+    Mmc3.prototype.clk = function () {
+        if (!this.postponeRequest) {
+            this.irqLine.request();
+        }
+        if (this.postponeRequest >= 0)
+            this.postponeRequest--;
     };
     return Mmc3;
 })();
@@ -11241,6 +11255,7 @@ var NesEmulator = (function () {
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
+                this.memoryMapper.clk();
                 if (this.dmaRequested) {
                     if (!(this.cpu.icycle & 1)) {
                         this.dmaRequested = false;
@@ -11591,6 +11606,7 @@ var PPU = (function () {
                     }
                     this.v += this.daddrWrite;
                     this.v &= 0x3fff;
+                    this.triggerMemoryAccess();
                     return res;
                 }
             default:
@@ -11610,8 +11626,6 @@ var PPU = (function () {
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
                 this.nmi_output = !!(value & 0x80);
-                if (this.addrSpriteBase === 0x1000 && this.addrTileBase === 0x0)
-                    window['alma'] = 1;
                 if (!this.nmi_output)
                     this.cpu.nmiLine = 1;
                 if (this.sy === 261 && this.sx === 1)
@@ -11665,7 +11679,7 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
-                    this.foo();
+                    this.triggerMemoryAccess();
                 }
                 this.w = 1 - this.w;
                 break;
@@ -11673,6 +11687,7 @@ var PPU = (function () {
                 this.vmemory.setByte(this.v & 0x3fff, value);
                 this.v += this.daddrWrite;
                 this.v &= 0x3fff;
+                this.triggerMemoryAccess();
                 break;
         }
     };
@@ -12120,7 +12135,7 @@ var PPU = (function () {
             }
         }
     };
-    PPU.prototype.foo = function () {
+    PPU.prototype.triggerMemoryAccess = function () {
         this.vmemory.getByte(this.v & 0x3fff);
     };
     PPU.syFirstVisible = 0;

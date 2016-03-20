@@ -3,7 +3,9 @@
 ///<reference path="../memory/Rom.ts"/>
 class Mmc3 implements IMemoryMapper {
 
-    lastA12 = 0;
+    wasDown = true;
+    curA12 = 0;
+    prevA12 = 0;
 
     memory: CompoundMemory;
     vmemory: CompoundMemory;
@@ -207,23 +209,34 @@ class Mmc3 implements IMemoryMapper {
     }
 
     onMemoryAccess(addr: number) {
-        const a12 = addr & 0x1000; 
-        if (!this.lastA12 && a12) {
+        this.prevA12 = this.curA12;
+        this.curA12 = addr & 0x1000;
+        this.wasDown = this.wasDown || !this.curA12;
+
+        var d = 1;
+        if (this.postponeRequest < 0 && !this.prevA12 && this.curA12) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.irqLine.request();
+                    this.postponeRequest = d;
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled) 
-                    this.irqLine.request();
-                
+                if (!this.scanLineCounter && this.irqEnabled)
+                    this.postponeRequest = d;
+
             }
-            //if(window['alma'] === 1)
-            //    console.log('xxx scanLineCounter', this.scanLineCounter);
         }
-        this.lastA12 = a12;
+    }
+
+    postponeRequest = -1;
+    clk() {
+        if (!this.postponeRequest) {
+            this.irqLine.request();
+        }
+
+        if (this.postponeRequest >= 0)
+            this.postponeRequest--;
     }
 }

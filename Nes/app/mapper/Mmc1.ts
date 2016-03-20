@@ -207,4 +207,6 @@ class Mmc1 implements IMemoryMapper {
     setCpuAndPpu(cpu: Mos6502) {
 
     }
+
+    clk() {}
 }
