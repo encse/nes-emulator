@@ -652,7 +652,7 @@ var Most6502Base = (function () {
             }
             this.ipCur = this.ip;
             this.trace(this.opcode);
-            if (this.ipCur >= 0xe3e9 && this.ipCur <= 0xe40a)
+            if (this.ipCur === 0xe3e8 || this.ipCur === 0xe3fb)
                 console.log(this.ipCur.toString(16));
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
@@ -11582,7 +11582,7 @@ var PPU = (function () {
                     this.v &= 0x3fff;
                     var res;
                     if (this.v >= 0x3f00) {
-                        res = this.paletteGetter(this.v);
+                        res = this.vmemory.getByte(this.v);
                         this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
                     }
                     else {
@@ -11610,6 +11610,8 @@ var PPU = (function () {
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
                 this.nmi_output = !!(value & 0x80);
+                if (this.addrSpriteBase === 0x1000 && this.addrTileBase === 0x0)
+                    window['alma'] = 1;
                 if (!this.nmi_output)
                     this.cpu.nmiLine = 1;
                 if (this.sy === 261 && this.sx === 1)
@@ -11663,7 +11665,7 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
-                    this.vmemory.getByte(this.v);
+                    this.foo();
                 }
                 this.w = 1 - this.w;
                 break;
@@ -11788,14 +11790,14 @@ var PPU = (function () {
         if (!this.showBg && !this.showSprites)
             return;
         var y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + y);
+        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + y);
         this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xffff00);
     };
     PPU.prototype.fetchBgTileHi = function () {
         if (!this.showBg && !this.showSprites)
             return;
         var y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + 8 + y);
+        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + 8 + y);
         this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
     };
     PPU.prototype.getNameTable = function (i) {
@@ -11856,6 +11858,8 @@ var PPU = (function () {
         this.stepOam();
         this.stepBg();
         this.stepS();
+        //this is to give a chance to MMC3 detecting the address v 
+        //this.vmemory.getByte(this.v & 0x3fff);
         this.flgVblankSuppress = false;
     };
     PPU.prototype.stepOam = function () {
@@ -11863,7 +11867,7 @@ var PPU = (function () {
         if (this.sy === 261 && this.sx === 1) {
             this.flgSpriteOverflow = false;
         }
-        else if (this.sy >= 0 && this.sy <= 239) {
+        else if (this.sy === 261 || (this.sy >= 0 && this.sy <= 239)) {
             if (!this.showSprites && !this.showBg)
                 return;
             if (this.sx >= 1 && this.sx <= 64) {
@@ -11945,35 +11949,30 @@ var PPU = (function () {
                 var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
                 this.addrOam = 0;
                 var b0 = this.secondaryOam[addrOamBase + 0];
-                if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = -1000;
-                }
-                else {
-                    switch (this.sx & 7) {
-                        case 1:
-                            {
-                                var b2 = this.secondaryOam[addrOamBase + 2];
-                                var b3 = this.secondaryOam[addrOamBase + 3];
-                                spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
-                                spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
-                                spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
-                                spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-                                spriteRenderingInfo.xCounter = b3;
-                                spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
-                            }
-                        case 0:
-                            {
-                                var b1 = this.secondaryOam[addrOamBase + 1];
-                                spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
-                                break;
-                            }
-                        case 6:
-                            {
-                                var b1 = this.secondaryOam[addrOamBase + 1];
-                                this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
-                                break;
-                            }
-                    }
+                switch (this.sx & 7) {
+                    case 1:
+                        {
+                            var b2 = this.secondaryOam[addrOamBase + 2];
+                            var b3 = this.secondaryOam[addrOamBase + 3];
+                            spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
+                            spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                            spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                            spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+                            spriteRenderingInfo.xCounter = b0 >= 0xef ? -1000 : b3;
+                            spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                        }
+                    case 0:
+                        {
+                            var b1 = this.secondaryOam[addrOamBase + 1];
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            break;
+                        }
+                    case 6:
+                        {
+                            var b1 = this.secondaryOam[addrOamBase + 1];
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            break;
+                        }
                 }
             }
         }
@@ -12119,6 +12118,9 @@ var PPU = (function () {
                 this.sy = 0;
             }
         }
+    };
+    PPU.prototype.foo = function () {
+        this.vmemory.getByte(this.v & 0x3fff);
     };
     PPU.syFirstVisible = 0;
     PPU.syPostRender = 240;

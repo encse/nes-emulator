@@ -71,16 +71,16 @@ main:
 	
 	jsr clear_oam
 	set_test 8,"Counter should be clocked 241 times in PPU frame"
-	ldx #241
-	jsr begin_counter_test
-	jsr wait_vbl
-	setb PPUSCROLL,0
-	sta PPUSCROLL
-	setb PPUCTRL,$08            ; sprites use tiles at $1xxx
-	setb PPUMASK,$18            ; enable bg and sprites
+	ldx #241					;e3d3
+	jsr begin_counter_test		;e3d5
+	jsr wait_vbl				;e3d8
+	setb PPUSCROLL,0			;e3db
+	sta PPUSCROLL				;e3e0
+	setb PPUCTRL,$08            ;e3e3 sprites use tiles at $1xxx
+	setb PPUMASK,$18            ;e3e8 enable bg and sprites
 	delay 29800
-	setb PPUMASK,$00            ; disable rendering
-	jsr should_be_clear
+	setb PPUMASK,$00            ;e3fb disable rendering
+	jsr should_be_clear			;e400
 	jsr clock_counter
 	jsr should_be_set
 		

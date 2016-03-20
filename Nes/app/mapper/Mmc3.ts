@@ -221,7 +221,8 @@ class Mmc3 implements IMemoryMapper {
                     this.irqLine.request();
                 
             }
-            //console.log('xxx scanLineCounter', this.scanLineCounter);
+            //if(window['alma'] === 1)
+            //    console.log('xxx scanLineCounter', this.scanLineCounter);
         }
         this.lastA12 = a12;
     }

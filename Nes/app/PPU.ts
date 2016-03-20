@@ -245,9 +245,9 @@ class PPU {
         case 0x7:
         {
             this.v &= 0x3fff;
-            let res;
+            let res: number;
             if (this.v >= 0x3f00) {
-                res = this.paletteGetter(this.v);
+                res = this.vmemory.getByte(this.v);
                 this.vramReadBuffer = this.vmemory.getByte((this.v & 0xff) | 0x2f00);
             } else {
                 res = this.vramReadBuffer;
@@ -280,6 +280,8 @@ class PPU {
             this.spriteHeight = value & 0x20 ? 16 : 8;
             this.nmi_output = !!(value & 0x80);
 
+            if (this.addrSpriteBase === 0x1000 && this.addrTileBase === 0x0)
+                window['alma'] = 1;
             if (!this.nmi_output)
                 this.cpu.nmiLine = 1;
 
@@ -331,23 +333,22 @@ class PPU {
         // The second write will set 6 upper bits.The address will increment
         // either by 1 or by 32 after each access to $2007.
         case 0x6: 
-                
             
             if (this.w === 0) {
                 this.t = (this.t & 0x00ff) | ((value & 0x3f) << 8);
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-
-                this.vmemory.getByte(this.v);
-
+                this.foo();
             }
             this.w = 1 - this.w;
+
             break;
         case 0x7:
 
             this.vmemory.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
+
             this.v &= 0x3fff;
             break;
         }
@@ -496,7 +497,7 @@ class PPU {
         if (!this.showBg && !this.showSprites)
             return;
         const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + y);
+        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + y);
         this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xffff00);
        
     }
@@ -505,7 +506,7 @@ class PPU {
         if (!this.showBg && !this.showSprites)
             return;
         const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + this.nt * 16 + 8 + y);
+        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + 8 + y);
 
         this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
     }
@@ -581,6 +582,9 @@ class PPU {
         this.stepBg();
         this.stepS();
 
+        //this is to give a chance to MMC3 detecting the address v 
+        //this.vmemory.getByte(this.v & 0x3fff);
+
         this.flgVblankSuppress = false;
     }
 
@@ -595,7 +599,7 @@ class PPU {
 
         if (this.sy === 261 && this.sx === 1) {
             this.flgSpriteOverflow = false;
-        } else if (this.sy >= 0 && this.sy <= 239) {
+        } else if (this.sy === 261 || (this.sy >= 0 && this.sy <= 239)) {
             if (!this.showSprites && !this.showBg)
                 return;
 
@@ -681,34 +685,31 @@ class PPU {
                 let spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
                 this.addrOam = 0;
                 let b0 = this.secondaryOam[addrOamBase + 0];
+               
+                switch (this.sx & 7) {
+                    case 1:
+                    {
+                        let b2 = this.secondaryOam[addrOamBase + 2];
+                        let b3 = this.secondaryOam[addrOamBase + 3];
+                        spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
+                        spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
+                        spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
+                        spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
+                        spriteRenderingInfo.xCounter = b0 >= 0xef ? -1000 :b3;
 
-                if (b0 >= 0xef) {
-                    spriteRenderingInfo.xCounter = -1000;
-                } else {
-                    switch (this.sx & 7) {
-                        case 1:
-                        {
-                            let b2 = this.secondaryOam[addrOamBase + 2];
-                            let b3 = this.secondaryOam[addrOamBase + 3];
-                            spriteRenderingInfo.ipaletteBase = (b2 & 3) << 2;
-                            spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
-                            spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
-                            spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-                            spriteRenderingInfo.xCounter = b3;
-                            spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
-                        }
-                        case 0:
-                        {
-                            let b1 = this.secondaryOam[addrOamBase + 1];
-                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0, b1, spriteRenderingInfo.flipVert);
-                            break;
-                        }
-                        case 6:
-                        {
-                            let b1 = this.secondaryOam[addrOamBase + 1];
-                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0, b1, spriteRenderingInfo.flipVert);
-                            break;
-                        }
+                        spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                    }
+                    case 0:
+                    {
+                        let b1 = this.secondaryOam[addrOamBase + 1];
+                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        break;
+                    }
+                    case 6:
+                    {
+                        let b1 = this.secondaryOam[addrOamBase + 1];
+                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        break;
                     }
                 }
             }
@@ -888,6 +889,8 @@ class PPU {
         0xff78d2cc, 0xff78deb4, 0xff90e2a8, 0xffb4e298, 
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ]);
-    
-   
+
+    foo() {
+         this.vmemory.getByte(this.v & 0x3fff);
+    }
 }
