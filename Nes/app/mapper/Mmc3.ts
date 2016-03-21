@@ -80,7 +80,8 @@ class Mmc3 implements IMemoryMapper {
 
     setCpuAndPpu(cpu: Mos6502, ppu:PPU) {
         this.irqLine = new IrqLine(cpu);
-       // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
+        this.ppu = ppu;
+        // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     }
 
     private setByte(addr: number, value: number): void {
@@ -108,20 +109,20 @@ class Mmc3 implements IMemoryMapper {
             if (addr & 1) { //IRQ reload 
                 this.scanLineCounterRestartRequested = true;
                
-                console.log('irqCounterRestartRequested');
+                //console.log('irqCounterRestartRequested');
             } else { //IRQ latch
                 this.scanLineCounterStartValue = value & 0xff;
-                console.log('irqCounterStartValue', value);
+                //console.log('irqCounterStartValue', value);
             }
         }
         else if (addr <= 0xffff) {
             if (addr & 1) { //irq enable
                 this.irqEnabled = true;
-                console.log('irqEnabled', true);
+                //console.log('irqEnabled', true);
             } else { //irq disable
                 this.irqLine.ack();
                 this.irqEnabled = false;
-                console.log('irqEnabled', false);
+               // console.log('irqEnabled', false);
             }
         }
     }
@@ -209,34 +210,48 @@ class Mmc3 implements IMemoryMapper {
     }
 
     onMemoryAccess(addr: number) {
-        this.prevA12 = this.curA12;
-        this.curA12 = addr & 0x1000;
-        this.wasDown = this.wasDown || !this.curA12;
+      //  if (addr < 0x2000) {
+            this.curA12 = addr & 0x1000;
+            this.wasDown = this.wasDown || !this.curA12;
+       // }
+         this.clk();
+    }
 
-        var d = 1;
-        if (this.postponeRequest < 0 && !this.prevA12 && this.curA12) {
+    lastRise = 0;
+    rise = false;
+    postponeRequest = -1;
+    clk() {
+        const d = this.ppu.addrTileBase === 0x1000 ? 0 : 0;
+        this.lastRise++;
+
+        //A12 rise within less than 16 dots of last A12 rise: no tick.
+        //Any other A12 rise: tick.
+        if (!this.prevA12 && this.curA12 && this.lastRise >= 0) {
+            this.lastRise = 0;
+
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
                     this.postponeRequest = d;
                 this.scanLineCounter = this.scanLineCounterStartValue;
-            }
-            else if (this.scanLineCounter > 0) {
+            } else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled)
+                if (!this.scanLineCounter && this.irqEnabled) {
                     this.postponeRequest = d;
-
+                }
             }
         }
-    }
+        this.prevA12 = this.curA12;
 
-    postponeRequest = -1;
-    clk() {
         if (!this.postponeRequest) {
+            console.log(this.ppu.showBg, this.ppu.showSprites, this.ppu.sx, this.ppu.sy);
             this.irqLine.request();
+            this.postponeRequest--;
+        } else {
+            this.postponeRequest--;
         }
 
-        if (this.postponeRequest >= 0)
-            this.postponeRequest--;
     }
+
+    ppu: PPU;
 }

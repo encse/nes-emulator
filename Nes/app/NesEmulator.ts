@@ -52,8 +52,7 @@
             }
 
             if (this.icycle === 0) {
-                this.memoryMapper.clk();
-                    
+
                 if (this.dmaRequested) {
 
                     if (!(this.cpu.icycle & 1)) {
@@ -65,7 +64,7 @@
                     this.idma--;
                     this.cpu.icycle++;
                 } else if (this.idma > 0) {
-                    
+
                     this.cpu.icycle++;
                     if (!(this.idma & 1)) {
                         this.bDma = this.memoryMapper.memory.getByte(this.addrDma++);
@@ -74,13 +73,14 @@
                         this.memoryMapper.memory.setByte(0x2004, this.bDma);
                     }
                     this.idma--;
-                  
-                }
-                else {
+
+                } else {
                     this.cpu.step();
                 }
+
+
             }
-            
+
             this.apu.step();
         }
     }

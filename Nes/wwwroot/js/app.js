@@ -651,9 +651,9 @@ var Most6502Base = (function () {
                 this.opcode = this.memory.getByte(this.ip);
             }
             this.ipCur = this.ip;
-            this.trace(this.opcode);
-            if (this.ipCur === 0xe3e8 || this.ipCur === 0xe3fb)
-                console.log(this.ipCur.toString(16));
+            //this.trace(this.opcode);
+            //if (this.ipCur === 0xe3e8 || this.ipCur === 0xe3fb)
+            //    console.log(this.ipCur.toString(16));
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
         this.opcodes[this.opcode].call(this);
@@ -10935,6 +10935,8 @@ var Mmc3 = (function () {
         this.scanLineCounterRestartRequested = false;
         this.scanLineCounter = 0;
         this.irqEnabled = true;
+        this.lastRise = 0;
+        this.rise = false;
         this.postponeRequest = -1;
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
@@ -10955,6 +10957,7 @@ var Mmc3 = (function () {
     }
     Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
         this.irqLine = new IrqLine(cpu);
+        this.ppu = ppu;
         // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     };
     Mmc3.prototype.setByte = function (addr, value) {
@@ -10982,22 +10985,18 @@ var Mmc3 = (function () {
         else if (addr <= 0xdffe) {
             if (addr & 1) {
                 this.scanLineCounterRestartRequested = true;
-                console.log('irqCounterRestartRequested');
             }
             else {
                 this.scanLineCounterStartValue = value & 0xff;
-                console.log('irqCounterStartValue', value);
             }
         }
         else if (addr <= 0xffff) {
             if (addr & 1) {
                 this.irqEnabled = true;
-                console.log('irqEnabled', true);
             }
             else {
                 this.irqLine.ack();
                 this.irqEnabled = false;
-                console.log('irqEnabled', false);
             }
         }
     };
@@ -11080,11 +11079,19 @@ var Mmc3 = (function () {
         return result;
     };
     Mmc3.prototype.onMemoryAccess = function (addr) {
-        this.prevA12 = this.curA12;
+        //  if (addr < 0x2000) {
         this.curA12 = addr & 0x1000;
         this.wasDown = this.wasDown || !this.curA12;
-        var d = 1;
-        if (this.postponeRequest < 0 && !this.prevA12 && this.curA12) {
+        // }
+        this.clk();
+    };
+    Mmc3.prototype.clk = function () {
+        var d = this.ppu.addrTileBase === 0x1000 ? 0 : 0;
+        this.lastRise++;
+        //A12 rise within less than 16 dots of last A12 rise: no tick.
+        //Any other A12 rise: tick.
+        if (!this.prevA12 && this.curA12 && this.lastRise >= 0) {
+            this.lastRise = 0;
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
@@ -11093,17 +11100,20 @@ var Mmc3 = (function () {
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled)
+                if (!this.scanLineCounter && this.irqEnabled) {
                     this.postponeRequest = d;
+                }
             }
         }
-    };
-    Mmc3.prototype.clk = function () {
+        this.prevA12 = this.curA12;
         if (!this.postponeRequest) {
+            console.log(this.ppu.showBg, this.ppu.showSprites, this.ppu.sx, this.ppu.sy);
             this.irqLine.request();
-        }
-        if (this.postponeRequest >= 0)
             this.postponeRequest--;
+        }
+        else {
+            this.postponeRequest--;
+        }
     };
     return Mmc3;
 })();
@@ -11249,13 +11259,18 @@ var NesEmulator = (function () {
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
             if ((this.icycle & 3) === 0) {
                 var nmiBefore = this.cpu.nmiLine;
+                var irqBefore = this.cpu.irqLine;
                 this.ppu.step();
+                ///  this.memoryMapper.clk();
                 var nmiAfter = this.cpu.nmiLine;
+                var irqAfter = this.cpu.irqLine;
+                //if (irqBefore > irqAfter && this.icycle === 4)
+                //    this.cpu.detectInterrupts();
+                //else
                 if (nmiBefore > nmiAfter && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
-                this.memoryMapper.clk();
                 if (this.dmaRequested) {
                     if (!(this.cpu.icycle & 1)) {
                         this.dmaRequested = false;
@@ -11976,17 +11991,18 @@ var PPU = (function () {
                             spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
                             spriteRenderingInfo.xCounter = b0 >= 0xef ? -1000 : b3;
                             spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                            break;
                         }
-                    case 0:
+                    case 4:
                         {
                             var b1 = this.secondaryOam[addrOamBase + 1];
-                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
                             break;
                         }
                     case 6:
                         {
                             var b1 = this.secondaryOam[addrOamBase + 1];
-                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
                             break;
                         }
                 }

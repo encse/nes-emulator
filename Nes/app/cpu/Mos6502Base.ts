@@ -368,9 +368,9 @@ this.opcodes[187] = this.op0xbb;
                 this.opcode = this.memory.getByte(this.ip);
             }
             this.ipCur = this.ip;
-            this.trace(this.opcode);
-            if (this.ipCur === 0xe3e8 || this.ipCur === 0xe3fb)
-                console.log(this.ipCur.toString(16));
+            //this.trace(this.opcode);
+            //if (this.ipCur === 0xe3e8 || this.ipCur === 0xe3fb)
+            //    console.log(this.ipCur.toString(16));
             this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
         }
 

@@ -697,17 +697,18 @@ class PPU {
                         spriteRenderingInfo.xCounter = b0 >= 0xef ? -1000 :b3;
 
                         spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
+                        break;
                     }
-                    case 0:
+                    case 4:
                     {
                         let b1 = this.secondaryOam[addrOamBase + 1];
-                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
                         break;
                     }
                     case 6:
                     {
                         let b1 = this.secondaryOam[addrOamBase + 1];
-                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
                         break;
                     }
                 }
