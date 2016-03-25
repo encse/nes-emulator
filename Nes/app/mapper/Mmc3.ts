@@ -157,6 +157,7 @@ class Mmc3 implements IMemoryMapper {
                          +-------+-------+-------+-------+---------------+---------------+
        */
         if (!this.chrMode) {
+
             this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] & 0xfe];
             this.vmemory.rgmemory[1] = this.CHRBanks[this.r[0] | 1];
             this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] & 0xfe];

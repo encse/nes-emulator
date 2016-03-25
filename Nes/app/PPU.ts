@@ -317,11 +317,11 @@ class PPU {
             break;
         case 0x5:
             if (this.w === 0) {
-                this.t = (this.t & 0x73e0) | ((value >> 3) & 0x1f);
+                this.t = (this.t & 0x7fe0) | ((value >> 3) & 0x1f);
                 this.x = value & 7;
             } else {
                 this.t = (this.t & 0x7c1f) | (((value >> 3) & 0x1f) << 5);
-                this.t = (this.t & 0x0fff) | (value & 7) << 10;
+                this.t = (this.t & 0x0fff) | (value & 7) << 12;
             }
             this.w = 1 - this.w;
             break;
