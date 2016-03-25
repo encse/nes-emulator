@@ -239,6 +239,7 @@ var Controller = (function () {
                 this.keyStateA[ControllerKeys.B_Key] = 1;
                 break;
         }
+        event.preventDefault();
     };
     Controller.prototype.onKeyUp = function (event) {
         switch (event.keyCode) {
@@ -267,6 +268,7 @@ var Controller = (function () {
                 this.keyStateA[ControllerKeys.B_Key] = 0;
                 break;
         }
+        event.preventDefault();
     };
     Object.defineProperty(Controller.prototype, "reg4016", {
         /**

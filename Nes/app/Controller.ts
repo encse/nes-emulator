@@ -35,6 +35,7 @@ class Controller {
             case 65: this.keyStateA[ControllerKeys.A_Key] = 1; break;
             case 66: this.keyStateA[ControllerKeys.B_Key] = 1; break;
         }
+        event.preventDefault();
     }
 
     onKeyUp(event: KeyboardEvent) {
@@ -48,6 +49,7 @@ class Controller {
             case 65: this.keyStateA[ControllerKeys.A_Key] = 0; break;
             case 66: this.keyStateA[ControllerKeys.B_Key] = 0; break;
         }
+        event.preventDefault();
     }
 
     set reg4016(value:number) {
