@@ -211,6 +211,9 @@ var Controller = (function () {
         this.keyUpEvents = [];
         canvas.tabIndex = 1;
         canvas.focus();
+        canvas.addEventListener('blur', function (_) {
+            setTimeout(function () { canvas.focus(); }, 20);
+        });
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
         this.registerKeyboardHandler(40, function () { _this.keyStateA[ControllerKeys.Down] = 0; });
@@ -11163,7 +11166,12 @@ var CompoundMemory = (function () {
         var stGetters = '';
         for (var i = 0; i < this.getters.length; i++) {
             var getter = this.getters[i];
-            stGetters += "if (" + getter.addrFirst + " <= addr && addr <= " + getter.addrLast + ") return this.getters[" + i + "].getter(addr);\n";
+            var check = '';
+            if (getter.addrFirst === getter.addrLast)
+                check = "addr === " + getter.addrFirst;
+            else
+                check = getter.addrFirst + " <= addr && addr <= " + getter.addrLast;
+            stGetters += "if (" + check + ") return this.getters[" + i + "].getter(addr);\n";
         }
         var addrLim = 0;
         var addrFirst = 0;
@@ -11184,7 +11192,12 @@ var CompoundMemory = (function () {
         var stSetters = '';
         for (var i = 0; i < this.setters.length; i++) {
             var setter = this.setters[i];
-            stSetters += "if (" + setter.addrFirst + " <= addr && addr <= " + setter.addrLast + ") return this.setters[" + i + "].setter(addr, value);\n";
+            var check = '';
+            if (setter.addrFirst === setter.addrLast)
+                check = "addr === " + setter.addrFirst;
+            else
+                check = setter.addrFirst + " <= addr && addr <= " + setter.addrLast;
+            stSetters += "if (" + check + ") return this.setters[" + i + "].setter(addr, value);\n";
         }
         var addrLim = 0;
         var addrFirst = 0;

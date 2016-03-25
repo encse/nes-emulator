@@ -22,6 +22,11 @@ class Controller {
     constructor(canvas: HTMLElement) {
         canvas.tabIndex = 1;
         canvas.focus();
+
+        canvas.addEventListener('blur', (_) => {
+            setTimeout(() => {canvas.focus(); }, 20);
+        });
+
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
 

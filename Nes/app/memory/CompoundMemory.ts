@@ -45,7 +45,13 @@ class CompoundMemory implements Memory {
         let stGetters = '';
         for (let i = 0; i < this.getters.length; i++) {
             let getter = this.getters[i];
-            stGetters += `if (${getter.addrFirst} <= addr && addr <= ${getter.addrLast}) return this.getters[${i}].getter(addr);\n`;
+            let check = '';
+            if (getter.addrFirst === getter.addrLast)
+                check = `addr === ${getter.addrFirst}`;
+            else
+                check = `${getter.addrFirst} <= addr && addr <= ${getter.addrLast}`;
+
+            stGetters += `if (${check}) return this.getters[${i}].getter(addr);\n`;
         }
 
         let addrLim = 0;
@@ -67,8 +73,13 @@ class CompoundMemory implements Memory {
     initSetter() {
         let stSetters = '';
         for (let i = 0; i < this.setters.length; i++) {
-            let setter = this.setters[i];
-            stSetters += `if (${setter.addrFirst} <= addr && addr <= ${setter.addrLast}) return this.setters[${i}].setter(addr, value);\n`;
+            const setter = this.setters[i];
+            let check = '';
+            if (setter.addrFirst === setter.addrLast)
+                check = `addr === ${setter.addrFirst}`;
+            else
+                check = `${setter.addrFirst} <= addr && addr <= ${setter.addrLast}`;
+            stSetters += `if (${check}) return this.setters[${i}].setter(addr, value);\n`;
         }
 
         let addrLim = 0;
@@ -79,7 +90,7 @@ class CompoundMemory implements Memory {
             let modifiedAddr = '';
             if (!addrFirst)
                 modifiedAddr = 'addr';
-            else
+            else 
                 modifiedAddr = `addr - ${addrFirst}`;
             stSetters += `if (addr < ${addrLim}) return this.rgmemory[${i}].setByte(${modifiedAddr}, value);\n`;
             addrFirst += memory.size();
