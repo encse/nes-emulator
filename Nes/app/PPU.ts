@@ -731,7 +731,7 @@ class PPU {
             var icolorBg: number;
             var bgTransparent = true;
 
-            if (this.showBg) {
+            if (this.showBg && (this.showBgInLeftmost8Pixels || this.sx > 8)) {
                 let tileCol = 17 - this.x;
 
                 let ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
@@ -767,7 +767,7 @@ class PPU {
                 for (let isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
 
-                    if (spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                    if ((this.showSpritesInLeftmost8Pixels || this.sx > 8) && spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
                         let tileCol = spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
                         let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;

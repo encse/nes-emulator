@@ -12008,7 +12008,7 @@ var PPU = (function () {
         if (this.sx >= 1 && this.sy >= 0 && this.sx <= 256 && this.sy < 240) {
             var icolorBg;
             var bgTransparent = true;
-            if (this.showBg) {
+            if (this.showBg && (this.showBgInLeftmost8Pixels || this.sx > 8)) {
                 var tileCol = 17 - this.x;
                 var ipalette0 = (this.bgTileLo >> (tileCol)) & 1;
                 var ipalette1 = (this.bgTileHi >> (tileCol - 2)) & 1;
@@ -12037,7 +12037,7 @@ var PPU = (function () {
             if (this.showSprites) {
                 for (var isprite = 0; isprite < 8; isprite++) {
                     var spriteRenderingInfo = this.rgspriteRenderingInfo[isprite];
-                    if (spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
+                    if ((this.showSpritesInLeftmost8Pixels || this.sx > 8) && spriteTransparent && spriteRenderingInfo.xCounter <= 0 && spriteRenderingInfo.xCounter >= -7) {
                         var tileCol = spriteRenderingInfo.flipHoriz ? -spriteRenderingInfo.xCounter : 7 + spriteRenderingInfo.xCounter;
                         var ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         var ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
