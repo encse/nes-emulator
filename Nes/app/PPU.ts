@@ -611,8 +611,8 @@ class PPU {
                 // initialized to $FF - attempting to read $2004 will return $FF.Internally, the clear operation 
                 // is implemented by reading from the OAM and writing into the secondary OAM as usual, only a signal 
                 // is active that makes the read always return $FF.
-                this.secondaryOam[this.sx] = 0xff;
-                this.secondaryOamISprite[this.sx >> 2] = -1;
+                this.secondaryOam[(this.sx - 1)] = 0xff;
+                this.secondaryOamISprite[(this.sx - 1) >> 2] = -1;
                 if (this.sx === 64) {
                     this.addrOam = 0;
                     this.addrSecondaryOam = 0;
@@ -698,8 +698,11 @@ class PPU {
                         spriteRenderingInfo.behindBg = !!(b2 & (1 << 5));
                         spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
                         spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
-                        spriteRenderingInfo.xCounter = b0 >= 0xef ? -1000 :b3;
+                        spriteRenderingInfo.xCounter = this.secondaryOamISprite[isprite] === -1 ? -1000 :b3;
 
+                        if (spriteRenderingInfo.xCounter > 238 && spriteRenderingInfo.xCounter < 240 && this.sy < 150) {
+                            console.log('nagyobb');
+                        }
                         spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
                         break;
                     }
@@ -772,6 +775,8 @@ class PPU {
                         let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
+                            if (this.sx == 256)
+                                console.log('most');
                             spriteTransparent = false;
                             spriteBehindBg = spriteRenderingInfo.behindBg;
                             flgZeroSprite = spriteRenderingInfo.flgZeroSprite;
