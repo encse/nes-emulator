@@ -522,7 +522,6 @@
     <TypeScriptCompile Include="app\mapper\MemoryMapperFactory.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc3.ts" />
     <TypeScriptCompile Include="app\memory\CleverRam.ts" />
-    <TypeScriptCompile Include="app\memory\CompoundMemoryWithAccessCheck.ts" />
     <TypeScriptCompile Include="app\runner\CpuTestRunner.ts" />
     <TypeScriptCompile Include="app\driver\CanvasDriver.ts" />
     <TypeScriptCompile Include="app\driver\DriverFactory.ts" />

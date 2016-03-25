@@ -700,9 +700,6 @@ class PPU {
                         spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
                         spriteRenderingInfo.xCounter = this.secondaryOamISprite[isprite] === -1 ? -1000 :b3;
 
-                        if (spriteRenderingInfo.xCounter > 238 && spriteRenderingInfo.xCounter < 240 && this.sy < 150) {
-                            console.log('nagyobb');
-                        }
                         spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
                         break;
                     }
@@ -775,8 +772,6 @@ class PPU {
                         let ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         let ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
-                            if (this.sx == 256)
-                                console.log('most');
                             spriteTransparent = false;
                             spriteBehindBg = spriteRenderingInfo.behindBg;
                             flgZeroSprite = spriteRenderingInfo.flgZeroSprite;
@@ -921,6 +916,6 @@ class PPU {
         
     }
     triggerMemoryAccess(addr) {
-         this.vmemory.getByte(addr);
+        this.vmemory.lastAddr = addr;
     }
 }

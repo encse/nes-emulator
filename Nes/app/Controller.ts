@@ -17,11 +17,26 @@ class Controller {
     keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
     keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
 
+    keyUpEvents: (() => void)[] = [];
+
     constructor(canvas: HTMLElement) {
         canvas.tabIndex = 1;
         canvas.focus();
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
+
+        this.registerKeyboardHandler(40, () => { this.keyStateA[ControllerKeys.Down] = 0; });
+        this.registerKeyboardHandler(38, () => { this.keyStateA[ControllerKeys.Up] = 0; });
+        this.registerKeyboardHandler(37, () => { this.keyStateA[ControllerKeys.Left] = 0; });
+        this.registerKeyboardHandler(39, () => { this.keyStateA[ControllerKeys.Right] = 0; });
+        this.registerKeyboardHandler(13, () => { this.keyStateA[ControllerKeys.Start_Key] = 0; });
+        this.registerKeyboardHandler(32, () => { this.keyStateA[ControllerKeys.Select_Key] = 0; });
+        this.registerKeyboardHandler(65, () => { this.keyStateA[ControllerKeys.A_Key] = 0; });
+        this.registerKeyboardHandler(66, () => { this.keyStateA[ControllerKeys.B_Key] = 0; });
+    }
+
+    registerKeyboardHandler(keycode: number, callback: () => void) {
+        this.keyUpEvents[keycode] = callback;
     }
 
     onKeyDown(event:KeyboardEvent) {
@@ -39,17 +54,11 @@ class Controller {
     }
 
     onKeyUp(event: KeyboardEvent) {
-        switch (event.keyCode) {
-            case 40: this.keyStateA[ControllerKeys.Down] = 0; break;
-            case 38: this.keyStateA[ControllerKeys.Up] = 0; break;
-            case 37: this.keyStateA[ControllerKeys.Left] = 0; break;
-            case 39: this.keyStateA[ControllerKeys.Right] = 0; break;
-            case 13: this.keyStateA[ControllerKeys.Start_Key] = 0; break;
-            case 32: this.keyStateA[ControllerKeys.Select_Key] = 0; break;
-            case 65: this.keyStateA[ControllerKeys.A_Key] = 0; break;
-            case 66: this.keyStateA[ControllerKeys.B_Key] = 0; break;
+        const callback = this.keyUpEvents[event.keyCode];
+        if (callback) {
+            callback();
+            event.preventDefault();
         }
-        event.preventDefault();
     }
 
     set reg4016(value:number) {

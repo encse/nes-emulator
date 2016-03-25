@@ -60,8 +60,7 @@ class Mmc3 implements IMemoryMapper {
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
 
-        this.vmemory = new CompoundMemoryWithAccessCheck(
-            this.onMemoryAccess.bind(this), 
+        this.vmemory = new CompoundMemory(
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.CHRBanks[2],
@@ -208,12 +207,12 @@ class Mmc3 implements IMemoryMapper {
         return result;
     }
 
-    onMemoryAccess(addr: number) {
-        this.curA12 = addr & 0x1000;
-    }
+    
 
     lastFall = 0;
     clk() {
+        this.curA12 = this.vmemory.lastAddr & 0x1000;
+
         if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
          
             

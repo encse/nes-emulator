@@ -203,15 +203,28 @@ var ControllerKeys;
 ;
 var Controller = (function () {
     function Controller(canvas) {
+        var _this = this;
         this.s = 0;
         this.i = 0;
         this.keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
         this.keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.keyUpEvents = [];
         canvas.tabIndex = 1;
         canvas.focus();
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
+        this.registerKeyboardHandler(40, function () { _this.keyStateA[ControllerKeys.Down] = 0; });
+        this.registerKeyboardHandler(38, function () { _this.keyStateA[ControllerKeys.Up] = 0; });
+        this.registerKeyboardHandler(37, function () { _this.keyStateA[ControllerKeys.Left] = 0; });
+        this.registerKeyboardHandler(39, function () { _this.keyStateA[ControllerKeys.Right] = 0; });
+        this.registerKeyboardHandler(13, function () { _this.keyStateA[ControllerKeys.Start_Key] = 0; });
+        this.registerKeyboardHandler(32, function () { _this.keyStateA[ControllerKeys.Select_Key] = 0; });
+        this.registerKeyboardHandler(65, function () { _this.keyStateA[ControllerKeys.A_Key] = 0; });
+        this.registerKeyboardHandler(66, function () { _this.keyStateA[ControllerKeys.B_Key] = 0; });
     }
+    Controller.prototype.registerKeyboardHandler = function (keycode, callback) {
+        this.keyUpEvents[keycode] = callback;
+    };
     Controller.prototype.onKeyDown = function (event) {
         switch (event.keyCode) {
             case 40:
@@ -242,33 +255,11 @@ var Controller = (function () {
         event.preventDefault();
     };
     Controller.prototype.onKeyUp = function (event) {
-        switch (event.keyCode) {
-            case 40:
-                this.keyStateA[ControllerKeys.Down] = 0;
-                break;
-            case 38:
-                this.keyStateA[ControllerKeys.Up] = 0;
-                break;
-            case 37:
-                this.keyStateA[ControllerKeys.Left] = 0;
-                break;
-            case 39:
-                this.keyStateA[ControllerKeys.Right] = 0;
-                break;
-            case 13:
-                this.keyStateA[ControllerKeys.Start_Key] = 0;
-                break;
-            case 32:
-                this.keyStateA[ControllerKeys.Select_Key] = 0;
-                break;
-            case 65:
-                this.keyStateA[ControllerKeys.A_Key] = 0;
-                break;
-            case 66:
-                this.keyStateA[ControllerKeys.B_Key] = 0;
-                break;
+        var callback = this.keyUpEvents[event.keyCode];
+        if (callback) {
+            callback();
+            event.preventDefault();
         }
-        event.preventDefault();
     };
     Object.defineProperty(Controller.prototype, "reg4016", {
         /**
@@ -10809,7 +10800,7 @@ var Mmc1 = (function () {
         }
     };
     Mmc1.prototype.update = function () {
-        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
+        //console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
         /*
             PRG Setup:
             --------------------------
@@ -10849,12 +10840,12 @@ var Mmc1 = (function () {
                       +-------------------------------+-------------------------------+
         */
         if (this.C === 0) {
-            console.log('chr:', this.CHR0);
+            //console.log('chr:', this.CHR0);
             this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 >> 1];
             this.vmemory.rgmemory[1] = this.CHRBanks[(this.CHR0 >> 1) + 1];
         }
         else {
-            console.log('chr mode 2:', this.CHR0);
+            // console.log('chr mode 2:', this.CHR0);
             this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
             this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
         }
@@ -10951,7 +10942,7 @@ var Mmc3 = (function () {
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
         this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
         this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
-        this.vmemory = new CompoundMemoryWithAccessCheck(this.onMemoryAccess.bind(this), this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
         this.update();
     }
@@ -11076,10 +11067,8 @@ var Mmc3 = (function () {
         }
         return result;
     };
-    Mmc3.prototype.onMemoryAccess = function (addr) {
-        this.curA12 = addr & 0x1000;
-    };
     Mmc3.prototype.clk = function () {
+        this.curA12 = this.vmemory.lastAddr & 0x1000;
         if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
@@ -11147,76 +11136,73 @@ var CompoundMemory = (function () {
         this.sizeI = 0;
         this.rgmemory = rgmemory;
         rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
+        this.initAccessors();
     }
     CompoundMemory.prototype.size = function () {
         return this.sizeI;
     };
     CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
         this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
+        this.initAccessors();
     };
     CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
         this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
+        this.initAccessors();
     };
     CompoundMemory.prototype.getByte = function (addr) {
-        for (var i = 0; i < this.getters.length; i++) {
-            var getter = this.getters[i];
-            if (getter.addrFirst <= addr && addr <= getter.addrLast) {
-                return getter.getter(addr);
-            }
-        }
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            if (addr < memory.size())
-                return memory.getByte(addr);
-            else
-                addr -= memory.size();
-        }
         throw 'address out of bounds';
     };
     CompoundMemory.prototype.setByte = function (addr, value) {
-        //if (addr == 0x3c2) {
-        //    console.log('xxx set', value.toString(16));
-        //}
-        for (var i = 0; i < this.setters.length; i++) {
-            var setter = this.setters[i];
-            if (setter.addrFirst <= addr && addr <= setter.addrLast) {
-                setter.setter(addr, value);
-                return;
-            }
+        throw 'address out of bounds';
+    };
+    CompoundMemory.prototype.initAccessors = function () {
+        this.initGetter();
+        this.initSetter();
+    };
+    CompoundMemory.prototype.initGetter = function () {
+        var stGetters = '';
+        for (var i = 0; i < this.getters.length; i++) {
+            var getter = this.getters[i];
+            stGetters += "if (" + getter.addrFirst + " <= addr && addr <= " + getter.addrLast + ") return this.getters[" + i + "].getter(addr);\n";
         }
+        var addrLim = 0;
+        var addrFirst = 0;
         for (var i = 0; i < this.rgmemory.length; i++) {
             var memory = this.rgmemory[i];
-            if (addr < memory.size()) {
-                memory.setByte(addr, value);
-                return;
-            }
+            addrLim += memory.size();
+            var modifiedAddr = '';
+            if (!addrFirst)
+                modifiedAddr = 'addr';
             else
-                addr -= memory.size();
+                modifiedAddr = "addr - " + addrFirst;
+            stGetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].getByte(" + modifiedAddr + ");\n";
+            addrFirst += memory.size();
         }
+        eval("this.getByte = function(addr) { " + stGetters + " }");
+    };
+    CompoundMemory.prototype.initSetter = function () {
+        var stSetters = '';
+        for (var i = 0; i < this.setters.length; i++) {
+            var setter = this.setters[i];
+            stSetters += "if (" + setter.addrFirst + " <= addr && addr <= " + setter.addrLast + ") return this.setters[" + i + "].setter(addr, value);\n";
+        }
+        var addrLim = 0;
+        var addrFirst = 0;
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            addrLim += memory.size();
+            var modifiedAddr = '';
+            if (!addrFirst)
+                modifiedAddr = 'addr';
+            else
+                modifiedAddr = "addr - " + addrFirst;
+            stSetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].setByte(" + modifiedAddr + ", value);\n";
+            addrFirst += memory.size();
+        }
+        eval("this.setByte = function(addr, value) {\n             this.lastAddr = addr;\n             " + stSetters + " }");
     };
     return CompoundMemory;
 })();
-///<reference path="CompoundMemory.ts"/>
-var CompoundMemoryWithAccessCheck = (function (_super) {
-    __extends(CompoundMemoryWithAccessCheck, _super);
-    function CompoundMemoryWithAccessCheck(onAccess) {
-        var rgmemory = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            rgmemory[_i - 1] = arguments[_i];
-        }
-        _super.apply(this, rgmemory);
-        this.onAccess = onAccess;
-    }
-    CompoundMemoryWithAccessCheck.prototype.getByte = function (addr) {
-        this.onAccess(addr);
-        return _super.prototype.getByte.call(this, addr);
-    };
-    CompoundMemoryWithAccessCheck.prototype.setByte = function (addr, value) {
-        this.onAccess(addr);
-        return _super.prototype.setByte.call(this, addr, value);
-    };
-    return CompoundMemoryWithAccessCheck;
-})(CompoundMemory);
 var NesEmulator = (function () {
     function NesEmulator(nesImage, canvas, driver) {
         var _this = this;
@@ -11983,9 +11969,6 @@ var PPU = (function () {
                             spriteRenderingInfo.flipHoriz = !!(b2 & (1 << 6));
                             spriteRenderingInfo.flipVert = !!(b2 & (1 << 7));
                             spriteRenderingInfo.xCounter = this.secondaryOamISprite[isprite] === -1 ? -1000 : b3;
-                            if (spriteRenderingInfo.xCounter > 238 && spriteRenderingInfo.xCounter < 240 && this.sy < 150) {
-                                console.log('nagyobb');
-                            }
                             spriteRenderingInfo.flgZeroSprite = !this.secondaryOamISprite[isprite];
                             break;
                         }
@@ -12047,8 +12030,6 @@ var PPU = (function () {
                         var ipalette0 = (spriteRenderingInfo.tileLo >> tileCol) & 1;
                         var ipalette1 = (spriteRenderingInfo.tileHi >> tileCol) & 1;
                         if (ipalette0 || ipalette1) {
-                            if (this.sx == 256)
-                                console.log('most');
                             spriteTransparent = false;
                             spriteBehindBg = spriteRenderingInfo.behindBg;
                             flgZeroSprite = spriteRenderingInfo.flgZeroSprite;
@@ -12173,7 +12154,7 @@ var PPU = (function () {
         }
     };
     PPU.prototype.triggerMemoryAccess = function (addr) {
-        this.vmemory.getByte(addr);
+        this.vmemory.lastAddr = addr;
     };
     PPU.syFirstVisible = 0;
     PPU.syPostRender = 240;
@@ -12352,11 +12333,13 @@ var NesRunner = (function (_super) {
         this.hpcStart = 0;
     }
     NesRunner.prototype.runI = function () {
+        var _this = this;
         this.hpcStart = window.performance.now();
         this.iFrameStart = this.nesEmulator.ppu.iFrame;
         this.fpsElement = document.createElement("span");
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
+        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), function () { _this.headerElement.classList.toggle('show'); });
         requestAnimationFrame(this.callback);
         //setInterval(this.printFps.bind(this), 1000);
     };

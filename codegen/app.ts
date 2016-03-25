@@ -1,6 +1,5 @@
 ﻿import Gen = require("./mos6502gen");
 var res = new Gen.Mos6502Gen().run();
-console.log();
 
 var fs = require('fs');
 fs.writeFile("../nes/app/cpu/Mos6502Base.ts", res, function (err) {

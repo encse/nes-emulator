@@ -17,7 +17,7 @@ class NesRunner extends NesRunnerBase {
         this.fpsElement = document.createElement("span");
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
-
+        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), () => {this.headerElement.classList.toggle('show')});
         requestAnimationFrame(this.callback);
         //setInterval(this.printFps.bind(this), 1000);
     }

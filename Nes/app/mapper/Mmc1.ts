@@ -141,7 +141,7 @@ class Mmc1 implements IMemoryMapper {
 
     private update() {
 
-        console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
+        //console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
         /*
             PRG Setup:
             --------------------------
@@ -182,11 +182,11 @@ class Mmc1 implements IMemoryMapper {
                       +-------------------------------+-------------------------------+
         */
         if (this.C === 0) {
-            console.log('chr:', this.CHR0);
+            //console.log('chr:', this.CHR0);
             this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 >> 1];
             this.vmemory.rgmemory[1] = this.CHRBanks[(this.CHR0 >> 1) + 1];
         } else {
-            console.log('chr mode 2:', this.CHR0);
+           // console.log('chr mode 2:', this.CHR0);
             this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
             this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
         }
