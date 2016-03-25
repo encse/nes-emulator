@@ -45,9 +45,12 @@
             if ((this.icycle & 3) === 0) {
 
                 const nmiBefore = this.cpu.nmiLine;
+                const irqBefore = this.cpu.irqLine;
                 this.ppu.step();
+                this.memoryMapper.clk();
                 const nmiAfter = this.cpu.nmiLine;
-                if (nmiBefore > nmiAfter && this.icycle === 4)
+                const irqAfter = this.cpu.irqLine;
+                if ((/*irqBefore > irqAfter ||*/ nmiBefore > nmiAfter) && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
 

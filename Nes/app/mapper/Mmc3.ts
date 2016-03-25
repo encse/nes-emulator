@@ -77,11 +77,9 @@ class Mmc3 implements IMemoryMapper {
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
         this.update();
     }
-
+    
     setCpuAndPpu(cpu: Mos6502, ppu:PPU) {
         this.irqLine = new IrqLine(cpu);
-        this.ppu = ppu;
-        // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     }
 
     private setByte(addr: number, value: number): void {
@@ -210,48 +208,32 @@ class Mmc3 implements IMemoryMapper {
     }
 
     onMemoryAccess(addr: number) {
-      //  if (addr < 0x2000) {
-            this.curA12 = addr & 0x1000;
-            this.wasDown = this.wasDown || !this.curA12;
-       // }
-         this.clk();
+        this.curA12 = addr & 0x1000;
     }
 
-    lastRise = 0;
-    rise = false;
-    postponeRequest = -1;
+    lastFall = 0;
     clk() {
-        const d = this.ppu.addrTileBase === 0x1000 ? 0 : 0;
-        this.lastRise++;
-
-        //A12 rise within less than 16 dots of last A12 rise: no tick.
-        //Any other A12 rise: tick.
-        if (!this.prevA12 && this.curA12 && this.lastRise >= 0) {
-            this.lastRise = 0;
-
+        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
+         
+            
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.postponeRequest = d;
+                    this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             } else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
                 if (!this.scanLineCounter && this.irqEnabled) {
-                    this.postponeRequest = d;
+                    this.irqLine.request();
                 }
             }
         }
-        this.prevA12 = this.curA12;
 
-        if (!this.postponeRequest) {
-            console.log(this.ppu.showBg, this.ppu.showSprites, this.ppu.sx, this.ppu.sy);
-            this.irqLine.request();
-            this.postponeRequest--;
-        } else {
-            this.postponeRequest--;
+        if (this.curA12 === 0) {
+            this.lastFall++;
+        } else if (this.curA12 !== 0) {
+            this.lastFall = 0;
         }
-
+        this.prevA12 = this.curA12;
     }
-
-    ppu: PPU;
 }

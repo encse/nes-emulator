@@ -256,7 +256,7 @@ class PPU {
               
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
-            this.triggerMemoryAccess();
+            this.triggerMemoryAccess(this.v);
             return res;
         }
         default:
@@ -337,17 +337,16 @@ class PPU {
             } else {
                 this.t = (this.t & 0xff00) + (value & 0xff);
                 this.v = this.t;
-                this.triggerMemoryAccess();
+                this.triggerMemoryAccess(this.v);
             }
             this.w = 1 - this.w;
 
             break;
         case 0x7:
-
-            this.vmemory.setByte(this.v & 0x3fff, value);
+            this.setByte(this.v & 0x3fff, value);
             this.v += this.daddrWrite;
             this.v &= 0x3fff;
-            this.triggerMemoryAccess();
+            this.triggerMemoryAccess(this.v);
             break;
         }
     }
@@ -426,87 +425,92 @@ class PPU {
         }
     }
 
-    private fetchUnusedNt() {
+    private fetchUnusedNt(phase: boolean) {
         if (!this.showBg && !this.showSprites)
             return;
 
-        const addr = 0x2000 | (this.v & 0x0fff);
-        this.vmemory.getByte(addr);
+        this.getByte(0x2000 | (this.v & 0x0fff), phase);
     }
 
-    private fetchNt() {
+    private fetchNt(phase: boolean) {
         if (!this.showBg && !this.showSprites)
             return;
-
-        const addr = 0x2000 | (this.v & 0x0fff);
-        this.nt = this.vmemory.getByte(addr);
+        if (this.getByte(0x2000 | (this.v & 0x0fff), phase))
+            this.nt = this.d;
     }
 
-    private fetchAt() {
+    private fetchAt(phase:boolean) {
         if (!this.showBg && !this.showSprites)
             return;
         const addr = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-        this.at = this.vmemory.getByte(addr);
-    
-        let dx = (this.v >> 1) & 1; //second bit of coarse x
-        let dy = (this.v >> 6) & 1; //second bit of coarse y
-       
-        let p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
+        if (this.getByte(addr, phase)) {
+            this.at = this.d;
 
-        this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
-        this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
-      
+            let dx = (this.v >> 1) & 1; //second bit of coarse x
+            let dy = (this.v >> 6) & 1; //second bit of coarse y
+
+            let p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
+
+            this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
+            this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
+        }
     }
 
-    private fetchSpriteTileLo(yTop, nt, flipVert) {
+    private fetchSpriteTileLo(yTop, nt, flipVert, phase:boolean) {
         if (!this.showSprites)
             return 0;
         if (this.spriteHeight === 8) {
             const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
-            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + y);
+            if (this.getByte(this.addrSpriteBase + (nt << 4) + y, phase))
+                return this.d;
         } else {
             let y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
             let addrBase = nt & 1 ? 0x1000 : 0;
             if (y > 7)
                 addrBase += 8;
-            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 0 + y);
+            if (this.getByte(addrBase + ((nt >> 1) << 5) + 0 + y, phase))
+                return this.d;
         }
-
+        return 0;
     }
 
-    private fetchSpriteTileHi(yTop, nt, flipVert) {
+    private fetchSpriteTileHi(yTop, nt, flipVert, phase) {
         if (!this.showSprites)
             return 0;
 
         if (this.spriteHeight === 8) {
             const y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
-            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + 8 + y);
+            if (this.getByte(this.addrSpriteBase + (nt << 4) + 8 + y, phase))
+                return this.d;
         } else {
             
             let y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
             let addrBase = nt & 1 ? 0x1000 : 0;
             if (y > 7)
                 addrBase += 8;
-            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 8 + y);
+            if (this.getByte(addrBase + ((nt >> 1) << 5) + 8 + y, phase))
+                return this.d;
+        }
+
+        return 0;
+    }
+
+    private fetchBgTileLo(phase:boolean) {
+        if (!this.showBg && !this.showSprites)
+            return;
+        const y = (this.v >> 12) & 0x07;
+        if (this.getByte(this.addrTileBase + (this.nt << 4) + y, phase)) {
+            this.bgTileLo = (this.d & 0xff) | (this.bgTileLo & 0xffff00);
         }
     }
-
-    private fetchBgTileLo() {
-        if (!this.showBg && !this.showSprites)
-            return;
-        const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + y);
-        this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xffff00);
-       
-    }
     
-    private fetchBgTileHi() {
+    private fetchBgTileHi(phase:boolean) {
         if (!this.showBg && !this.showSprites)
             return;
         const y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + 8 + y);
-
-        this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
+        if (this.getByte(this.addrTileBase + (this.nt << 4) + 8 + y, phase)) {
+            this.bgTileHi = (this.d & 0xff) | (this.bgTileHi & 0xffff00);
+        }
     }
 
     getNameTable(i) {
@@ -700,15 +704,17 @@ class PPU {
                         break;
                     }
                     case 4:
+                    case 5:
                     {
                         let b1 = this.secondaryOam[addrOamBase + 1];
-                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert, (this.sx & 7) === 4);
                         break;
                     }
                     case 6:
+                    case 7:
                     {
                         let b1 = this.secondaryOam[addrOamBase + 1];
-                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                        spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert, (this.sx & 7) === 6);
                         break;
                     }
                 }
@@ -809,19 +815,25 @@ class PPU {
                         this.flgVblank = false;
                 }
 
-                if ((this.sx & 0x07) === 2) {
-                    this.fetchNt();
-                } else if ((this.sx & 0x07) === 4) {
-                    this.fetchAt();
-                } else if ((this.sx & 0x07) === 6) {
-                    this.fetchBgTileLo();
-                } else if ((this.sx & 0x07) === 0) {
-                    this.fetchBgTileHi();
-
-                    if (this.sx === 256)
-                        this.incVertV();
-                    else
-                        this.incHoriV();
+                switch(this.sx & 0x07) {
+                    case 1: this.fetchNt(false); break;
+                    case 2: this.fetchNt(true); break;
+                    case 3: this.fetchAt(false); break;
+                    case 4:
+                        this.fetchAt(true);
+                        this.fetchBgTileLo(false);
+                        break;
+                    case 6:
+                        this.fetchBgTileLo(true);
+                        this.fetchBgTileHi(false);
+                        break;
+                    case 0:
+                        this.fetchBgTileHi(true); 
+                        if (this.sx === 256)
+                            this.incVertV();
+                        else
+                            this.incHoriV();
+                        break;
                 }
 
             } else if (this.sx === 257) {
@@ -829,9 +841,7 @@ class PPU {
             } else if (this.sy === 261 && this.sx >= 280 && this.sx <= 304) {
                 this.resetVertV();
             } else if (this.sx >= 337 && this.sx <= 340) {
-                if ((this.sx & 2) === 0) {
-                    this.fetchUnusedNt();
-                }
+                this.fetchUnusedNt(!(this.sx & 2));
             }
         } else if (this.sy === 240) {
             if (this.sx === 0) {
@@ -890,7 +900,22 @@ class PPU {
         0xffe4d6a0, 0xffa0a2a0, 0xff000000, 0xff000000
     ]);
 
-    triggerMemoryAccess() {
-         this.vmemory.getByte(this.v & 0x3fff);
+    d: number;
+    setByte(addr: number, value: number) {
+        this.vmemory.setByte(addr, value);
+    }
+
+    getByte(addr: number, phase: boolean) {
+        if (!phase) {
+            this.triggerMemoryAccess(addr);
+            return false;
+        } else {
+            this.d = this.vmemory.getByte(addr);
+            return true;
+        }
+        
+    }
+    triggerMemoryAccess(addr) {
+         this.vmemory.getByte(addr);
     }
 }

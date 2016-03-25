@@ -10935,9 +10935,7 @@ var Mmc3 = (function () {
         this.scanLineCounterRestartRequested = false;
         this.scanLineCounter = 0;
         this.irqEnabled = true;
-        this.lastRise = 0;
-        this.rise = false;
-        this.postponeRequest = -1;
+        this.lastFall = 0;
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -10957,8 +10955,6 @@ var Mmc3 = (function () {
     }
     Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
         this.irqLine = new IrqLine(cpu);
-        this.ppu = ppu;
-        // ppu.attachAddrBusListener(this.addrBusListener.bind(this));
     };
     Mmc3.prototype.setByte = function (addr, value) {
         if (addr <= 0x9ffe) {
@@ -11079,41 +11075,30 @@ var Mmc3 = (function () {
         return result;
     };
     Mmc3.prototype.onMemoryAccess = function (addr) {
-        //  if (addr < 0x2000) {
         this.curA12 = addr & 0x1000;
-        this.wasDown = this.wasDown || !this.curA12;
-        // }
-        this.clk();
     };
     Mmc3.prototype.clk = function () {
-        var d = this.ppu.addrTileBase === 0x1000 ? 0 : 0;
-        this.lastRise++;
-        //A12 rise within less than 16 dots of last A12 rise: no tick.
-        //Any other A12 rise: tick.
-        if (!this.prevA12 && this.curA12 && this.lastRise >= 0) {
-            this.lastRise = 0;
+        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
             if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
                 this.scanLineCounterRestartRequested = false;
                 if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.postponeRequest = d;
+                    this.irqLine.request();
                 this.scanLineCounter = this.scanLineCounterStartValue;
             }
             else if (this.scanLineCounter > 0) {
                 this.scanLineCounter--;
                 if (!this.scanLineCounter && this.irqEnabled) {
-                    this.postponeRequest = d;
+                    this.irqLine.request();
                 }
             }
         }
+        if (this.curA12 === 0) {
+            this.lastFall++;
+        }
+        else if (this.curA12 !== 0) {
+            this.lastFall = 0;
+        }
         this.prevA12 = this.curA12;
-        if (!this.postponeRequest) {
-            console.log(this.ppu.showBg, this.ppu.showSprites, this.ppu.sx, this.ppu.sy);
-            this.irqLine.request();
-            this.postponeRequest--;
-        }
-        else {
-            this.postponeRequest--;
-        }
     };
     return Mmc3;
 })();
@@ -11261,13 +11246,10 @@ var NesEmulator = (function () {
                 var nmiBefore = this.cpu.nmiLine;
                 var irqBefore = this.cpu.irqLine;
                 this.ppu.step();
-                ///  this.memoryMapper.clk();
+                this.memoryMapper.clk();
                 var nmiAfter = this.cpu.nmiLine;
                 var irqAfter = this.cpu.irqLine;
-                //if (irqBefore > irqAfter && this.icycle === 4)
-                //    this.cpu.detectInterrupts();
-                //else
-                if (nmiBefore > nmiAfter && this.icycle === 4)
+                if ((nmiBefore > nmiAfter) && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
@@ -11621,7 +11603,7 @@ var PPU = (function () {
                     }
                     this.v += this.daddrWrite;
                     this.v &= 0x3fff;
-                    this.triggerMemoryAccess();
+                    this.triggerMemoryAccess(this.v);
                     return res;
                 }
             default:
@@ -11694,15 +11676,15 @@ var PPU = (function () {
                 else {
                     this.t = (this.t & 0xff00) + (value & 0xff);
                     this.v = this.t;
-                    this.triggerMemoryAccess();
+                    this.triggerMemoryAccess(this.v);
                 }
                 this.w = 1 - this.w;
                 break;
             case 0x7:
-                this.vmemory.setByte(this.v & 0x3fff, value);
+                this.setByte(this.v & 0x3fff, value);
                 this.v += this.daddrWrite;
                 this.v &= 0x3fff;
-                this.triggerMemoryAccess();
+                this.triggerMemoryAccess(this.v);
                 break;
         }
     };
@@ -11763,72 +11745,81 @@ var PPU = (function () {
             this.v = (this.v & ~0x03E0) | (y << 5); // put coarse Y back into v
         }
     };
-    PPU.prototype.fetchUnusedNt = function () {
+    PPU.prototype.fetchUnusedNt = function (phase) {
         if (!this.showBg && !this.showSprites)
             return;
-        var addr = 0x2000 | (this.v & 0x0fff);
-        this.vmemory.getByte(addr);
+        this.getByte(0x2000 | (this.v & 0x0fff), phase);
     };
-    PPU.prototype.fetchNt = function () {
+    PPU.prototype.fetchNt = function (phase) {
         if (!this.showBg && !this.showSprites)
             return;
-        var addr = 0x2000 | (this.v & 0x0fff);
-        this.nt = this.vmemory.getByte(addr);
+        if (this.getByte(0x2000 | (this.v & 0x0fff), phase))
+            this.nt = this.d;
     };
-    PPU.prototype.fetchAt = function () {
+    PPU.prototype.fetchAt = function (phase) {
         if (!this.showBg && !this.showSprites)
             return;
         var addr = 0x23C0 | (this.v & 0x0C00) | ((this.v >> 4) & 0x38) | ((this.v >> 2) & 0x07);
-        this.at = this.vmemory.getByte(addr);
-        var dx = (this.v >> 1) & 1; //second bit of coarse x
-        var dy = (this.v >> 6) & 1; //second bit of coarse y
-        var p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
-        this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
-        this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
+        if (this.getByte(addr, phase)) {
+            this.at = this.d;
+            var dx = (this.v >> 1) & 1; //second bit of coarse x
+            var dy = (this.v >> 6) & 1; //second bit of coarse y
+            var p = (this.at >> ((dy << 2) + (dx << 1))) & 3;
+            this.p2 = (this.p2 & 0xffff00) | (p & 1 ? 0xff : 0);
+            this.p3 = (this.p3 & 0xffff00) | (p & 2 ? 0xff : 0);
+        }
     };
-    PPU.prototype.fetchSpriteTileLo = function (yTop, nt, flipVert) {
+    PPU.prototype.fetchSpriteTileLo = function (yTop, nt, flipVert, phase) {
         if (!this.showSprites)
             return 0;
         if (this.spriteHeight === 8) {
             var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
-            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + y);
+            if (this.getByte(this.addrSpriteBase + (nt << 4) + y, phase))
+                return this.d;
         }
         else {
             var y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
             var addrBase = nt & 1 ? 0x1000 : 0;
             if (y > 7)
                 addrBase += 8;
-            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 0 + y);
+            if (this.getByte(addrBase + ((nt >> 1) << 5) + 0 + y, phase))
+                return this.d;
         }
+        return 0;
     };
-    PPU.prototype.fetchSpriteTileHi = function (yTop, nt, flipVert) {
+    PPU.prototype.fetchSpriteTileHi = function (yTop, nt, flipVert, phase) {
         if (!this.showSprites)
             return 0;
         if (this.spriteHeight === 8) {
             var y = flipVert ? 7 - (this.sy - yTop) : this.sy - yTop;
-            return this.vmemory.getByte(this.addrSpriteBase + (nt << 4) + 8 + y);
+            if (this.getByte(this.addrSpriteBase + (nt << 4) + 8 + y, phase))
+                return this.d;
         }
         else {
             var y = flipVert ? 15 - (this.sy - yTop) : this.sy - yTop;
             var addrBase = nt & 1 ? 0x1000 : 0;
             if (y > 7)
                 addrBase += 8;
-            return this.vmemory.getByte(addrBase + ((nt >> 1) << 5) + 8 + y);
+            if (this.getByte(addrBase + ((nt >> 1) << 5) + 8 + y, phase))
+                return this.d;
+        }
+        return 0;
+    };
+    PPU.prototype.fetchBgTileLo = function (phase) {
+        if (!this.showBg && !this.showSprites)
+            return;
+        var y = (this.v >> 12) & 0x07;
+        if (this.getByte(this.addrTileBase + (this.nt << 4) + y, phase)) {
+            this.bgTileLo = (this.d & 0xff) | (this.bgTileLo & 0xffff00);
         }
     };
-    PPU.prototype.fetchBgTileLo = function () {
+    PPU.prototype.fetchBgTileHi = function (phase) {
         if (!this.showBg && !this.showSprites)
             return;
         var y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + y);
-        this.bgTileLo = (b & 0xff) | (this.bgTileLo & 0xffff00);
-    };
-    PPU.prototype.fetchBgTileHi = function () {
-        if (!this.showBg && !this.showSprites)
-            return;
-        var y = (this.v >> 12) & 0x07;
-        var b = this.vmemory.getByte(this.addrTileBase + (this.nt << 4) + 8 + y);
-        this.bgTileHi = (b & 0xff) | (this.bgTileHi & 0xffff00);
+        if (this.getByte(this.addrTileBase + (this.nt << 4) + 8 + y, phase)) {
+            this.bgTileHi = (this.d & 0xff) | (this.bgTileHi & 0xffff00);
+        }
     };
     PPU.prototype.getNameTable = function (i) {
         var st = '';
@@ -11994,15 +11985,17 @@ var PPU = (function () {
                             break;
                         }
                     case 4:
+                    case 5:
                         {
                             var b1 = this.secondaryOam[addrOamBase + 1];
-                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            this.rgspriteRenderingInfo[isprite].tileLo = this.fetchSpriteTileLo(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert, (this.sx & 7) === 4);
                             break;
                         }
                     case 6:
+                    case 7:
                         {
                             var b1 = this.secondaryOam[addrOamBase + 1];
-                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert);
+                            spriteRenderingInfo.tileHi = this.fetchSpriteTileHi(b0 >= 0xef ? this.sy : b0, b1, spriteRenderingInfo.flipVert, (this.sx & 7) === 6);
                             break;
                         }
                 }
@@ -12085,21 +12078,31 @@ var PPU = (function () {
                     if (this.sx === 1)
                         this.flgVblank = false;
                 }
-                if ((this.sx & 0x07) === 2) {
-                    this.fetchNt();
-                }
-                else if ((this.sx & 0x07) === 4) {
-                    this.fetchAt();
-                }
-                else if ((this.sx & 0x07) === 6) {
-                    this.fetchBgTileLo();
-                }
-                else if ((this.sx & 0x07) === 0) {
-                    this.fetchBgTileHi();
-                    if (this.sx === 256)
-                        this.incVertV();
-                    else
-                        this.incHoriV();
+                switch (this.sx & 0x07) {
+                    case 1:
+                        this.fetchNt(false);
+                        break;
+                    case 2:
+                        this.fetchNt(true);
+                        break;
+                    case 3:
+                        this.fetchAt(false);
+                        break;
+                    case 4:
+                        this.fetchAt(true);
+                        this.fetchBgTileLo(false);
+                        break;
+                    case 6:
+                        this.fetchBgTileLo(true);
+                        this.fetchBgTileHi(false);
+                        break;
+                    case 0:
+                        this.fetchBgTileHi(true);
+                        if (this.sx === 256)
+                            this.incVertV();
+                        else
+                            this.incHoriV();
+                        break;
                 }
             }
             else if (this.sx === 257) {
@@ -12109,9 +12112,7 @@ var PPU = (function () {
                 this.resetVertV();
             }
             else if (this.sx >= 337 && this.sx <= 340) {
-                if ((this.sx & 2) === 0) {
-                    this.fetchUnusedNt();
-                }
+                this.fetchUnusedNt(!(this.sx & 2));
             }
         }
         else if (this.sy === 240) {
@@ -12151,8 +12152,21 @@ var PPU = (function () {
             }
         }
     };
-    PPU.prototype.triggerMemoryAccess = function () {
-        this.vmemory.getByte(this.v & 0x3fff);
+    PPU.prototype.setByte = function (addr, value) {
+        this.vmemory.setByte(addr, value);
+    };
+    PPU.prototype.getByte = function (addr, phase) {
+        if (!phase) {
+            this.triggerMemoryAccess(addr);
+            return false;
+        }
+        else {
+            this.d = this.vmemory.getByte(addr);
+            return true;
+        }
+    };
+    PPU.prototype.triggerMemoryAccess = function (addr) {
+        this.vmemory.getByte(addr);
     };
     PPU.syFirstVisible = 0;
     PPU.syPostRender = 240;
