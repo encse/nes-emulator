@@ -143,7 +143,7 @@ class Mmc1 implements IMemoryMapper {
                 }
                 this.update();
 
-              //  this.iWrite = 0;
+               // this.iWrite = 0;
                 this.rTemp = 0;
             }
         }

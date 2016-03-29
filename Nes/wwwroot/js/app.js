@@ -10811,7 +10811,7 @@ var Mmc1 = (function () {
                     this.r3 = this.rTemp;
                 }
                 this.update();
-                this.iWrite = 0;
+                // this.iWrite = 0;
                 this.rTemp = 0;
             }
         }
@@ -12254,13 +12254,19 @@ var NesRunnerBase = (function () {
         xhr.open("GET", this.url, true);
         xhr.responseType = "arraybuffer";
         xhr.onload = function (_) {
-            if (xhr.status > 99 && xhr.status < 299) {
-                var blob = new Uint8Array(xhr.response);
-                onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+            try {
+                if (xhr.status > 99 && xhr.status < 299) {
+                    var blob = new Uint8Array(xhr.response);
+                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+                }
+                else {
+                    _this.logError("http error " + xhr.status);
+                    onLoad(null);
+                }
             }
-            else {
-                _this.logError("http error " + xhr.status);
-                onLoad(null);
+            catch (e) {
+                canvas.remove();
+                _this.logError(e);
             }
         };
         xhr.send();

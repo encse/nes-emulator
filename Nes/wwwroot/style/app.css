@@ -60,3 +60,7 @@ h1, h2, p {
 #nesContainer h2.show {
 	display: block;
 }
+
+.error {
+	color: red;
+}

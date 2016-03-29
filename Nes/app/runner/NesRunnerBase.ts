@@ -56,12 +56,18 @@ class NesRunnerBase {
         xhr.open("GET", this.url, true);
         xhr.responseType = "arraybuffer";
         xhr.onload = _ => {
-            if (xhr.status > 99 && xhr.status < 299) {
-                const blob = new Uint8Array(xhr.response);
-                onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
-            } else {
-                this.logError("http error " + xhr.status);
-                onLoad(null);
+            try {
+                if (xhr.status > 99 && xhr.status < 299) {
+                    const blob = new Uint8Array(xhr.response);
+
+                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+                } else {
+                    this.logError("http error " + xhr.status);
+                    onLoad(null);
+                }
+            } catch (e) {
+                canvas.remove();
+                this.logError(e);
             }
         }
         xhr.send();
