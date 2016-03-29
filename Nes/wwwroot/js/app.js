@@ -110,7 +110,7 @@ var APU = (function () {
                 //upper 5 bits:
                 //iiii i-- - length index
                 if (!this.lc0Halt) {
-                    this.lc0 = this.lcTable[value >> 4][(value >> 3) & 1];
+                    this.lc0 = this.lcTable[(value >> 3) & 1][value >> 4];
                 }
                 break;
             case 0x4015:
@@ -10811,7 +10811,7 @@ var Mmc1 = (function () {
                     this.r3 = this.rTemp;
                 }
                 this.update();
-                //  this.iWrite = 0;
+                this.iWrite = 0;
                 this.rTemp = 0;
             }
         }

@@ -129,7 +129,7 @@
 
                 //iiii i-- - length index
                 if (!this.lc0Halt) {
-                    this.lc0 = this.lcTable[value >> 4][(value >> 3) & 1];
+                    this.lc0 = this.lcTable[(value >> 3) & 1][value >> 4];
                 }
                 break;
             case 0x4015:
