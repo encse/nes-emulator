@@ -123,13 +123,11 @@ class Mmc1 implements IMemoryMapper {
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
-            this.P = 1;
-            this.S = 1;
+            this.r0 = 3 << 2;
             this.iWrite = 0;
             this.rTemp = 0;
         } else {
-            this.rTemp = (this.rTemp & (0xFF - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite); //((this.rTemp << 1) + flgData) & 0xff;
-           // this.rTemp = ((this.rTemp << 1) + flgData) & 0xff;
+            this.rTemp = (this.rTemp & (0xff - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite);
             this.iWrite++;
             if (this.iWrite === 5) {
                 if (addr <= 0x9fff) {
@@ -143,7 +141,7 @@ class Mmc1 implements IMemoryMapper {
                 }
                 this.update();
 
-               // this.iWrite = 0;
+                this.iWrite = 0;
                 this.rTemp = 0;
             }
         }

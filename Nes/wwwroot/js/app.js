@@ -10788,14 +10788,12 @@ var Mmc1 = (function () {
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
-            this.P = 1;
-            this.S = 1;
+            this.r0 = 3 << 2;
             this.iWrite = 0;
             this.rTemp = 0;
         }
         else {
-            this.rTemp = (this.rTemp & (0xFF - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite); //((this.rTemp << 1) + flgData) & 0xff;
-            // this.rTemp = ((this.rTemp << 1) + flgData) & 0xff;
+            this.rTemp = (this.rTemp & (0xff - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite);
             this.iWrite++;
             if (this.iWrite === 5) {
                 if (addr <= 0x9fff) {
@@ -10811,7 +10809,7 @@ var Mmc1 = (function () {
                     this.r3 = this.rTemp;
                 }
                 this.update();
-                // this.iWrite = 0;
+                this.iWrite = 0;
                 this.rTemp = 0;
             }
         }
@@ -11272,28 +11270,24 @@ var NesEmulator = (function () {
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
             if ((this.icycle & 3) === 0) {
                 var nmiBefore = this.cpu.nmiLine;
-                var irqBefore = this.cpu.irqLine;
                 this.ppu.step();
                 this.memoryMapper.clk();
                 var nmiAfter = this.cpu.nmiLine;
-                var irqAfter = this.cpu.irqLine;
                 if ((nmiBefore > nmiAfter) && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
             if (this.icycle === 0) {
                 if (this.dmaRequested) {
-                    if (!(this.cpu.icycle & 1)) {
-                        this.dmaRequested = false;
-                        this.idma = 512;
-                    }
-                    this.cpu.icycle++;
+                    this.dmaRequested = false;
+                    this.idma = 512;
+                    if (this.cpu.icycle & 1)
+                        this.idma++;
                 }
                 else if (this.idma > 512) {
                     this.idma--;
-                    this.cpu.icycle++;
                 }
                 else if (this.idma > 0) {
-                    this.cpu.icycle++;
+                    //  this.cpu.icycle++;
                     if (!(this.idma & 1)) {
                         this.bDma = this.memoryMapper.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;

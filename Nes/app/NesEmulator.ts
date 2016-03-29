@@ -39,18 +39,15 @@
     private idma = 0;
     private icycle = 0;
     step() {
-
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
 
             if ((this.icycle & 3) === 0) {
 
                 const nmiBefore = this.cpu.nmiLine;
-                const irqBefore = this.cpu.irqLine;
                 this.ppu.step();
                 this.memoryMapper.clk();
                 const nmiAfter = this.cpu.nmiLine;
-                const irqAfter = this.cpu.irqLine;
-                if ((/*irqBefore > irqAfter ||*/ nmiBefore > nmiAfter) && this.icycle === 4)
+                if ((nmiBefore > nmiAfter) && this.icycle === 4)
                     this.cpu.detectInterrupts();
             }
 
@@ -58,17 +55,15 @@
 
                 if (this.dmaRequested) {
 
-                    if (!(this.cpu.icycle & 1)) {
-                        this.dmaRequested = false;
-                        this.idma = 512;
-                    }
-                    this.cpu.icycle++;
+                    this.dmaRequested = false;
+                    this.idma = 512;
+                    if (this.cpu.icycle & 1)
+                        this.idma++;
                 } else if (this.idma > 512) {
                     this.idma--;
-                    this.cpu.icycle++;
                 } else if (this.idma > 0) {
 
-                    this.cpu.icycle++;
+                    //  this.cpu.icycle++;
                     if (!(this.idma & 1)) {
                         this.bDma = this.memoryMapper.memory.getByte(this.addrDma++);
                         this.addrDma &= 0xffff;
@@ -80,8 +75,6 @@
                 } else {
                     this.cpu.step();
                 }
-
-
             }
 
             this.apu.step();
