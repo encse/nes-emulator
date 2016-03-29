@@ -17,7 +17,7 @@
 
         this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, () => { return this.controller.reg4016; });
         this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, (_, v) => { this.controller.reg4016 = v; });
-        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4016; });
+        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4017; });
 
         this.cpu = new Mos6502(this.memoryMapper.memory);
         this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));

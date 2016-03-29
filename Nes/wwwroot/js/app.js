@@ -205,15 +205,13 @@ var Controller = (function () {
     function Controller(canvas) {
         var _this = this;
         this.s = 0;
-        this.i = 0;
+        this.iA = 0;
+        this.iB = 0;
         this.keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
         this.keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
         this.keyUpEvents = [];
         canvas.tabIndex = 1;
         canvas.focus();
-        canvas.addEventListener('blur', function (_) {
-            setTimeout(function () { canvas.focus(); }, 20);
-        });
         canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
         canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
         this.registerKeyboardHandler(40, function () { _this.keyStateA[ControllerKeys.Down] = 0; });
@@ -276,28 +274,32 @@ var Controller = (function () {
             +++------- Open bus
         */
         get: function () {
+            //console.log('4016');
             if (this.s)
                 return this.keyStateA[0];
-            else {
-                var r = this.keyStateA[this.i % 8];
-                this.i++;
-                return r;
-            }
+            else if (this.iA < 8)
+                return this.keyStateA[this.iA++];
+            else
+                return 0x40 | 1;
         },
         set: function (value) {
             this.s = value & 1;
-            if (!this.s)
-                this.i = 0;
+            if (!this.s) {
+                this.iA = 0;
+                this.iB = 0;
+            }
+            //  console.log('this.s', this.s);
         },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(Controller.prototype, "reg4017", {
         get: function () {
+            //   console.log('4017');
             if (this.s)
                 return 0x40 | this.keyStateB[0];
-            else if (this.i < 8)
-                return 0x40 | this.keyStateB[this.i++];
+            else if (this.iB < 8)
+                return 0x40 | this.keyStateB[this.iB++];
             else
                 return 0x40 | 1;
         },
@@ -10686,18 +10688,23 @@ var Mmc1 = (function () {
          * $E000-FFFF:  [...W PPPP]
          */
         this.r3 = 0;
-        this.PRGBanks = nesImage.ROMBanks;
-        this.CHRBanks = nesImage.VRAMBanks;
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
         while (this.PRGBanks.length < 2)
             this.PRGBanks.push(new Ram(0x4000));
         while (this.CHRBanks.length < 2)
             this.CHRBanks.push(new Ram(0x1000));
-        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[1]);
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[this.PRGBanks.length - 1]);
         this.nametableA = new Ram(0x400);
         this.nametableB = new Ram(0x400);
         this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
         this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.nametable, new Ram(0x1000));
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.r0 = 0;
+        this.r1 = 0; //chr0
+        this.r2 = 1; //chr1
+        this.r3 = 0; //prg1
+        this.update();
     }
     Object.defineProperty(Mmc1.prototype, "C", {
         /** CHR Mode (0=8k mode, 1=4k mode) */
@@ -10740,7 +10747,7 @@ var Mmc1 = (function () {
         configurable: true
     });
     Object.defineProperty(Mmc1.prototype, "CHR1", {
-        get: function () { return this.r1 & 31; },
+        get: function () { return this.r2 & 31; },
         enumerable: true,
         configurable: true
     });
@@ -10781,46 +10788,52 @@ var Mmc1 = (function () {
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
-            this.rTemp = 0;
             this.P = 1;
             this.S = 1;
             this.iWrite = 0;
+            this.rTemp = 0;
         }
         else {
-            this.rTemp = (this.rTemp << 1) + flgData;
+            this.rTemp = (this.rTemp & (0xFF - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite); //((this.rTemp << 1) + flgData) & 0xff;
+            // this.rTemp = ((this.rTemp << 1) + flgData) & 0xff;
             this.iWrite++;
             if (this.iWrite === 5) {
-                if (addr <= 0x9fff)
+                if (addr <= 0x9fff) {
                     this.r0 = this.rTemp;
-                else if (addr <= 0xbfff)
+                }
+                else if (addr <= 0xbfff) {
                     this.r1 = this.rTemp;
-                else if (addr <= 0xdfff)
+                }
+                else if (addr <= 0xdfff) {
                     this.r2 = this.rTemp;
-                else if (addr <= 0xffff)
+                }
+                else if (addr <= 0xffff) {
                     this.r3 = this.rTemp;
+                }
                 this.update();
+                //  this.iWrite = 0;
+                this.rTemp = 0;
             }
         }
     };
     Mmc1.prototype.update = function () {
-        //console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
         /*
-            PRG Setup:
-            --------------------------
-            There is 1 PRG reg and 3 PRG modes.
+           PRG Setup:
+           --------------------------
+           There is 1 PRG reg and 3 PRG modes.
 
-                           $8000   $A000   $C000   $E000
-                         +-------------------------------+
-            P=0:         |            <$E000>            |
-                         +-------------------------------+
-            P=1, S=0:    |     { 0 }     |     $E000     |
-                         +---------------+---------------+
-            P=1, S=1:    |     $E000     |     {$0F}     |
-                         +---------------+---------------+
-        */
-        if (this.P === 1) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+                          $8000   $A000   $C000   $E000
+                        +-------------------------------+
+           P=0:         |            <$E000>            |
+                        +-------------------------------+
+           P=1, S=0:    |     { 0 }     |     $E000     |
+                        +---------------+---------------+
+           P=1, S=1:    |     $E000     |     {$0F}     |
+                        +---------------+---------------+
+       */
+        if (this.P === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 & 0xfe];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0 | 1];
         }
         else if (this.S === 0) {
             this.memory.rgmemory[3] = this.PRGBanks[0];
@@ -10828,24 +10841,24 @@ var Mmc1 = (function () {
         }
         else {
             this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 1];
         }
         /*
-            CHR Setup:
-            --------------------------
-            There are 2 CHR regs and 2 CHR modes.
+          CHR Setup:
+          --------------------------
+          There are 2 CHR regs and 2 CHR modes.
 
-                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
-                      +---------------------------------------------------------------+
-            C=0:      |                            <$A000>                            |
-                      +---------------------------------------------------------------+
-            C=1:      |             $A000             |             $C000             |
-                      +-------------------------------+-------------------------------+
-        */
+                      $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
+                    +---------------------------------------------------------------+
+          C=0:      |                            <$A000>                            |
+                    +---------------------------------------------------------------+
+          C=1:      |             $A000             |             $C000             |
+                    +-------------------------------+-------------------------------+
+      */
         if (this.C === 0) {
             //console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 >> 1];
-            this.vmemory.rgmemory[1] = this.CHRBanks[(this.CHR0 >> 1) + 1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR0 | 1];
         }
         else {
             // console.log('chr mode 2:', this.CHR0);
@@ -10866,6 +10879,20 @@ var Mmc1 = (function () {
             this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
             this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
         }
+    };
+    Mmc1.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
     };
     Mmc1.prototype.setCpuAndPpu = function (cpu) {
     };
@@ -11231,7 +11258,7 @@ var NesEmulator = (function () {
         });
         this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
         this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
-        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4016; });
+        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4017; });
         this.cpu = new Mos6502(this.memoryMapper.memory);
         this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
         this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);

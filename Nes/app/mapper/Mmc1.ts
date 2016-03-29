@@ -41,7 +41,7 @@ class Mmc1 implements IMemoryMapper {
      *  CHR Reg 1
      */
     r2: number = 0;
-    get CHR1(): number { return this.r1 & 31; }
+    get CHR1(): number { return this.r2 & 31; }
 
     /**
      * $E000-FFFF:  [...W PPPP]
@@ -64,8 +64,8 @@ class Mmc1 implements IMemoryMapper {
     private CHRBanks: Memory[];
 
     constructor(nesImage: NesImage) {
-        this.PRGBanks = nesImage.ROMBanks;
-        this.CHRBanks = nesImage.VRAMBanks;
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
 
         while (this.PRGBanks.length < 2)
             this.PRGBanks.push(new Ram(0x4000));
@@ -78,7 +78,7 @@ class Mmc1 implements IMemoryMapper {
             new Ram(0x2000),
             new Ram(0x4000),
             this.PRGBanks[0],
-            this.PRGBanks[1]
+            this.PRGBanks[this.PRGBanks.length - 1]
         );
 
         this.nametableA = new Ram(0x400);
@@ -93,6 +93,11 @@ class Mmc1 implements IMemoryMapper {
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.r0 = 0;
+        this.r1 = 0; //chr0
+        this.r2 = 1; //chr1
+        this.r3 = 0; //prg1
+        this.update();
         
     }
 
@@ -118,47 +123,51 @@ class Mmc1 implements IMemoryMapper {
         var flgReset = value >> 7;
         var flgData = value & 0x1;
         if (flgReset === 1) {
-            this.rTemp = 0;
             this.P = 1;
             this.S = 1;
             this.iWrite = 0;
+            this.rTemp = 0;
         } else {
-            this.rTemp = (this.rTemp << 1) + flgData;
+            this.rTemp = (this.rTemp & (0xFF - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite); //((this.rTemp << 1) + flgData) & 0xff;
+           // this.rTemp = ((this.rTemp << 1) + flgData) & 0xff;
             this.iWrite++;
             if (this.iWrite === 5) {
-                if (addr <= 0x9fff)
+                if (addr <= 0x9fff) {
                     this.r0 = this.rTemp;
-                else if (addr <= 0xbfff)
+                } else if (addr <= 0xbfff) {
                     this.r1 = this.rTemp;
-                else if (addr <= 0xdfff)
+                } else if (addr <= 0xdfff) {
                     this.r2 = this.rTemp;
-                else if (addr <= 0xffff)
+                } else if (addr <= 0xffff) {
                     this.r3 = this.rTemp;
+                }
                 this.update();
+
+              //  this.iWrite = 0;
+                this.rTemp = 0;
             }
         }
     }
 
     private update() {
-
-        //console.log('mmc1', this.r0, this.r1, this.r2, this.r3);
+  
         /*
-            PRG Setup:
-            --------------------------
-            There is 1 PRG reg and 3 PRG modes.
+           PRG Setup:
+           --------------------------
+           There is 1 PRG reg and 3 PRG modes.
 
-                           $8000   $A000   $C000   $E000
-                         +-------------------------------+
-            P=0:         |            <$E000>            |
-                         +-------------------------------+
-            P=1, S=0:    |     { 0 }     |     $E000     |
-                         +---------------+---------------+
-            P=1, S=1:    |     $E000     |     {$0F}     |
-                         +---------------+---------------+
-        */
-        if (this.P === 1) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 >> 1];
-            this.memory.rgmemory[4] = this.PRGBanks[(this.PRG0 >> 1) + 1];
+                          $8000   $A000   $C000   $E000
+                        +-------------------------------+
+           P=0:         |            <$E000>            |
+                        +-------------------------------+
+           P=1, S=0:    |     { 0 }     |     $E000     |
+                        +---------------+---------------+
+           P=1, S=1:    |     $E000     |     {$0F}     |
+                        +---------------+---------------+
+       */
+        if (this.P === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 & 0xfe];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0 | 1];
         }
         else if (this.S === 0) {
             this.memory.rgmemory[3] = this.PRGBanks[0];
@@ -166,34 +175,34 @@ class Mmc1 implements IMemoryMapper {
         }
         else {
             this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[4] = this.PRGBanks[0x0f];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 1];
         }
 
         /*
-            CHR Setup:
-            --------------------------
-            There are 2 CHR regs and 2 CHR modes.
+          CHR Setup:
+          --------------------------
+          There are 2 CHR regs and 2 CHR modes.
 
-                        $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00 
-                      +---------------------------------------------------------------+
-            C=0:      |                            <$A000>                            |
-                      +---------------------------------------------------------------+
-            C=1:      |             $A000             |             $C000             |
-                      +-------------------------------+-------------------------------+
-        */
+                      $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00 
+                    +---------------------------------------------------------------+
+          C=0:      |                            <$A000>                            |
+                    +---------------------------------------------------------------+
+          C=1:      |             $A000             |             $C000             |
+                    +-------------------------------+-------------------------------+
+      */
         if (this.C === 0) {
             //console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 >> 1];
-            this.vmemory.rgmemory[1] = this.CHRBanks[(this.CHR0 >> 1) + 1];
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR0 | 1];
         } else {
-           // console.log('chr mode 2:', this.CHR0);
+            // console.log('chr mode 2:', this.CHR0);
             this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
             this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
         }
 
         if (this.M === 0) {
             this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
-        } else if (this.M === 1){
+        } else if (this.M === 1) {
             this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
         } else if (this.M === 2) {
             this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
@@ -204,9 +213,25 @@ class Mmc1 implements IMemoryMapper {
         }
     }
 
+    splitMemory(romBanks: ROM[], size: number): Memory[] {
+        const result = [];
+        for (let rom of romBanks) {
+            let i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    }
+
     setCpuAndPpu(cpu: Mos6502) {
 
     }
+
+
 
     clk() {}
 }
