@@ -93,7 +93,7 @@ class Mmc1 implements IMemoryMapper {
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-        this.r0 = 0;
+        this.r0 = 3 << 2;
         this.r1 = 0; //chr0
         this.r2 = 1; //chr1
         this.r3 = 0; //prg1
@@ -206,8 +206,9 @@ class Mmc1 implements IMemoryMapper {
             this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
             this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
         } else if (this.M === 3) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametableA;
+            this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+           
         }
     }
 

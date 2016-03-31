@@ -174,7 +174,7 @@ class PPU {
             addr = 0;
         else 
             addr &= 0x1f;
-        return this.palette[addr] = value & 0xff;
+        return this.palette[addr] = value & 0x3f;
     }
 
     private paletteGetter(addr: number) {
