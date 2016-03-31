@@ -1,3 +1,25 @@
+var IrqLine = (function () {
+    function IrqLine(cpu) {
+        this.cpu = cpu;
+        this._isRequested = false;
+    }
+    IrqLine.prototype.request = function () {
+        if (!this._isRequested) {
+            this.cpu.irqLine--;
+            this._isRequested = true;
+        }
+    };
+    IrqLine.prototype.ack = function () {
+        if (this._isRequested) {
+            this.cpu.irqLine++;
+            this._isRequested = false;
+        }
+    };
+    IrqLine.prototype.isRequested = function () {
+        return this._isRequested;
+    };
+    return IrqLine;
+})();
 var APU = (function () {
     /**
      *
@@ -189,124 +211,629 @@ var APU = (function () {
     };
     return APU;
 })();
-var ControllerKeys;
-(function (ControllerKeys) {
-    ControllerKeys[ControllerKeys["A_Key"] = 0] = "A_Key";
-    ControllerKeys[ControllerKeys["B_Key"] = 1] = "B_Key";
-    ControllerKeys[ControllerKeys["Select_Key"] = 2] = "Select_Key";
-    ControllerKeys[ControllerKeys["Start_Key"] = 3] = "Start_Key";
-    ControllerKeys[ControllerKeys["Up"] = 4] = "Up";
-    ControllerKeys[ControllerKeys["Down"] = 5] = "Down";
-    ControllerKeys[ControllerKeys["Left"] = 6] = "Left";
-    ControllerKeys[ControllerKeys["Right"] = 7] = "Right";
-})(ControllerKeys || (ControllerKeys = {}));
-;
-var Controller = (function () {
-    function Controller(canvas) {
-        var _this = this;
-        this.s = 0;
-        this.iA = 0;
-        this.iB = 0;
-        this.keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.keyUpEvents = [];
-        canvas.tabIndex = 1;
-        canvas.focus();
-        canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
-        canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
-        this.registerKeyboardHandler(40, function () { _this.keyStateA[ControllerKeys.Down] = 0; });
-        this.registerKeyboardHandler(38, function () { _this.keyStateA[ControllerKeys.Up] = 0; });
-        this.registerKeyboardHandler(37, function () { _this.keyStateA[ControllerKeys.Left] = 0; });
-        this.registerKeyboardHandler(39, function () { _this.keyStateA[ControllerKeys.Right] = 0; });
-        this.registerKeyboardHandler(13, function () { _this.keyStateA[ControllerKeys.Start_Key] = 0; });
-        this.registerKeyboardHandler(32, function () { _this.keyStateA[ControllerKeys.Select_Key] = 0; });
-        this.registerKeyboardHandler(65, function () { _this.keyStateA[ControllerKeys.A_Key] = 0; });
-        this.registerKeyboardHandler(66, function () { _this.keyStateA[ControllerKeys.B_Key] = 0; });
+///<reference path="IMemoryMapper.ts"/>
+var Mmc0 = (function () {
+    function Mmc0(nesImage) {
+        if (nesImage.ROMBanks.length === 1) {
+            this.memory = new CompoundMemory(new Ram(0xc000), nesImage.ROMBanks[0]);
+        }
+        else if (nesImage.ROMBanks.length === 2) {
+            this.memory = new CompoundMemory(new Ram(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
+        }
+        if (nesImage.VRAMBanks.length > 1)
+            throw 'unknown VRAMBanks';
+        if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
+            throw 'unknown VRAMBanks';
+        var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new Ram(0x2000);
+        var nameTableA = new Ram(0x400);
+        var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
+        var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
+        var nameTableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
+        var rest = new Ram(0x1000);
+        this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
     }
-    Controller.prototype.registerKeyboardHandler = function (keycode, callback) {
-        this.keyUpEvents[keycode] = callback;
+    Mmc0.prototype.setCpuAndPpu = function (cpu) {
     };
-    Controller.prototype.onKeyDown = function (event) {
-        switch (event.keyCode) {
-            case 40:
-                this.keyStateA[ControllerKeys.Down] = 1;
-                break;
-            case 38:
-                this.keyStateA[ControllerKeys.Up] = 1;
-                break;
-            case 37:
-                this.keyStateA[ControllerKeys.Left] = 1;
-                break;
-            case 39:
-                this.keyStateA[ControllerKeys.Right] = 1;
-                break;
-            case 13:
-                this.keyStateA[ControllerKeys.Start_Key] = 1;
-                break;
-            case 32:
-                this.keyStateA[ControllerKeys.Select_Key] = 1;
-                break;
-            case 65:
-                this.keyStateA[ControllerKeys.A_Key] = 1;
-                break;
-            case 66:
-                this.keyStateA[ControllerKeys.B_Key] = 1;
-                break;
-        }
-        event.preventDefault();
-    };
-    Controller.prototype.onKeyUp = function (event) {
-        var callback = this.keyUpEvents[event.keyCode];
-        if (callback) {
-            callback();
-            event.preventDefault();
+    Mmc0.prototype.clk = function () { };
+    return Mmc0;
+})();
+var MemoryMapperFactory = (function () {
+    function MemoryMapperFactory() {
+    }
+    MemoryMapperFactory.prototype.create = function (nesImage) {
+        switch (nesImage.mapperType) {
+            case 0:
+                return new Mmc0(nesImage);
+            case 1:
+                return new Mmc1(nesImage);
+            case 4:
+                return new Mmc3(nesImage);
+            default:
+                throw 'unkown mapper ' + nesImage.mapperType;
         }
     };
-    Object.defineProperty(Controller.prototype, "reg4016", {
-        /**
-         * Front-loading NES $4016 and $4017, and Top-loading NES $4017
-            7  bit  0
-            ---- ----
-            OOOx xxxD
-            |||| ||||
-            |||| |||+- Serial controller data
-            |||+-+++-- Always 0
-            +++------- Open bus
-        */
-        get: function () {
-            //console.log('4016');
-            if (this.s)
-                return this.keyStateA[0];
-            else if (this.iA < 8)
-                return this.keyStateA[this.iA++];
-            else
-                return 0x40 | 1;
-        },
-        set: function (value) {
-            this.s = value & 1;
-            if (!this.s) {
-                this.iA = 0;
-                this.iB = 0;
+    return MemoryMapperFactory;
+})();
+///<reference path="Memory.ts"/>
+var Ram = (function () {
+    function Ram(sizeI) {
+        this.sizeI = sizeI;
+        this.memory = new Uint8Array(sizeI);
+    }
+    Ram.fromBytes = function (memory) {
+        var res = new Ram(0);
+        res.memory = memory;
+        return res;
+    };
+    Ram.prototype.size = function () {
+        return this.memory.length;
+    };
+    Ram.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    Ram.prototype.setByte = function (addr, value) {
+        this.memory[addr] = value & 0xff;
+    };
+    return Ram;
+})();
+///<reference path="Memory.ts"/>
+var ROM = (function () {
+    function ROM(size) {
+        this.memory = new Uint8Array(size);
+    }
+    ROM.fromBytes = function (memory) {
+        var res = new ROM(0);
+        res.memory = memory;
+        return res;
+    };
+    ROM.prototype.size = function () {
+        return this.memory.length;
+    };
+    ROM.prototype.getByte = function (addr) {
+        return this.memory[addr];
+    };
+    ROM.prototype.setByte = function (addr, value) {
+    };
+    ROM.prototype.subArray = function (addr, size) {
+        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
+    };
+    return ROM;
+})();
+///<reference path="IMemoryMapper.ts"/>
+///<reference path="../memory/Ram.ts"/>
+///<reference path="../memory/Rom.ts"/>
+var Mmc3 = (function () {
+    function Mmc3(nesImage) {
+        this.wasDown = true;
+        this.curA12 = 0;
+        this.prevA12 = 0;
+        this.horizontalMirroring = 0;
+        this.fourScreenVram = 0;
+        this.scanLineCounterStartValue = 0;
+        this.scanLineCounterRestartRequested = false;
+        this.scanLineCounter = 0;
+        this.irqEnabled = true;
+        this.lastFall = 0;
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
+        this.r = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.prgRam = new CleverRam(0x2000);
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), //0x2000
+        new Ram(0x4000), this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
+        this.nametableC = new Ram(0x400);
+        this.nametableD = new Ram(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
+        this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
+        this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.update();
+    }
+    Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
+        this.irqLine = new IrqLine(cpu);
+    };
+    Mmc3.prototype.setByte = function (addr, value) {
+        if (addr <= 0x9ffe) {
+            if (addr & 1) {
+                this.r[this.temp] = value;
+                this.update();
             }
-            //  console.log('this.s', this.s);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Controller.prototype, "reg4017", {
-        get: function () {
-            //   console.log('4017');
-            if (this.s)
-                return 0x40 | this.keyStateB[0];
-            else if (this.iB < 8)
-                return 0x40 | this.keyStateB[this.iB++];
+            else {
+                this.temp = value & 7;
+                this.chrMode = (value >> 7) & 1;
+                this.prgMode = (value >> 6) & 1;
+            }
+        }
+        else if (addr <= 0xbfff) {
+            if (addr & 1) {
+                this.prgRam.readEnable = !!((value >> 7) & 1);
+                this.prgRam.writeEnable = !((value >> 6) & 1);
+            }
+            else {
+                this.horizontalMirroring = value & 1;
+                this.update();
+            }
+        }
+        else if (addr <= 0xdffe) {
+            if (addr & 1) {
+                this.scanLineCounterRestartRequested = true;
+            }
+            else {
+                this.scanLineCounterStartValue = value & 0xff;
+            }
+        }
+        else if (addr <= 0xffff) {
+            if (addr & 1) {
+                this.irqEnabled = true;
+            }
+            else {
+                this.irqLine.ack();
+                this.irqEnabled = false;
+            }
+        }
+    };
+    Mmc3.prototype.update = function () {
+        /*
+                           $8000   $A000   $C000   $E000
+                         +-------+-------+-------+-------+
+            PRG Mode 0:  |  R:6  |  R:7  | { -2} | { -1} |
+                         +-------+-------+-------+-------+
+            PRG Mode 1:  | { -2} |  R:7  |  R:6  | { -1} |
+                         +-------+-------+-------+-------+
+        */
+        if (!this.prgMode) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
+        }
+        else {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRGBanks.length - 2];
+            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
+            this.memory.rgmemory[5] = this.PRGBanks[this.r[6]];
+            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
+        }
+        /*
+                           $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
+                         +---------------+---------------+-------+-------+-------+-------+
+            CHR Mode 0:  |     <R:0>     |     <R:1>     |  R:2  |  R:3  |  R:4  |  R:5  |
+                         +---------------+---------------+---------------+---------------+
+            CHR Mode 1:  |  R:2  |  R:3  |  R:4  |  R:5  |     <R:0>     |     <R:1>     |
+                         +-------+-------+-------+-------+---------------+---------------+
+       */
+        if (!this.chrMode) {
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[1] | 1];
+            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[2]];
+            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[3]];
+            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[4]];
+            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[5]];
+        }
+        else {
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[2]];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[3]];
+            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[4]];
+            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[5]];
+            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] & 0xfe];
+            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[0] | 1];
+            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] & 0xfe];
+            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
+        }
+        if (!this.fourScreenVram) {
+            if (this.horizontalMirroring) {
+                this.nametable.rgmemory[0] = this.nametableA;
+                this.nametable.rgmemory[1] = this.nametableA;
+                this.nametable.rgmemory[2] = this.nametableB;
+                this.nametable.rgmemory[3] = this.nametableB;
+            }
+            else {
+                this.nametable.rgmemory[0] = this.nametableA;
+                this.nametable.rgmemory[1] = this.nametableB;
+                this.nametable.rgmemory[2] = this.nametableA;
+                this.nametable.rgmemory[3] = this.nametableB;
+            }
+        }
+    };
+    Mmc3.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    };
+    Mmc3.prototype.clk = function () {
+        this.curA12 = this.vmemory.lastAddr & 0x1000;
+        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
+            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
+                this.scanLineCounterRestartRequested = false;
+                if (!this.scanLineCounterStartValue && this.irqEnabled)
+                    this.irqLine.request();
+                this.scanLineCounter = this.scanLineCounterStartValue;
+            }
+            else if (this.scanLineCounter > 0) {
+                this.scanLineCounter--;
+                if (!this.scanLineCounter && this.irqEnabled) {
+                    this.irqLine.request();
+                }
+            }
+        }
+        if (this.curA12 === 0) {
+            this.lastFall++;
+        }
+        else if (this.curA12 !== 0) {
+            this.lastFall = 0;
+        }
+        this.prevA12 = this.curA12;
+    };
+    return Mmc3;
+})();
+///<reference path="Memory.ts"/>
+var CleverRam = (function () {
+    function CleverRam(sizeI, repeat) {
+        if (repeat === void 0) { repeat = 1; }
+        this.sizeI = sizeI;
+        this.writeEnable = true;
+        this.readEnable = true;
+        this.memory = new Uint8Array(sizeI);
+        this.sizeI *= repeat;
+    }
+    CleverRam.fromBytes = function (memory) {
+        var res = new CleverRam(0);
+        res.memory = memory;
+        return res;
+    };
+    CleverRam.prototype.size = function () {
+        return this.sizeI;
+    };
+    CleverRam.prototype.getByte = function (addr) {
+        if (!this.readEnable)
+            return 0;
+        return this.memory[addr > this.sizeI ? addr % this.sizeI : addr];
+    };
+    CleverRam.prototype.setByte = function (addr, value) {
+        if (this.writeEnable)
+            this.memory[addr > this.sizeI ? addr % this.sizeI : addr] = value & 0xff;
+    };
+    return CleverRam;
+})();
+var NesRunnerBase = (function () {
+    function NesRunnerBase(container, url) {
+        this.container = container;
+        this.url = url;
+        var containerT = document.createElement('div');
+        this.container.appendChild(containerT);
+        this.container = containerT;
+        this.onEndCallback = function () { };
+    }
+    NesRunnerBase.prototype.log = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
+    };
+    NesRunnerBase.prototype.logError = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var st = "";
+        for (var i = 0; i < args.length; i++)
+            st += " " + args[i];
+        var div = document.createElement("div");
+        div.classList.add("error");
+        div.innerHTML = st.replace(/\n/g, "<br/>");
+        this.logElement.appendChild(div);
+    };
+    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
+        var _this = this;
+        this.headerElement = document.createElement("h2");
+        this.container.appendChild(this.headerElement);
+        var canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 240;
+        this.container.appendChild(canvas);
+        var driver = new DriverFactory().createRenderer(canvas);
+        this.headerElement.innerText = this.url + " " + driver.tsto();
+        this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
+        this.container.appendChild(this.logElement);
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", this.url, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function (_) {
+            try {
+                if (xhr.status > 99 && xhr.status < 299) {
+                    var blob = new Uint8Array(xhr.response);
+                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+                }
+                else {
+                    _this.logError("http error " + xhr.status);
+                    onLoad(null);
+                }
+            }
+            catch (e) {
+                canvas.remove();
+                _this.logError(e);
+            }
+        };
+        xhr.send();
+    };
+    NesRunnerBase.prototype.onEnd = function (callback) {
+        this.onEndCallback = callback;
+    };
+    NesRunnerBase.prototype.run = function () {
+        var _this = this;
+        this.loadEmulator(function (nesEmulator) {
+            _this.nesEmulator = nesEmulator;
+            if (!nesEmulator)
+                _this.onEndCallback();
             else
-                return 0x40 | 1;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    return Controller;
+                _this.runI();
+        });
+    };
+    NesRunnerBase.prototype.runI = function () {
+        this.onEndCallback();
+    };
+    return NesRunnerBase;
+})();
+///<reference path="NesRunnerBase.ts"/>
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var CpuTestRunner = (function (_super) {
+    __extends(CpuTestRunner, _super);
+    function CpuTestRunner(container, url, checkForString) {
+        var _this = this;
+        _super.call(this, container, url);
+        this.checkForString = checkForString;
+        this.callback = this.renderFrame.bind(this);
+        this.container.classList.add('test-case');
+        var collapseButton = document.createElement('div');
+        collapseButton.className = 'collapse-button';
+        collapseButton.onclick = function (e) {
+            $(_this.container).toggleClass('collapsed');
+        };
+        this.container.appendChild(collapseButton);
+    }
+    CpuTestRunner.prototype.testFinished = function (nesEmulator) {
+        if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
+            nesEmulator.cpu.getByte(0x6001) === 0xde &&
+            nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
+            nesEmulator.cpu.getByte(0x6003) === 0x61) {
+            var resultCode = nesEmulator.cpu.getByte(0x6000);
+            if (resultCode !== 0) {
+                this.log('res: ' + resultCode.toString(16));
+                this.container.classList.add('failed');
+            }
+            else {
+                this.container.classList.add('passed');
+            }
+            var res = "";
+            var i = 0x6004;
+            while (nesEmulator.cpu.getByte(i) !== 0) {
+                res += String.fromCharCode(nesEmulator.cpu.getByte(i));
+                i++;
+            }
+            this.log(res);
+            return true;
+        }
+        if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
+            nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
+            nesEmulator.cpu.flgInterruptDisable &&
+            !nesEmulator.ppu.nmiOutput) {
+            var out = nesEmulator.ppu.getNameTable(0);
+            this.log(out);
+            if (out.indexOf(this.checkForString) >= 0) {
+                this.container.classList.add('passed');
+            }
+            else {
+                this.container.classList.add('failed');
+            }
+            return true;
+        }
+        return false;
+    };
+    CpuTestRunner.prototype.runI = function () {
+        requestAnimationFrame(this.callback);
+    };
+    CpuTestRunner.prototype.renderFrame = function () {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        if (this.testFinished(nesEmulator)) {
+            this.container.classList.add('collapsed');
+            this.onEndCallback();
+            return;
+        }
+        try {
+            var frameCurrent = ppu.iFrame;
+            while (frameCurrent === ppu.iFrame)
+                nesEmulator.step();
+        }
+        catch (e) {
+            this.container.classList.add('collapsed');
+            this.logError(e);
+            this.onEndCallback();
+            return;
+        }
+        requestAnimationFrame(this.callback);
+    };
+    return CpuTestRunner;
+})(NesRunnerBase);
+///<reference path="IDriver.ts"/>
+var CanvasDriver = (function () {
+    function CanvasDriver(canvas) {
+        this.ctx = canvas.getContext("2d");
+        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
+        var buf = new ArrayBuffer(this.imageData.data.length);
+        this.buf8 = new Uint8ClampedArray(buf);
+        this.data = new Uint32Array(buf);
+    }
+    CanvasDriver.prototype.getBuffer = function () {
+        return this.data;
+    };
+    CanvasDriver.prototype.render = function () {
+        this.imageData.data.set(this.buf8);
+        this.ctx.putImageData(this.imageData, 0, 0);
+    };
+    CanvasDriver.prototype.tsto = function () {
+        return "Canvas driver";
+    };
+    return CanvasDriver;
+})();
+var DriverFactory = (function () {
+    function DriverFactory() {
+    }
+    DriverFactory.prototype.createRenderer = function (canvas) {
+        //return new CanvasDriver(canvas);
+        try {
+            return new WebGlDriver(canvas);
+        }
+        catch (e) {
+            console.error(e);
+            return new CanvasDriver(canvas);
+        }
+    };
+    return DriverFactory;
+})();
+///<reference path="IDriver.ts"/>
+var WebGlDriver = (function () {
+    function WebGlDriver(canvas) {
+        _a = [canvas.width, canvas.height], this.width = _a[0], this.height = _a[1];
+        this.initWebGl(canvas);
+        var buf = new ArrayBuffer(this.width * this.height * 4);
+        this.buf8 = new Uint8Array(buf);
+        this.buf32 = new Uint32Array(buf);
+        var _a;
+    }
+    WebGlDriver.prototype.initWebGl = function (canvas) {
+        var contextAttributes = { premultipliedAlpha: true };
+        this.glContext = (canvas.getContext('webgl', contextAttributes) ||
+            canvas.getContext('experimental-webgl', contextAttributes));
+        if (!this.glContext)
+            throw "WebGl is not supported";
+        // Set clear color to black, fully transparent
+        this.glContext.clearColor(0.0, 0.0, 0.0, 0.0);
+        var vertexShader = this.createShaderFromSource(this.glContext.VERTEX_SHADER, "\n            attribute vec2 aPosition;\n            attribute vec2 aTextureCoord;\n            \n            varying highp vec2 vTextureCoord;\n            \n            void main() {\n                gl_Position = vec4(aPosition, 0, 1);\n                vTextureCoord = aTextureCoord;\n            }");
+        var fragmentShader = this.createShaderFromSource(this.glContext.FRAGMENT_SHADER, "\n            varying highp vec2 vTextureCoord;\n            uniform sampler2D uSampler;\n            void main() {\n                gl_FragColor = texture2D(uSampler, vTextureCoord);\n            }");
+        var program = this.createProgram([vertexShader, fragmentShader]);
+        this.glContext.useProgram(program);
+        var positionAttribute = this.glContext.getAttribLocation(program, "aPosition");
+        this.glContext.enableVertexAttribArray(positionAttribute);
+        var textureCoordAttribute = this.glContext.getAttribLocation(program, "aTextureCoord");
+        this.glContext.enableVertexAttribArray(textureCoordAttribute);
+        // Associate the uniform texture sampler with TEXTURE0 slot
+        var textureSamplerUniform = this.glContext.getUniformLocation(program, "uSampler");
+        this.glContext.uniform1i(textureSamplerUniform, 0);
+        // Create a buffer used to represent whole set of viewport vertices
+        var vertexBuffer = this.glContext.createBuffer();
+        this.glContext.bindBuffer(this.glContext.ARRAY_BUFFER, vertexBuffer);
+        this.glContext.bufferData(this.glContext.ARRAY_BUFFER, WebGlDriver.VIEWPORT_VERTICES, this.glContext.STATIC_DRAW);
+        this.glContext.vertexAttribPointer(positionAttribute, 2, this.glContext.FLOAT, false, 0, 0);
+        // Create a buffer used to represent whole set of vertex texture coordinates
+        var textureCoordinateBuffer = this.glContext.createBuffer();
+        this.glContext.bindBuffer(this.glContext.ARRAY_BUFFER, textureCoordinateBuffer);
+        this.glContext.bufferData(this.glContext.ARRAY_BUFFER, WebGlDriver.VERTEX_TEXTURE_COORDS, this.glContext.STATIC_DRAW);
+        this.glContext.vertexAttribPointer(textureCoordAttribute, 2, this.glContext.FLOAT, false, 0, 0);
+        // Note: TEXTURE_MIN_FILTER, TEXTURE_WRAP_S and TEXTURE_WRAP_T parameters need to be set
+        //       so we can handle textures whose width and height are not a power of 2.
+        this.texture = this.glContext.createTexture();
+        this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture);
+        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_MAG_FILTER, this.glContext.LINEAR);
+        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_MIN_FILTER, this.glContext.LINEAR);
+        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_WRAP_S, this.glContext.CLAMP_TO_EDGE);
+        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_WRAP_T, this.glContext.CLAMP_TO_EDGE);
+        this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
+        // Since we're only using one single texture, we just make TEXTURE0 the active one
+        // at all times
+        this.glContext.activeTexture(this.glContext.TEXTURE0);
+        this.glContext.viewport(0, 0, this.width, this.height);
+    };
+    // Create a shader of specified type, with the specified source, and compile it.
+    //     .createShaderFromSource(shaderType, shaderSource)
+    //
+    // shaderType: Type of shader to create (fragment or vertex shader)
+    // shaderSource: Source for shader to create (string)
+    WebGlDriver.prototype.createShaderFromSource = function (shaderType, shaderSource) {
+        var shader = this.glContext.createShader(shaderType);
+        this.glContext.shaderSource(shader, shaderSource);
+        this.glContext.compileShader(shader);
+        // Check for errors during compilation
+        var status = this.glContext.getShaderParameter(shader, this.glContext.COMPILE_STATUS);
+        if (!status) {
+            var infoLog = this.glContext.getShaderInfoLog(shader);
+            this.glContext.deleteShader(shader);
+            throw "Unable to compile '" + shaderType + "' shader. Error:" + infoLog;
+        }
+        return shader;
+    };
+    // Create a WebGL program attached to the specified shaders.
+    //     .createProgram(shaderArray)
+    //
+    // shaderArray: Array of shaders to attach to program
+    WebGlDriver.prototype.createProgram = function (shaderArray) {
+        var newProgram = this.glContext.createProgram();
+        for (var shaderIndex = 0; shaderIndex < shaderArray.length; ++shaderIndex)
+            this.glContext.attachShader(newProgram, shaderArray[shaderIndex]);
+        this.glContext.linkProgram(newProgram);
+        // Check for errors during linking
+        var status = this.glContext.getProgramParameter(newProgram, this.glContext.LINK_STATUS);
+        if (!status) {
+            var infoLog = this.glContext.getProgramInfoLog(newProgram);
+            this.glContext.deleteProgram(newProgram);
+            throw "Unable to link WebGL program. Error:" + infoLog;
+        }
+        return newProgram;
+    };
+    WebGlDriver.prototype.getBuffer = function () {
+        return this.buf32;
+    };
+    WebGlDriver.prototype.render = function () {
+        this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture);
+        this.glContext.texImage2D(this.glContext.TEXTURE_2D, 0, this.glContext.RGBA, this.width, this.height, 0, this.glContext.RGBA, this.glContext.UNSIGNED_BYTE, this.buf8);
+        this.glContext.drawArrays(this.glContext.TRIANGLES, 0, WebGlDriver.NUM_VIEWPORT_VERTICES);
+        this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
+    };
+    WebGlDriver.prototype.tsto = function () {
+        return "WebGL driver";
+    };
+    // vertices representing entire viewport as two triangles which make up the whole
+    // rectangle, in post-projection/clipspace coordinates
+    WebGlDriver.VIEWPORT_VERTICES = new Float32Array([
+        -1.0, -1.0,
+        1.0, -1.0,
+        -1.0, 1.0,
+        -1.0, 1.0,
+        1.0, -1.0,
+        1.0, 1.0]);
+    WebGlDriver.NUM_VIEWPORT_VERTICES = WebGlDriver.VIEWPORT_VERTICES.length / 2;
+    // Texture coordinates corresponding to each viewport vertex
+    WebGlDriver.VERTEX_TEXTURE_COORDS = new Float32Array([
+        0.0, 1.0,
+        1.0, 1.0,
+        0.0, 0.0,
+        0.0, 0.0,
+        1.0, 1.0,
+        1.0, 0.0]);
+    return WebGlDriver;
 })();
 var Most6502Base = (function () {
     function Most6502Base(memory) {
@@ -10391,11 +10918,6 @@ var Most6502Base = (function () {
     return Most6502Base;
 })();
 ///<reference path="Mos6502Base.ts"/>
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
 var Mos6502 = (function (_super) {
     __extends(Mos6502, _super);
     function Mos6502(memory) {
@@ -10443,936 +10965,166 @@ var Mos6502 = (function (_super) {
     };
     return Mos6502;
 })(Most6502Base);
-///<reference path="IDriver.ts"/>
-var CanvasDriver = (function () {
-    function CanvasDriver(canvas) {
-        this.ctx = canvas.getContext("2d");
-        this.imageData = this.ctx.getImageData(0, 0, 256, 240);
-        var buf = new ArrayBuffer(this.imageData.data.length);
-        this.buf8 = new Uint8ClampedArray(buf);
-        this.data = new Uint32Array(buf);
-    }
-    CanvasDriver.prototype.getBuffer = function () {
-        return this.data;
-    };
-    CanvasDriver.prototype.render = function () {
-        this.imageData.data.set(this.buf8);
-        this.ctx.putImageData(this.imageData, 0, 0);
-    };
-    CanvasDriver.prototype.tsto = function () {
-        return "Canvas driver";
-    };
-    return CanvasDriver;
-})();
-var DriverFactory = (function () {
-    function DriverFactory() {
-    }
-    DriverFactory.prototype.createRenderer = function (canvas) {
-        //return new CanvasDriver(canvas);
-        try {
-            return new WebGlDriver(canvas);
-        }
-        catch (e) {
-            console.error(e);
-            return new CanvasDriver(canvas);
-        }
-    };
-    return DriverFactory;
-})();
-///<reference path="IDriver.ts"/>
-var WebGlDriver = (function () {
-    function WebGlDriver(canvas) {
-        _a = [canvas.width, canvas.height], this.width = _a[0], this.height = _a[1];
-        this.initWebGl(canvas);
-        var buf = new ArrayBuffer(this.width * this.height * 4);
-        this.buf8 = new Uint8Array(buf);
-        this.buf32 = new Uint32Array(buf);
-        var _a;
-    }
-    WebGlDriver.prototype.initWebGl = function (canvas) {
-        var contextAttributes = { premultipliedAlpha: true };
-        this.glContext = (canvas.getContext('webgl', contextAttributes) ||
-            canvas.getContext('experimental-webgl', contextAttributes));
-        if (!this.glContext)
-            throw "WebGl is not supported";
-        // Set clear color to black, fully transparent
-        this.glContext.clearColor(0.0, 0.0, 0.0, 0.0);
-        var vertexShader = this.createShaderFromSource(this.glContext.VERTEX_SHADER, "\n            attribute vec2 aPosition;\n            attribute vec2 aTextureCoord;\n            \n            varying highp vec2 vTextureCoord;\n            \n            void main() {\n                gl_Position = vec4(aPosition, 0, 1);\n                vTextureCoord = aTextureCoord;\n            }");
-        var fragmentShader = this.createShaderFromSource(this.glContext.FRAGMENT_SHADER, "\n            varying highp vec2 vTextureCoord;\n            uniform sampler2D uSampler;\n            void main() {\n                gl_FragColor = texture2D(uSampler, vTextureCoord);\n            }");
-        var program = this.createProgram([vertexShader, fragmentShader]);
-        this.glContext.useProgram(program);
-        var positionAttribute = this.glContext.getAttribLocation(program, "aPosition");
-        this.glContext.enableVertexAttribArray(positionAttribute);
-        var textureCoordAttribute = this.glContext.getAttribLocation(program, "aTextureCoord");
-        this.glContext.enableVertexAttribArray(textureCoordAttribute);
-        // Associate the uniform texture sampler with TEXTURE0 slot
-        var textureSamplerUniform = this.glContext.getUniformLocation(program, "uSampler");
-        this.glContext.uniform1i(textureSamplerUniform, 0);
-        // Create a buffer used to represent whole set of viewport vertices
-        var vertexBuffer = this.glContext.createBuffer();
-        this.glContext.bindBuffer(this.glContext.ARRAY_BUFFER, vertexBuffer);
-        this.glContext.bufferData(this.glContext.ARRAY_BUFFER, WebGlDriver.VIEWPORT_VERTICES, this.glContext.STATIC_DRAW);
-        this.glContext.vertexAttribPointer(positionAttribute, 2, this.glContext.FLOAT, false, 0, 0);
-        // Create a buffer used to represent whole set of vertex texture coordinates
-        var textureCoordinateBuffer = this.glContext.createBuffer();
-        this.glContext.bindBuffer(this.glContext.ARRAY_BUFFER, textureCoordinateBuffer);
-        this.glContext.bufferData(this.glContext.ARRAY_BUFFER, WebGlDriver.VERTEX_TEXTURE_COORDS, this.glContext.STATIC_DRAW);
-        this.glContext.vertexAttribPointer(textureCoordAttribute, 2, this.glContext.FLOAT, false, 0, 0);
-        // Note: TEXTURE_MIN_FILTER, TEXTURE_WRAP_S and TEXTURE_WRAP_T parameters need to be set
-        //       so we can handle textures whose width and height are not a power of 2.
-        this.texture = this.glContext.createTexture();
-        this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture);
-        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_MAG_FILTER, this.glContext.LINEAR);
-        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_MIN_FILTER, this.glContext.LINEAR);
-        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_WRAP_S, this.glContext.CLAMP_TO_EDGE);
-        this.glContext.texParameteri(this.glContext.TEXTURE_2D, this.glContext.TEXTURE_WRAP_T, this.glContext.CLAMP_TO_EDGE);
-        this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
-        // Since we're only using one single texture, we just make TEXTURE0 the active one
-        // at all times
-        this.glContext.activeTexture(this.glContext.TEXTURE0);
-        this.glContext.viewport(0, 0, this.width, this.height);
-    };
-    // Create a shader of specified type, with the specified source, and compile it.
-    //     .createShaderFromSource(shaderType, shaderSource)
-    //
-    // shaderType: Type of shader to create (fragment or vertex shader)
-    // shaderSource: Source for shader to create (string)
-    WebGlDriver.prototype.createShaderFromSource = function (shaderType, shaderSource) {
-        var shader = this.glContext.createShader(shaderType);
-        this.glContext.shaderSource(shader, shaderSource);
-        this.glContext.compileShader(shader);
-        // Check for errors during compilation
-        var status = this.glContext.getShaderParameter(shader, this.glContext.COMPILE_STATUS);
-        if (!status) {
-            var infoLog = this.glContext.getShaderInfoLog(shader);
-            this.glContext.deleteShader(shader);
-            throw "Unable to compile '" + shaderType + "' shader. Error:" + infoLog;
-        }
-        return shader;
-    };
-    // Create a WebGL program attached to the specified shaders.
-    //     .createProgram(shaderArray)
-    //
-    // shaderArray: Array of shaders to attach to program
-    WebGlDriver.prototype.createProgram = function (shaderArray) {
-        var newProgram = this.glContext.createProgram();
-        for (var shaderIndex = 0; shaderIndex < shaderArray.length; ++shaderIndex)
-            this.glContext.attachShader(newProgram, shaderArray[shaderIndex]);
-        this.glContext.linkProgram(newProgram);
-        // Check for errors during linking
-        var status = this.glContext.getProgramParameter(newProgram, this.glContext.LINK_STATUS);
-        if (!status) {
-            var infoLog = this.glContext.getProgramInfoLog(newProgram);
-            this.glContext.deleteProgram(newProgram);
-            throw "Unable to link WebGL program. Error:" + infoLog;
-        }
-        return newProgram;
-    };
-    WebGlDriver.prototype.getBuffer = function () {
-        return this.buf32;
-    };
-    WebGlDriver.prototype.render = function () {
-        this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture);
-        this.glContext.texImage2D(this.glContext.TEXTURE_2D, 0, this.glContext.RGBA, this.width, this.height, 0, this.glContext.RGBA, this.glContext.UNSIGNED_BYTE, this.buf8);
-        this.glContext.drawArrays(this.glContext.TRIANGLES, 0, WebGlDriver.NUM_VIEWPORT_VERTICES);
-        this.glContext.bindTexture(this.glContext.TEXTURE_2D, null);
-    };
-    WebGlDriver.prototype.tsto = function () {
-        return "WebGL driver";
-    };
-    // vertices representing entire viewport as two triangles which make up the whole
-    // rectangle, in post-projection/clipspace coordinates
-    WebGlDriver.VIEWPORT_VERTICES = new Float32Array([
-        -1.0, -1.0,
-        1.0, -1.0,
-        -1.0, 1.0,
-        -1.0, 1.0,
-        1.0, -1.0,
-        1.0, 1.0]);
-    WebGlDriver.NUM_VIEWPORT_VERTICES = WebGlDriver.VIEWPORT_VERTICES.length / 2;
-    // Texture coordinates corresponding to each viewport vertex
-    WebGlDriver.VERTEX_TEXTURE_COORDS = new Float32Array([
-        0.0, 1.0,
-        1.0, 1.0,
-        0.0, 0.0,
-        0.0, 0.0,
-        1.0, 1.0,
-        1.0, 0.0]);
-    return WebGlDriver;
-})();
-var IrqLine = (function () {
-    function IrqLine(cpu) {
-        this.cpu = cpu;
-        this._isRequested = false;
-    }
-    IrqLine.prototype.request = function () {
-        if (!this._isRequested) {
-            this.cpu.irqLine--;
-            this._isRequested = true;
-        }
-    };
-    IrqLine.prototype.ack = function () {
-        if (this._isRequested) {
-            this.cpu.irqLine++;
-            this._isRequested = false;
-        }
-    };
-    IrqLine.prototype.isRequested = function () {
-        return this._isRequested;
-    };
-    return IrqLine;
-})();
-var MemoryMapperFactory = (function () {
-    function MemoryMapperFactory() {
-    }
-    MemoryMapperFactory.prototype.create = function (nesImage) {
-        switch (nesImage.mapperType) {
-            case 0:
-                return new Mmc0(nesImage);
-            case 1:
-                return new Mmc1(nesImage);
-            case 4:
-                return new Mmc3(nesImage);
-            default:
-                throw 'unkown mapper ' + nesImage.mapperType;
-        }
-    };
-    return MemoryMapperFactory;
-})();
-///<reference path="IMemoryMapper.ts"/>
-var Mmc0 = (function () {
-    function Mmc0(nesImage) {
-        if (nesImage.ROMBanks.length === 1) {
-            this.memory = new CompoundMemory(new Ram(0xc000), nesImage.ROMBanks[0]);
-        }
-        else if (nesImage.ROMBanks.length === 2) {
-            this.memory = new CompoundMemory(new Ram(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
-        }
-        if (nesImage.VRAMBanks.length > 1)
-            throw 'unknown VRAMBanks';
-        if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
-            throw 'unknown VRAMBanks';
-        var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new Ram(0x2000);
-        var nameTableA = new Ram(0x400);
-        var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
-        var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
-        var nameTableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
-        var rest = new Ram(0x1000);
-        this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
-    }
-    Mmc0.prototype.setCpuAndPpu = function (cpu) {
-    };
-    Mmc0.prototype.clk = function () { };
-    return Mmc0;
-})();
-///<reference path="IMemoryMapper.ts"/>
-var Mmc1 = (function () {
-    function Mmc1(nesImage) {
-        this.iWrite = 0;
-        this.rTemp = 0;
-        /**
-         * $8000-9FFF:  [...C PSMM]
-         */
-        this.r0 = 0;
-        /**
-         *  $A000-BFFF:  [...C CCCC]
-            CHR Reg 0
-         */
-        this.r1 = 0;
-        /**
-         *  $C000-DFFF:  [...C CCCC]
-         *  CHR Reg 1
-         */
-        this.r2 = 0;
-        /**
-         * $E000-FFFF:  [...W PPPP]
-         */
-        this.r3 = 0;
-        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
-        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
-        while (this.PRGBanks.length < 2)
-            this.PRGBanks.push(new Ram(0x4000));
-        while (this.CHRBanks.length < 2)
-            this.CHRBanks.push(new Ram(0x1000));
-        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[this.PRGBanks.length - 1]);
-        this.nametableA = new Ram(0x400);
-        this.nametableB = new Ram(0x400);
-        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
-        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.nametable, new Ram(0x1000));
-        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-        this.r0 = 0;
-        this.r1 = 0; //chr0
-        this.r2 = 1; //chr1
-        this.r3 = 0; //prg1
-        this.update();
-    }
-    Object.defineProperty(Mmc1.prototype, "C", {
-        /** CHR Mode (0=8k mode, 1=4k mode) */
-        get: function () { return (this.r0 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "P", {
-        /** PRG Size (0=32k mode, 1=16k mode) */
-        get: function () { return (this.r0 >> 3) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "S", {
-        /**
-         * Slot select:
-         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
-         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
-         *  This bit is ignored when 'P' is clear (32k mode)
-         */
-        get: function () { return (this.r0 >> 2) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "M", {
-        /**
-         *  Mirroring control:
-         *  %00 = 1ScA
-         *  %01 = 1ScB
-         *  %10 = Vert
-         *  %11 = Horz
-         */
-        get: function () { return this.r0 & 3; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "CHR0", {
-        get: function () { return this.r1 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "CHR1", {
-        get: function () { return this.r2 & 31; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "PRG0", {
-        get: function () { return this.r3 & 15; },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Mmc1.prototype, "W", {
-        /**
-         * W = WRAM Disable (0=enabled, 1=disabled)
-         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
-         * Later ones do.
-         */
-        get: function () { return (this.r3 >> 4) & 1; },
-        enumerable: true,
-        configurable: true
-    });
-    Mmc1.prototype.setByte = function (addr, value) {
-        /*Temporary reg port ($8000-FFFF):
-            [r... ...d]
-                r = reset flag
-                d = data bit
-
-        When 'r' is set:
-            - 'd' is ignored
-            - hidden temporary reg is reset (so that the next write is the "first" write)
-            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
-            - other bits of $8000 (and other regs) are unchanged
-
-        When 'r' is clear:
-            - 'd' proceeds as the next bit written in the 5-bit sequence
-            - If this completes the 5-bit sequence:
-                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
-                - temporary reg is reset (so that next write is the "first" write)
-        */
-        value &= 0xff;
-        var flgReset = value >> 7;
-        var flgData = value & 0x1;
-        if (flgReset === 1) {
-            this.r0 = 3 << 2;
-            this.iWrite = 0;
-            this.rTemp = 0;
-        }
-        else {
-            this.rTemp = (this.rTemp & (0xff - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite);
-            this.iWrite++;
-            if (this.iWrite === 5) {
-                if (addr <= 0x9fff) {
-                    this.r0 = this.rTemp;
-                }
-                else if (addr <= 0xbfff) {
-                    this.r1 = this.rTemp;
-                }
-                else if (addr <= 0xdfff) {
-                    this.r2 = this.rTemp;
-                }
-                else if (addr <= 0xffff) {
-                    this.r3 = this.rTemp;
-                }
-                this.update();
-                this.iWrite = 0;
-                this.rTemp = 0;
-            }
-        }
-    };
-    Mmc1.prototype.update = function () {
-        /*
-           PRG Setup:
-           --------------------------
-           There is 1 PRG reg and 3 PRG modes.
-
-                          $8000   $A000   $C000   $E000
-                        +-------------------------------+
-           P=0:         |            <$E000>            |
-                        +-------------------------------+
-           P=1, S=0:    |     { 0 }     |     $E000     |
-                        +---------------+---------------+
-           P=1, S=1:    |     $E000     |     {$0F}     |
-                        +---------------+---------------+
-       */
-        if (this.P === 0) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 & 0xfe];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0 | 1];
-        }
-        else if (this.S === 0) {
-            this.memory.rgmemory[3] = this.PRGBanks[0];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
-        }
-        else {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
-            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 1];
-        }
-        /*
-          CHR Setup:
-          --------------------------
-          There are 2 CHR regs and 2 CHR modes.
-
-                      $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
-                    +---------------------------------------------------------------+
-          C=0:      |                            <$A000>                            |
-                    +---------------------------------------------------------------+
-          C=1:      |             $A000             |             $C000             |
-                    +-------------------------------+-------------------------------+
-      */
-        if (this.C === 0) {
-            //console.log('chr:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 & 0xfe];
-            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR0 | 1];
-        }
-        else {
-            // console.log('chr mode 2:', this.CHR0);
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
-            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
-        }
-        if (this.M === 0) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-        else if (this.M === 1) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 2) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
-        }
-        else if (this.M === 3) {
-            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
-            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
-        }
-    };
-    Mmc1.prototype.splitMemory = function (romBanks, size) {
-        var result = [];
-        for (var _i = 0; _i < romBanks.length; _i++) {
-            var rom = romBanks[_i];
-            var i = 0;
-            if (rom.size() % size)
-                throw 'cannot split memory';
-            while (i < rom.size()) {
-                result.push(rom.subArray(i, size));
-                i += size;
-            }
-        }
-        return result;
-    };
-    Mmc1.prototype.setCpuAndPpu = function (cpu) {
-    };
-    Mmc1.prototype.clk = function () { };
-    return Mmc1;
-})();
-///<reference path="Memory.ts"/>
-var Ram = (function () {
-    function Ram(sizeI) {
-        this.sizeI = sizeI;
-        this.memory = new Uint8Array(sizeI);
-    }
-    Ram.fromBytes = function (memory) {
-        var res = new Ram(0);
-        res.memory = memory;
-        return res;
-    };
-    Ram.prototype.size = function () {
-        return this.memory.length;
-    };
-    Ram.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    Ram.prototype.setByte = function (addr, value) {
-        this.memory[addr] = value & 0xff;
-    };
-    return Ram;
-})();
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(size) {
-        this.memory = new Uint8Array(size);
-    }
-    ROM.fromBytes = function (memory) {
-        var res = new ROM(0);
-        res.memory = memory;
-        return res;
-    };
-    ROM.prototype.size = function () {
-        return this.memory.length;
-    };
-    ROM.prototype.getByte = function (addr) {
-        return this.memory[addr];
-    };
-    ROM.prototype.setByte = function (addr, value) {
-    };
-    ROM.prototype.subArray = function (addr, size) {
-        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
-    };
-    return ROM;
-})();
-///<reference path="IMemoryMapper.ts"/>
-///<reference path="../memory/Ram.ts"/>
-///<reference path="../memory/Rom.ts"/>
-var Mmc3 = (function () {
-    function Mmc3(nesImage) {
-        this.wasDown = true;
-        this.curA12 = 0;
-        this.prevA12 = 0;
-        this.horizontalMirroring = 0;
-        this.fourScreenVram = 0;
-        this.scanLineCounterStartValue = 0;
-        this.scanLineCounterRestartRequested = false;
-        this.scanLineCounter = 0;
-        this.irqEnabled = true;
-        this.lastFall = 0;
-        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
-        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
-        this.r = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.prgRam = new CleverRam(0x2000);
-        this.memory = new CompoundMemory(new CleverRam(0x800, 4), //0x2000
-        new Ram(0x4000), this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
-        this.nametableA = new Ram(0x400);
-        this.nametableB = new Ram(0x400);
-        this.nametableC = new Ram(0x400);
-        this.nametableD = new Ram(0x400);
-        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableC, this.nametableD);
-        this.horizontalMirroring = nesImage.fVerticalMirroring ? 0 : 1;
-        this.fourScreenVram = nesImage.fFourScreenVRAM ? 1 : 0;
-        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.CHRBanks[2], this.CHRBanks[3], this.CHRBanks[4], this.CHRBanks[5], this.CHRBanks[6], this.CHRBanks[7], this.nametable, new Ram(0x1000));
-        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
-        this.update();
-    }
-    Mmc3.prototype.setCpuAndPpu = function (cpu, ppu) {
-        this.irqLine = new IrqLine(cpu);
-    };
-    Mmc3.prototype.setByte = function (addr, value) {
-        if (addr <= 0x9ffe) {
-            if (addr & 1) {
-                this.r[this.temp] = value;
-                this.update();
-            }
-            else {
-                this.temp = value & 7;
-                this.chrMode = (value >> 7) & 1;
-                this.prgMode = (value >> 6) & 1;
-            }
-        }
-        else if (addr <= 0xbfff) {
-            if (addr & 1) {
-                this.prgRam.readEnable = !!((value >> 7) & 1);
-                this.prgRam.writeEnable = !((value >> 6) & 1);
-            }
-            else {
-                this.horizontalMirroring = value & 1;
-                this.update();
-            }
-        }
-        else if (addr <= 0xdffe) {
-            if (addr & 1) {
-                this.scanLineCounterRestartRequested = true;
-            }
-            else {
-                this.scanLineCounterStartValue = value & 0xff;
-            }
-        }
-        else if (addr <= 0xffff) {
-            if (addr & 1) {
-                this.irqEnabled = true;
-            }
-            else {
-                this.irqLine.ack();
-                this.irqEnabled = false;
-            }
-        }
-    };
-    Mmc3.prototype.update = function () {
-        /*
-                           $8000   $A000   $C000   $E000
-                         +-------+-------+-------+-------+
-            PRG Mode 0:  |  R:6  |  R:7  | { -2} | { -1} |
-                         +-------+-------+-------+-------+
-            PRG Mode 1:  | { -2} |  R:7  |  R:6  | { -1} |
-                         +-------+-------+-------+-------+
-        */
-        if (!this.prgMode) {
-            this.memory.rgmemory[3] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
-        }
-        else {
-            this.memory.rgmemory[3] = this.PRGBanks[this.PRGBanks.length - 2];
-            this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
-            this.memory.rgmemory[5] = this.PRGBanks[this.r[6]];
-            this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
-        }
-        /*
-                           $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
-                         +---------------+---------------+-------+-------+-------+-------+
-            CHR Mode 0:  |     <R:0>     |     <R:1>     |  R:2  |  R:3  |  R:4  |  R:5  |
-                         +---------------+---------------+---------------+---------------+
-            CHR Mode 1:  |  R:2  |  R:3  |  R:4  |  R:5  |     <R:0>     |     <R:1>     |
-                         +-------+-------+-------+-------+---------------+---------------+
-       */
-        if (!this.chrMode) {
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[0] & 0xfe];
-            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[0] | 1];
-            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[1] & 0xfe];
-            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[1] | 1];
-            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[2]];
-            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[3]];
-            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[4]];
-            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[5]];
-        }
-        else {
-            this.vmemory.rgmemory[0] = this.CHRBanks[this.r[2]];
-            this.vmemory.rgmemory[1] = this.CHRBanks[this.r[3]];
-            this.vmemory.rgmemory[2] = this.CHRBanks[this.r[4]];
-            this.vmemory.rgmemory[3] = this.CHRBanks[this.r[5]];
-            this.vmemory.rgmemory[4] = this.CHRBanks[this.r[0] & 0xfe];
-            this.vmemory.rgmemory[5] = this.CHRBanks[this.r[0] | 1];
-            this.vmemory.rgmemory[6] = this.CHRBanks[this.r[1] & 0xfe];
-            this.vmemory.rgmemory[7] = this.CHRBanks[this.r[1] | 1];
-        }
-        if (!this.fourScreenVram) {
-            if (this.horizontalMirroring) {
-                this.nametable.rgmemory[0] = this.nametableA;
-                this.nametable.rgmemory[1] = this.nametableA;
-                this.nametable.rgmemory[2] = this.nametableB;
-                this.nametable.rgmemory[3] = this.nametableB;
-            }
-            else {
-                this.nametable.rgmemory[0] = this.nametableA;
-                this.nametable.rgmemory[1] = this.nametableB;
-                this.nametable.rgmemory[2] = this.nametableA;
-                this.nametable.rgmemory[3] = this.nametableB;
-            }
-        }
-    };
-    Mmc3.prototype.splitMemory = function (romBanks, size) {
-        var result = [];
-        for (var _i = 0; _i < romBanks.length; _i++) {
-            var rom = romBanks[_i];
-            var i = 0;
-            if (rom.size() % size)
-                throw 'cannot split memory';
-            while (i < rom.size()) {
-                result.push(rom.subArray(i, size));
-                i += size;
-            }
-        }
-        return result;
-    };
-    Mmc3.prototype.clk = function () {
-        this.curA12 = this.vmemory.lastAddr & 0x1000;
-        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
-            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
-                this.scanLineCounterRestartRequested = false;
-                if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.irqLine.request();
-                this.scanLineCounter = this.scanLineCounterStartValue;
-            }
-            else if (this.scanLineCounter > 0) {
-                this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled) {
-                    this.irqLine.request();
-                }
-            }
-        }
-        if (this.curA12 === 0) {
-            this.lastFall++;
-        }
-        else if (this.curA12 !== 0) {
-            this.lastFall = 0;
-        }
-        this.prevA12 = this.curA12;
-    };
-    return Mmc3;
-})();
-///<reference path="Memory.ts"/>
-var CleverRam = (function () {
-    function CleverRam(sizeI, repeat) {
-        if (repeat === void 0) { repeat = 1; }
-        this.sizeI = sizeI;
-        this.writeEnable = true;
-        this.readEnable = true;
-        this.memory = new Uint8Array(sizeI);
-        this.sizeI *= repeat;
-    }
-    CleverRam.fromBytes = function (memory) {
-        var res = new CleverRam(0);
-        res.memory = memory;
-        return res;
-    };
-    CleverRam.prototype.size = function () {
-        return this.sizeI;
-    };
-    CleverRam.prototype.getByte = function (addr) {
-        if (!this.readEnable)
-            return 0;
-        return this.memory[addr > this.sizeI ? addr % this.sizeI : addr];
-    };
-    CleverRam.prototype.setByte = function (addr, value) {
-        if (this.writeEnable)
-            this.memory[addr > this.sizeI ? addr % this.sizeI : addr] = value & 0xff;
-    };
-    return CleverRam;
-})();
-///<reference path="Memory.ts"/>
-var CompoundMemory = (function () {
-    function CompoundMemory() {
+var ControllerKeys;
+(function (ControllerKeys) {
+    ControllerKeys[ControllerKeys["A_Key"] = 0] = "A_Key";
+    ControllerKeys[ControllerKeys["B_Key"] = 1] = "B_Key";
+    ControllerKeys[ControllerKeys["Select_Key"] = 2] = "Select_Key";
+    ControllerKeys[ControllerKeys["Start_Key"] = 3] = "Start_Key";
+    ControllerKeys[ControllerKeys["Up"] = 4] = "Up";
+    ControllerKeys[ControllerKeys["Down"] = 5] = "Down";
+    ControllerKeys[ControllerKeys["Left"] = 6] = "Left";
+    ControllerKeys[ControllerKeys["Right"] = 7] = "Right";
+})(ControllerKeys || (ControllerKeys = {}));
+;
+var Controller = (function () {
+    function Controller(canvas) {
         var _this = this;
-        var rgmemory = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            rgmemory[_i - 0] = arguments[_i];
-        }
-        this.rgmemory = [];
-        this.setters = [];
-        this.getters = [];
-        this.sizeI = 0;
-        this.rgmemory = rgmemory;
-        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
-        this.initAccessors();
+        this.s = 0;
+        this.iA = 0;
+        this.iB = 0;
+        this.keyStateA = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.keyStateB = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.keyUpEvents = [];
+        canvas.tabIndex = 1;
+        canvas.focus();
+        canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
+        canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
+        this.registerKeyboardHandler(40, function () { _this.keyStateA[ControllerKeys.Down] = 0; });
+        this.registerKeyboardHandler(38, function () { _this.keyStateA[ControllerKeys.Up] = 0; });
+        this.registerKeyboardHandler(37, function () { _this.keyStateA[ControllerKeys.Left] = 0; });
+        this.registerKeyboardHandler(39, function () { _this.keyStateA[ControllerKeys.Right] = 0; });
+        this.registerKeyboardHandler(13, function () { _this.keyStateA[ControllerKeys.Start_Key] = 0; });
+        this.registerKeyboardHandler(32, function () { _this.keyStateA[ControllerKeys.Select_Key] = 0; });
+        this.registerKeyboardHandler(65, function () { _this.keyStateA[ControllerKeys.A_Key] = 0; });
+        this.registerKeyboardHandler(66, function () { _this.keyStateA[ControllerKeys.B_Key] = 0; });
     }
-    CompoundMemory.prototype.size = function () {
-        return this.sizeI;
+    Controller.prototype.registerKeyboardHandler = function (keycode, callback) {
+        this.keyUpEvents[keycode] = callback;
     };
-    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
-        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
-        this.initAccessors();
-    };
-    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
-        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
-        this.initAccessors();
-    };
-    CompoundMemory.prototype.getByte = function (addr) {
-        throw 'address out of bounds';
-    };
-    CompoundMemory.prototype.setByte = function (addr, value) {
-        throw 'address out of bounds';
-    };
-    CompoundMemory.prototype.initAccessors = function () {
-        this.initGetter();
-        this.initSetter();
-    };
-    CompoundMemory.prototype.initGetter = function () {
-        var stGetters = '';
-        for (var i = 0; i < this.getters.length; i++) {
-            var getter = this.getters[i];
-            var check = '';
-            if (getter.addrFirst === getter.addrLast)
-                check = "addr === " + getter.addrFirst;
-            else
-                check = getter.addrFirst + " <= addr && addr <= " + getter.addrLast;
-            stGetters += "if (" + check + ") return this.getters[" + i + "].getter(addr);\n";
+    Controller.prototype.onKeyDown = function (event) {
+        switch (event.keyCode) {
+            case 40:
+                this.keyStateA[ControllerKeys.Down] = 1;
+                break;
+            case 38:
+                this.keyStateA[ControllerKeys.Up] = 1;
+                break;
+            case 37:
+                this.keyStateA[ControllerKeys.Left] = 1;
+                break;
+            case 39:
+                this.keyStateA[ControllerKeys.Right] = 1;
+                break;
+            case 13:
+                this.keyStateA[ControllerKeys.Start_Key] = 1;
+                break;
+            case 32:
+                this.keyStateA[ControllerKeys.Select_Key] = 1;
+                break;
+            case 65:
+                this.keyStateA[ControllerKeys.A_Key] = 1;
+                break;
+            case 66:
+                this.keyStateA[ControllerKeys.B_Key] = 1;
+                break;
         }
-        var addrLim = 0;
-        var addrFirst = 0;
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            addrLim += memory.size();
-            var modifiedAddr = '';
-            if (!addrFirst)
-                modifiedAddr = 'addr';
-            else
-                modifiedAddr = "addr - " + addrFirst;
-            stGetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].getByte(" + modifiedAddr + ");\n";
-            addrFirst += memory.size();
-        }
-        eval("this.getByte = function(addr) { " + stGetters + " }");
+        event.preventDefault();
     };
-    CompoundMemory.prototype.initSetter = function () {
-        var stSetters = '';
-        for (var i = 0; i < this.setters.length; i++) {
-            var setter = this.setters[i];
-            var check = '';
-            if (setter.addrFirst === setter.addrLast)
-                check = "addr === " + setter.addrFirst;
-            else
-                check = setter.addrFirst + " <= addr && addr <= " + setter.addrLast;
-            stSetters += "if (" + check + ") return this.setters[" + i + "].setter(addr, value);\n";
+    Controller.prototype.onKeyUp = function (event) {
+        var callback = this.keyUpEvents[event.keyCode];
+        if (callback) {
+            callback();
+            event.preventDefault();
         }
-        var addrLim = 0;
-        var addrFirst = 0;
-        for (var i = 0; i < this.rgmemory.length; i++) {
-            var memory = this.rgmemory[i];
-            addrLim += memory.size();
-            var modifiedAddr = '';
-            if (!addrFirst)
-                modifiedAddr = 'addr';
-            else
-                modifiedAddr = "addr - " + addrFirst;
-            stSetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].setByte(" + modifiedAddr + ", value);\n";
-            addrFirst += memory.size();
-        }
-        eval("this.setByte = function(addr, value) {\n             this.lastAddr = addr;\n             " + stSetters + " }");
     };
-    return CompoundMemory;
+    Object.defineProperty(Controller.prototype, "reg4016", {
+        /**
+         * Front-loading NES $4016 and $4017, and Top-loading NES $4017
+            7  bit  0
+            ---- ----
+            OOOx xxxD
+            |||| ||||
+            |||| |||+- Serial controller data
+            |||+-+++-- Always 0
+            +++------- Open bus
+        */
+        get: function () {
+            //console.log('4016');
+            if (this.s)
+                return this.keyStateA[0];
+            else if (this.iA < 8)
+                return this.keyStateA[this.iA++];
+            else
+                return 0x40 | 1;
+        },
+        set: function (value) {
+            this.s = value & 1;
+            if (!this.s) {
+                this.iA = 0;
+                this.iB = 0;
+            }
+            //  console.log('this.s', this.s);
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Controller.prototype, "reg4017", {
+        get: function () {
+            //   console.log('4017');
+            if (this.s)
+                return 0x40 | this.keyStateB[0];
+            else if (this.iB < 8)
+                return 0x40 | this.keyStateB[this.iB++];
+            else
+                return 0x40 | 1;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    return Controller;
 })();
-var NesEmulator = (function () {
-    function NesEmulator(nesImage, canvas, driver) {
+///<reference path="NesRunnerBase.ts"/>
+var NesRunner = (function (_super) {
+    __extends(NesRunner, _super);
+    function NesRunner(container, url) {
+        _super.call(this, container, url);
+        this.callback = this.renderFrame.bind(this);
+        this.iFrameStart = 0;
+        this.hpcStart = 0;
+    }
+    NesRunner.prototype.runI = function () {
         var _this = this;
-        this.dmaRequested = false;
-        this.idma = 0;
-        this.icycle = 0;
-        if (nesImage.fPAL)
-            throw 'only NTSC images are supported';
-        this.memoryMapper = new MemoryMapperFactory().create(nesImage);
-        this.memoryMapper.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
-            _this.dmaRequested = true;
-            _this.addrDma = v << 8;
-        });
-        this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
-        this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
-        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4017; });
-        this.cpu = new Mos6502(this.memoryMapper.memory);
-        this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
-        this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
-        this.ppu.setDriver(driver);
-        this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
-        this.cpu.reset();
-        this.controller = new Controller(canvas);
-        window['nesemulator'] = this;
-    }
-    NesEmulator.prototype.step = function () {
-        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
-            if ((this.icycle & 3) === 0) {
-                var nmiBefore = this.cpu.nmiLine;
-                this.ppu.step();
-                this.memoryMapper.clk();
-                var nmiAfter = this.cpu.nmiLine;
-                if ((nmiBefore > nmiAfter) && this.icycle === 4)
-                    this.cpu.detectInterrupts();
-            }
-            if (this.icycle === 0) {
-                if (this.dmaRequested) {
-                    this.dmaRequested = false;
-                    this.idma = 512;
-                    if (this.cpu.icycle & 1)
-                        this.idma++;
-                }
-                else if (this.idma > 512) {
-                    this.idma--;
-                }
-                else if (this.idma > 0) {
-                    //  this.cpu.icycle++;
-                    if (!(this.idma & 1)) {
-                        this.bDma = this.memoryMapper.memory.getByte(this.addrDma++);
-                        this.addrDma &= 0xffff;
-                    }
-                    else {
-                        this.memoryMapper.memory.setByte(0x2004, this.bDma);
-                    }
-                    this.idma--;
-                }
-                else {
-                    this.cpu.step();
-                }
-            }
-            this.apu.step();
+        this.hpcStart = window.performance.now();
+        this.iFrameStart = this.nesEmulator.ppu.iFrame;
+        this.fpsElement = document.createElement("span");
+        this.headerElement.innerText += " ";
+        this.headerElement.appendChild(this.fpsElement);
+        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), function () { _this.headerElement.classList.toggle('show'); });
+        requestAnimationFrame(this.callback);
+        //setInterval(this.printFps.bind(this), 1000);
+    };
+    NesRunner.prototype.printFps = function () {
+        var hpcNow = Date.now();
+        var dt = hpcNow - this.hpcStart;
+        if (dt > 1000) {
+            var fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
+            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
+            this.iFrameStart = this.nesEmulator.ppu.iFrame;
+            this.hpcStart = hpcNow;
         }
     };
-    return NesEmulator;
-})();
-var NesImage = (function () {
-    function NesImage(rawBytes) {
-        this.trainer = null;
-        for (var i = 0; i < 4; i++)
-            if (rawBytes[i] !== NesImage.magic[i])
-                throw 'invalid NES header';
-        this.ROMBanks = new Array(rawBytes[4]);
-        this.VRAMBanks = new Array(rawBytes[5]);
-        this.fVerticalMirroring = !!(rawBytes[6] & 1);
-        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
-        var fTrainer = !!(rawBytes[6] & 4);
-        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
-        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
-        this.fVSSystem = !!(rawBytes[7] & 1);
-        if ((rawBytes[7] & 0x0e) !== 0)
-            throw 'invalid NES header';
-        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
-        this.fPAL = (rawBytes[9] & 1) === 1;
-        if ((rawBytes[9] & 0xfe) !== 0)
-            throw 'invalid NES header';
-        for (var i = 0xa; i < 0x10; i++)
-            if (rawBytes[i] !== 0)
-                throw 'invalid NES header';
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
-            throw 'invalid NES format';
-        var idx = 0x10;
-        if (fTrainer) {
-            this.trainer = rawBytes.slice(idx, idx + 0x100);
-            idx += 0x100;
-        }
-        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
-            this.RAMBanks[ibank] = new Ram(0x2000);
-        }
-        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
-            idx += 0x4000;
-        }
-        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
-            idx += 0x2000;
-        }
-    }
-    /*
-     * 0-3      String "NES^Z" used to recognize .NES files.
-        4        Number of 16kB ROM banks.
-        5        Number of 8kB VROM banks.
-        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
-                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
-                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
-                 bit 3     1 for a four-screen VRAM layout.
-                 bit 4-7   Four lower bits of ROM Mapper Type.
-        7        bit 0     1 for VS-System cartridges.
-                 bit 1-3   Reserved, must be zeroes!
-                 bit 4-7   Four higher bits of ROM Mapper Type.
-        8        Number of 8kB RAM banks. For compatibility with the previous
-                 versions of the .NES format, assume 1x8kB RAM page when this
-                 byte is zero.
-        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
-                 bit 1-7   Reserved, must be zeroes!
-        10-15    Reserved, must be zeroes!
-        16-...   ROM banks, in ascending order. If a trainer is present, its
-                 512 bytes precede the ROM bank contents.
-        ...-EOF  VROM banks, in ascending order.
-     */
-    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
-    return NesImage;
-})();
+    NesRunner.prototype.renderFrame = function (hpcNow) {
+        var nesEmulator = this.nesEmulator;
+        var ppu = nesEmulator.ppu;
+        var frameCurrent = ppu.iFrame;
+        while (frameCurrent === ppu.iFrame)
+            nesEmulator.step();
+        this.printFps();
+        requestAnimationFrame(this.callback);
+    };
+    return NesRunner;
+})(NesRunnerBase);
 var SpriteRenderingInfo = (function () {
     function SpriteRenderingInfo() {
         this.flgZeroSprite = false;
@@ -11440,7 +11192,7 @@ var PPU = (function () {
         this.flgVblankSuppress = false;
         this.flgSpriteZeroHit = false;
         this.flgSpriteOverflow = false;
-        this.nmi_output = false;
+        this.nmiOutput = false;
         this.spriteHeight = 8;
         this.imageGrayscale = false;
         this.showBgInLeftmost8Pixels = false;
@@ -11644,13 +11396,14 @@ var PPU = (function () {
                 this.addrSpriteBase = value & 0x08 ? 0x1000 : 0;
                 this.addrTileBase = value & 0x10 ? 0x1000 : 0;
                 this.spriteHeight = value & 0x20 ? 16 : 8;
-                this.nmi_output = !!(value & 0x80);
-                if (!this.nmi_output)
+                var nmiOutputNew = !!(value & 0x80);
+                if (!nmiOutputNew)
                     this.cpu.nmiLine = 1;
                 if (this.sy === 261 && this.sx === 1)
                     this.flgVblank = false;
-                if (this.nmi_output && this.flgVblank)
+                if (!this.nmiOutput && nmiOutputNew && this.flgVblank)
                     this.cpu.nmiLine = 0;
+                this.nmiOutput = nmiOutputNew;
                 break;
             case 0x1:
                 this.imageGrayscale = !!(value & 0x01);
@@ -12147,7 +11900,7 @@ var PPU = (function () {
         else if (this.sy === 241) {
             if (this.sx === 1 && !this.flgVblankSuppress) {
                 this.flgVblank = true;
-                if (this.nmi_output) {
+                if (this.nmiOutput) {
                     this.cpu.nmiLine = 0;
                 }
             }
@@ -12197,213 +11950,461 @@ var PPU = (function () {
     PPU.sxMax = 340;
     return PPU;
 })();
-var NesRunnerBase = (function () {
-    function NesRunnerBase(container, url) {
-        this.container = container;
-        this.url = url;
-        var containerT = document.createElement('div');
-        this.container.appendChild(containerT);
-        this.container = containerT;
-        this.onEndCallback = function () { };
-    }
-    NesRunnerBase.prototype.log = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var st = "";
-        for (var i = 0; i < args.length; i++)
-            st += " " + args[i];
-        var div = document.createElement("div");
-        div.innerHTML = st.replace(/\n/g, "<br/>");
-        this.logElement.appendChild(div);
-    };
-    NesRunnerBase.prototype.logError = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var st = "";
-        for (var i = 0; i < args.length; i++)
-            st += " " + args[i];
-        var div = document.createElement("div");
-        div.classList.add("error");
-        div.innerHTML = st.replace(/\n/g, "<br/>");
-        this.logElement.appendChild(div);
-    };
-    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
+///<reference path="Memory.ts"/>
+var CompoundMemory = (function () {
+    function CompoundMemory() {
         var _this = this;
-        this.headerElement = document.createElement("h2");
-        this.container.appendChild(this.headerElement);
-        var canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 240;
-        this.container.appendChild(canvas);
-        var driver = new DriverFactory().createRenderer(canvas);
-        this.headerElement.innerText = this.url + " " + driver.tsto();
-        this.logElement = document.createElement("div");
-        this.logElement.classList.add('log');
-        this.container.appendChild(this.logElement);
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", this.url, true);
-        xhr.responseType = "arraybuffer";
-        xhr.onload = function (_) {
-            try {
-                if (xhr.status > 99 && xhr.status < 299) {
-                    var blob = new Uint8Array(xhr.response);
-                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+        var rgmemory = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            rgmemory[_i - 0] = arguments[_i];
+        }
+        this.rgmemory = [];
+        this.setters = [];
+        this.getters = [];
+        this.sizeI = 0;
+        this.rgmemory = rgmemory;
+        rgmemory.forEach(function (memory) { return _this.sizeI += memory.size(); });
+        this.initAccessors();
+    }
+    CompoundMemory.prototype.size = function () {
+        return this.sizeI;
+    };
+    CompoundMemory.prototype.shadowSetter = function (addrFirst, addrLast, setter) {
+        this.setters.push({ addrFirst: addrFirst, addrLast: addrLast, setter: setter });
+        this.initAccessors();
+    };
+    CompoundMemory.prototype.shadowGetter = function (addrFirst, addrLast, getter) {
+        this.getters.push({ addrFirst: addrFirst, addrLast: addrLast, getter: getter });
+        this.initAccessors();
+    };
+    CompoundMemory.prototype.getByte = function (addr) {
+        throw 'address out of bounds';
+    };
+    CompoundMemory.prototype.setByte = function (addr, value) {
+        throw 'address out of bounds';
+    };
+    CompoundMemory.prototype.initAccessors = function () {
+        this.initGetter();
+        this.initSetter();
+    };
+    CompoundMemory.prototype.initGetter = function () {
+        var stGetters = '';
+        for (var i = 0; i < this.getters.length; i++) {
+            var getter = this.getters[i];
+            var check = '';
+            if (getter.addrFirst === getter.addrLast)
+                check = "addr === " + getter.addrFirst;
+            else
+                check = getter.addrFirst + " <= addr && addr <= " + getter.addrLast;
+            stGetters += "if (" + check + ") return this.getters[" + i + "].getter(addr);\n";
+        }
+        var addrLim = 0;
+        var addrFirst = 0;
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            addrLim += memory.size();
+            var modifiedAddr = '';
+            if (!addrFirst)
+                modifiedAddr = 'addr';
+            else
+                modifiedAddr = "addr - " + addrFirst;
+            stGetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].getByte(" + modifiedAddr + ");\n";
+            addrFirst += memory.size();
+        }
+        eval("this.getByte = function(addr) { " + stGetters + " }");
+    };
+    CompoundMemory.prototype.initSetter = function () {
+        var stSetters = '';
+        for (var i = 0; i < this.setters.length; i++) {
+            var setter = this.setters[i];
+            var check = '';
+            if (setter.addrFirst === setter.addrLast)
+                check = "addr === " + setter.addrFirst;
+            else
+                check = setter.addrFirst + " <= addr && addr <= " + setter.addrLast;
+            stSetters += "if (" + check + ") return this.setters[" + i + "].setter(addr, value);\n";
+        }
+        var addrLim = 0;
+        var addrFirst = 0;
+        for (var i = 0; i < this.rgmemory.length; i++) {
+            var memory = this.rgmemory[i];
+            addrLim += memory.size();
+            var modifiedAddr = '';
+            if (!addrFirst)
+                modifiedAddr = 'addr';
+            else
+                modifiedAddr = "addr - " + addrFirst;
+            stSetters += "if (addr < " + addrLim + ") return this.rgmemory[" + i + "].setByte(" + modifiedAddr + ", value);\n";
+            addrFirst += memory.size();
+        }
+        eval("this.setByte = function(addr, value) {\n             this.lastAddr = addr;\n             " + stSetters + " }");
+    };
+    return CompoundMemory;
+})();
+///<reference path="IMemoryMapper.ts"/>
+var Mmc1 = (function () {
+    function Mmc1(nesImage) {
+        this.iWrite = 0;
+        this.rTemp = 0;
+        /**
+         * $8000-9FFF:  [...C PSMM]
+         */
+        this.r0 = 0;
+        /**
+         *  $A000-BFFF:  [...C CCCC]
+            CHR Reg 0
+         */
+        this.r1 = 0;
+        /**
+         *  $C000-DFFF:  [...C CCCC]
+         *  CHR Reg 1
+         */
+        this.r2 = 0;
+        /**
+         * $E000-FFFF:  [...W PPPP]
+         */
+        this.r3 = 0;
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
+        while (this.PRGBanks.length < 2)
+            this.PRGBanks.push(new Ram(0x4000));
+        while (this.CHRBanks.length < 2)
+            this.CHRBanks.push(new Ram(0x1000));
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.nametable, new Ram(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+        this.r0 = 0;
+        this.r1 = 0; //chr0
+        this.r2 = 1; //chr1
+        this.r3 = 0; //prg1
+        this.update();
+    }
+    Object.defineProperty(Mmc1.prototype, "C", {
+        /** CHR Mode (0=8k mode, 1=4k mode) */
+        get: function () { return (this.r0 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "P", {
+        /** PRG Size (0=32k mode, 1=16k mode) */
+        get: function () { return (this.r0 >> 3) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "S", {
+        /**
+         * Slot select:
+         *  0 = $C000 swappable, $8000 fixed to page $00 (mode A)
+         *  1 = $8000 swappable, $C000 fixed to page $0F (mode B)
+         *  This bit is ignored when 'P' is clear (32k mode)
+         */
+        get: function () { return (this.r0 >> 2) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "M", {
+        /**
+         *  Mirroring control:
+         *  %00 = 1ScA
+         *  %01 = 1ScB
+         *  %10 = Vert
+         *  %11 = Horz
+         */
+        get: function () { return this.r0 & 3; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "CHR0", {
+        get: function () { return this.r1 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "CHR1", {
+        get: function () { return this.r2 & 31; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "PRG0", {
+        get: function () { return this.r3 & 15; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Mmc1.prototype, "W", {
+        /**
+         * W = WRAM Disable (0=enabled, 1=disabled)
+         * Disabled WRAM cannot be read or written.  Earlier MMC1 versions apparently do not have this bit implemented.
+         * Later ones do.
+         */
+        get: function () { return (this.r3 >> 4) & 1; },
+        enumerable: true,
+        configurable: true
+    });
+    Mmc1.prototype.setByte = function (addr, value) {
+        /*Temporary reg port ($8000-FFFF):
+            [r... ...d]
+                r = reset flag
+                d = data bit
+
+        When 'r' is set:
+            - 'd' is ignored
+            - hidden temporary reg is reset (so that the next write is the "first" write)
+            - bits 2,3 of reg $8000 are set (16k PRG mode, $8000 swappable)
+            - other bits of $8000 (and other regs) are unchanged
+
+        When 'r' is clear:
+            - 'd' proceeds as the next bit written in the 5-bit sequence
+            - If this completes the 5-bit sequence:
+                - temporary reg is copied to actual internal reg (which reg depends on the last address written to)
+                - temporary reg is reset (so that next write is the "first" write)
+        */
+        value &= 0xff;
+        var flgReset = value >> 7;
+        var flgData = value & 0x1;
+        if (flgReset === 1) {
+            this.r0 = 3 << 2;
+            this.iWrite = 0;
+            this.rTemp = 0;
+        }
+        else {
+            this.rTemp = (this.rTemp & (0xff - (1 << this.iWrite))) | ((flgData & 1) << this.iWrite);
+            this.iWrite++;
+            if (this.iWrite === 5) {
+                if (addr <= 0x9fff) {
+                    this.r0 = this.rTemp;
+                }
+                else if (addr <= 0xbfff) {
+                    this.r1 = this.rTemp;
+                }
+                else if (addr <= 0xdfff) {
+                    this.r2 = this.rTemp;
+                }
+                else if (addr <= 0xffff) {
+                    this.r3 = this.rTemp;
+                }
+                this.update();
+                this.iWrite = 0;
+                this.rTemp = 0;
+            }
+        }
+    };
+    Mmc1.prototype.update = function () {
+        /*
+           PRG Setup:
+           --------------------------
+           There is 1 PRG reg and 3 PRG modes.
+
+                          $8000   $A000   $C000   $E000
+                        +-------------------------------+
+           P=0:         |            <$E000>            |
+                        +-------------------------------+
+           P=1, S=0:    |     { 0 }     |     $E000     |
+                        +---------------+---------------+
+           P=1, S=1:    |     $E000     |     {$0F}     |
+                        +---------------+---------------+
+       */
+        if (this.P === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0 & 0xfe];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0 | 1];
+        }
+        else if (this.S === 0) {
+            this.memory.rgmemory[3] = this.PRGBanks[0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRG0];
+        }
+        else {
+            this.memory.rgmemory[3] = this.PRGBanks[this.PRG0];
+            this.memory.rgmemory[4] = this.PRGBanks[this.PRGBanks.length - 1];
+        }
+        /*
+          CHR Setup:
+          --------------------------
+          There are 2 CHR regs and 2 CHR modes.
+
+                      $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
+                    +---------------------------------------------------------------+
+          C=0:      |                            <$A000>                            |
+                    +---------------------------------------------------------------+
+          C=1:      |             $A000             |             $C000             |
+                    +-------------------------------+-------------------------------+
+      */
+        if (this.C === 0) {
+            //console.log('chr:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0 & 0xfe];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR0 | 1];
+        }
+        else {
+            // console.log('chr mode 2:', this.CHR0);
+            this.vmemory.rgmemory[0] = this.CHRBanks[this.CHR0];
+            this.vmemory.rgmemory[1] = this.CHRBanks[this.CHR1];
+        }
+        if (this.M === 0) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+        else if (this.M === 1) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 2) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else if (this.M === 3) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableB;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableA;
+        }
+    };
+    Mmc1.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    };
+    Mmc1.prototype.setCpuAndPpu = function (cpu) {
+    };
+    Mmc1.prototype.clk = function () { };
+    return Mmc1;
+})();
+var NesEmulator = (function () {
+    function NesEmulator(nesImage, canvas, driver) {
+        var _this = this;
+        this.dmaRequested = false;
+        this.idma = 0;
+        this.icycle = 0;
+        if (nesImage.fPAL)
+            throw 'only NTSC images are supported';
+        this.memoryMapper = new MemoryMapperFactory().create(nesImage);
+        this.memoryMapper.memory.shadowSetter(0x4014, 0x4014, function (_, v) {
+            _this.dmaRequested = true;
+            _this.addrDma = v << 8;
+        });
+        this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, function () { return _this.controller.reg4016; });
+        this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, function (_, v) { _this.controller.reg4016 = v; });
+        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, function () { return _this.controller.reg4017; });
+        this.cpu = new Mos6502(this.memoryMapper.memory);
+        this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
+        this.ppu = new PPU(this.memoryMapper.memory, this.memoryMapper.vmemory, this.cpu);
+        this.ppu.setDriver(driver);
+        this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
+        this.cpu.reset();
+        this.controller = new Controller(canvas);
+        window['nesemulator'] = this;
+    }
+    NesEmulator.prototype.step = function () {
+        for (this.icycle = 0; this.icycle < 12; this.icycle++) {
+            if ((this.icycle & 3) === 0) {
+                var nmiBefore = this.cpu.nmiLine;
+                this.ppu.step();
+                this.memoryMapper.clk();
+                var nmiAfter = this.cpu.nmiLine;
+                if ((nmiBefore > nmiAfter) && this.icycle === 4)
+                    this.cpu.detectInterrupts();
+            }
+            if (this.icycle === 0) {
+                if (this.dmaRequested) {
+                    this.dmaRequested = false;
+                    this.idma = 512;
+                    if (this.cpu.icycle & 1)
+                        this.idma++;
+                }
+                else if (this.idma > 512) {
+                    this.idma--;
+                }
+                else if (this.idma > 0) {
+                    //  this.cpu.icycle++;
+                    if (!(this.idma & 1)) {
+                        this.bDma = this.memoryMapper.memory.getByte(this.addrDma++);
+                        this.addrDma &= 0xffff;
+                    }
+                    else {
+                        this.memoryMapper.memory.setByte(0x2004, this.bDma);
+                    }
+                    this.idma--;
                 }
                 else {
-                    _this.logError("http error " + xhr.status);
-                    onLoad(null);
+                    this.cpu.step();
                 }
             }
-            catch (e) {
-                canvas.remove();
-                _this.logError(e);
-            }
-        };
-        xhr.send();
+            this.apu.step();
+        }
     };
-    NesRunnerBase.prototype.onEnd = function (callback) {
-        this.onEndCallback = callback;
-    };
-    NesRunnerBase.prototype.run = function () {
-        var _this = this;
-        this.loadEmulator(function (nesEmulator) {
-            _this.nesEmulator = nesEmulator;
-            if (!nesEmulator)
-                _this.onEndCallback();
-            else
-                _this.runI();
-        });
-    };
-    NesRunnerBase.prototype.runI = function () {
-        this.onEndCallback();
-    };
-    return NesRunnerBase;
+    return NesEmulator;
 })();
-///<reference path="NesRunnerBase.ts"/>
-var CpuTestRunner = (function (_super) {
-    __extends(CpuTestRunner, _super);
-    function CpuTestRunner(container, url, checkForString) {
-        var _this = this;
-        _super.call(this, container, url);
-        this.checkForString = checkForString;
-        this.callback = this.renderFrame.bind(this);
-        this.container.classList.add('test-case');
-        var collapseButton = document.createElement('div');
-        collapseButton.className = 'collapse-button';
-        collapseButton.onclick = function (e) {
-            $(_this.container).toggleClass('collapsed');
-        };
-        this.container.appendChild(collapseButton);
+var NesImage = (function () {
+    function NesImage(rawBytes) {
+        this.trainer = null;
+        for (var i = 0; i < 4; i++)
+            if (rawBytes[i] !== NesImage.magic[i])
+                throw 'invalid NES header';
+        this.ROMBanks = new Array(rawBytes[4]);
+        this.VRAMBanks = new Array(rawBytes[5]);
+        this.fVerticalMirroring = !!(rawBytes[6] & 1);
+        this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
+        var fTrainer = !!(rawBytes[6] & 4);
+        this.fFourScreenVRAM = !!(rawBytes[6] & 8);
+        this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
+        this.fVSSystem = !!(rawBytes[7] & 1);
+        if ((rawBytes[7] & 0x0e) !== 0)
+            throw 'invalid NES header';
+        this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
+        this.fPAL = (rawBytes[9] & 1) === 1;
+        if ((rawBytes[9] & 0xfe) !== 0)
+            throw 'invalid NES header';
+        for (var i = 0xa; i < 0x10; i++)
+            if (rawBytes[i] !== 0)
+                throw 'invalid NES header';
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
+            throw 'invalid NES format';
+        var idx = 0x10;
+        if (fTrainer) {
+            this.trainer = rawBytes.slice(idx, idx + 0x100);
+            idx += 0x100;
+        }
+        for (var ibank = 0; ibank < this.RAMBanks.length; ibank++) {
+            this.RAMBanks[ibank] = new Ram(0x2000);
+        }
+        for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
+            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
+            idx += 0x4000;
+        }
+        for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
+            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            idx += 0x2000;
+        }
     }
-    CpuTestRunner.prototype.testFinished = function (nesEmulator) {
-        if (nesEmulator.cpu.getByte(0x6000) !== 0x80 &&
-            nesEmulator.cpu.getByte(0x6001) === 0xde &&
-            nesEmulator.cpu.getByte(0x6002) === 0xb0 &&
-            nesEmulator.cpu.getByte(0x6003) === 0x61) {
-            var resultCode = nesEmulator.cpu.getByte(0x6000);
-            if (resultCode !== 0) {
-                this.log('res: ' + resultCode.toString(16));
-                this.container.classList.add('failed');
-            }
-            else {
-                this.container.classList.add('passed');
-            }
-            var res = "";
-            var i = 0x6004;
-            while (nesEmulator.cpu.getByte(i) !== 0) {
-                res += String.fromCharCode(nesEmulator.cpu.getByte(i));
-                i++;
-            }
-            this.log(res);
-            return true;
-        }
-        if (nesEmulator.cpu.getByte(nesEmulator.cpu.ipCur) === 0x4c &&
-            nesEmulator.cpu.getWord(nesEmulator.cpu.ipCur + 1) === nesEmulator.cpu.ipCur &&
-            nesEmulator.cpu.flgInterruptDisable &&
-            !nesEmulator.ppu.nmi_output) {
-            var out = nesEmulator.ppu.getNameTable(0);
-            this.log(out);
-            if (out.indexOf(this.checkForString) >= 0) {
-                this.container.classList.add('passed');
-            }
-            else {
-                this.container.classList.add('failed');
-            }
-            return true;
-        }
-        return false;
-    };
-    CpuTestRunner.prototype.runI = function () {
-        requestAnimationFrame(this.callback);
-    };
-    CpuTestRunner.prototype.renderFrame = function () {
-        var nesEmulator = this.nesEmulator;
-        var ppu = nesEmulator.ppu;
-        if (this.testFinished(nesEmulator)) {
-            this.container.classList.add('collapsed');
-            this.onEndCallback();
-            return;
-        }
-        try {
-            var frameCurrent = ppu.iFrame;
-            while (frameCurrent === ppu.iFrame)
-                nesEmulator.step();
-        }
-        catch (e) {
-            this.container.classList.add('collapsed');
-            this.logError(e);
-            this.onEndCallback();
-            return;
-        }
-        requestAnimationFrame(this.callback);
-    };
-    return CpuTestRunner;
-})(NesRunnerBase);
-///<reference path="NesRunnerBase.ts"/>
-var NesRunner = (function (_super) {
-    __extends(NesRunner, _super);
-    function NesRunner(container, url) {
-        _super.call(this, container, url);
-        this.callback = this.renderFrame.bind(this);
-        this.iFrameStart = 0;
-        this.hpcStart = 0;
-    }
-    NesRunner.prototype.runI = function () {
-        var _this = this;
-        this.hpcStart = window.performance.now();
-        this.iFrameStart = this.nesEmulator.ppu.iFrame;
-        this.fpsElement = document.createElement("span");
-        this.headerElement.innerText += " ";
-        this.headerElement.appendChild(this.fpsElement);
-        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), function () { _this.headerElement.classList.toggle('show'); });
-        requestAnimationFrame(this.callback);
-        //setInterval(this.printFps.bind(this), 1000);
-    };
-    NesRunner.prototype.printFps = function () {
-        var hpcNow = Date.now();
-        var dt = hpcNow - this.hpcStart;
-        if (dt > 1000) {
-            var fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
-            this.fpsElement.innerText = Math.round(fps * 100) / 100 + " fps";
-            this.iFrameStart = this.nesEmulator.ppu.iFrame;
-            this.hpcStart = hpcNow;
-        }
-    };
-    NesRunner.prototype.renderFrame = function (hpcNow) {
-        var nesEmulator = this.nesEmulator;
-        var ppu = nesEmulator.ppu;
-        var frameCurrent = ppu.iFrame;
-        while (frameCurrent === ppu.iFrame)
-            nesEmulator.step();
-        this.printFps();
-        requestAnimationFrame(this.callback);
-    };
-    return NesRunner;
-})(NesRunnerBase);
+    /*
+     * 0-3      String "NES^Z" used to recognize .NES files.
+        4        Number of 16kB ROM banks.
+        5        Number of 8kB VROM banks.
+        6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
+                 bit 1     1 for battery-backed RAM at $6000-$7FFF.
+                 bit 2     1 for a 512-byte trainer at $7000-$71FF.
+                 bit 3     1 for a four-screen VRAM layout.
+                 bit 4-7   Four lower bits of ROM Mapper Type.
+        7        bit 0     1 for VS-System cartridges.
+                 bit 1-3   Reserved, must be zeroes!
+                 bit 4-7   Four higher bits of ROM Mapper Type.
+        8        Number of 8kB RAM banks. For compatibility with the previous
+                 versions of the .NES format, assume 1x8kB RAM page when this
+                 byte is zero.
+        9        bit 0     1 for PAL cartridges, otherwise assume NTSC.
+                 bit 1-7   Reserved, must be zeroes!
+        10-15    Reserved, must be zeroes!
+        16-...   ROM banks, in ascending order. If a trainer is present, its
+                 512 bytes precede the ROM bank contents.
+        ...-EOF  VROM banks, in ascending order.
+     */
+    NesImage.magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
+    return NesImage;
+})();
 var StepTestRunner = (function () {
     function StepTestRunner() {
         this.ich = 0;

@@ -66,7 +66,7 @@ class PPU {
     flgVblankSuppress = false;
     flgSpriteZeroHit = false;
     flgSpriteOverflow = false;
-    nmi_output = false;
+    nmiOutput = false;
 
 
     spriteHeight = 8;
@@ -278,16 +278,18 @@ class PPU {
             this.addrSpriteBase = value & 0x08 ? 0x1000 : 0;
             this.addrTileBase = value & 0x10 ? 0x1000 : 0;
             this.spriteHeight = value & 0x20 ? 16 : 8;
-            this.nmi_output = !!(value & 0x80);
+            const nmiOutputNew = !!(value & 0x80);
 
-            if (!this.nmi_output)
+            if (!nmiOutputNew)
                 this.cpu.nmiLine = 1;
 
             if (this.sy === 261 && this.sx === 1)
                 this.flgVblank = false;
             
-            if (this.nmi_output && this.flgVblank)
+            if (!this.nmiOutput && nmiOutputNew && this.flgVblank)
                 this.cpu.nmiLine = 0;
+
+            this.nmiOutput = nmiOutputNew;
 
             break;
         case 0x1:
@@ -852,7 +854,7 @@ class PPU {
         } else if (this.sy === 241) {
             if (this.sx === 1 && !this.flgVblankSuppress) {
                 this.flgVblank = true;
-                if (this.nmi_output) {
+                if (this.nmiOutput) {
                     this.cpu.nmiLine = 0;
                 }
             } else if (this.sx === 260) {
