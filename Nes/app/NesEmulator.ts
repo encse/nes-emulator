@@ -3,9 +3,8 @@
     memoryMapper: IMemoryMapper;
     ppu: PPU;
     apu: APU;
-    controller: Controller;
 
-    public constructor(nesImage: NesImage, canvas:HTMLCanvasElement, driver:IDriver) {
+    public constructor(nesImage: NesImage, driver:IDriver, public controller:Controller) {
         if (nesImage.fPAL)
             throw 'only NTSC images are supported';
         this.memoryMapper = new MemoryMapperFactory().create(nesImage);
@@ -27,7 +26,6 @@
         this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
 
         this.cpu.reset();
-        this.controller = new Controller(canvas);
 
         window['nesemulator'] = this;
     }
@@ -79,5 +77,12 @@
 
             this.apu.step();
         }
+    }
+
+    public destroy() {
+        this.controller = null;
+        this.apu = null;
+        this.ppu = null;
+        this.cpu = null;
     }
 }

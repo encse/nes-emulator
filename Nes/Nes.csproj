@@ -515,12 +515,13 @@
     <Content Include="wwwroot\test\ppu\sprite_overflow_tests\source\validation.a" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="app\IrqLine.ts" />
+    <TypeScriptCompile Include="app\cpu\IrqLine.ts" />
     <TypeScriptCompile Include="app\APU.ts" />
     <TypeScriptCompile Include="app\mapper\IMemoryMapper.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc0.ts" />
     <TypeScriptCompile Include="app\mapper\MemoryMapperFactory.ts" />
     <TypeScriptCompile Include="app\mapper\Mmc3.ts" />
+    <TypeScriptCompile Include="app\mapper\UxROM.ts" />
     <TypeScriptCompile Include="app\memory\CleverRam.ts" />
     <TypeScriptCompile Include="app\runner\CpuTestRunner.ts" />
     <TypeScriptCompile Include="app\driver\CanvasDriver.ts" />

@@ -308,6 +308,28 @@ var Controller = (function () {
     });
     return Controller;
 })();
+var IrqLine = (function () {
+    function IrqLine(cpu) {
+        this.cpu = cpu;
+        this._isRequested = false;
+    }
+    IrqLine.prototype.request = function () {
+        if (!this._isRequested) {
+            this.cpu.irqLine--;
+            this._isRequested = true;
+        }
+    };
+    IrqLine.prototype.ack = function () {
+        if (this._isRequested) {
+            this.cpu.irqLine++;
+            this._isRequested = false;
+        }
+    };
+    IrqLine.prototype.isRequested = function () {
+        return this._isRequested;
+    };
+    return IrqLine;
+})();
 var Most6502Base = (function () {
     function Most6502Base(memory) {
         this.memory = memory;
@@ -10600,28 +10622,6 @@ var WebGlDriver = (function () {
         1.0, 0.0]);
     return WebGlDriver;
 })();
-var IrqLine = (function () {
-    function IrqLine(cpu) {
-        this.cpu = cpu;
-        this._isRequested = false;
-    }
-    IrqLine.prototype.request = function () {
-        if (!this._isRequested) {
-            this.cpu.irqLine--;
-            this._isRequested = true;
-        }
-    };
-    IrqLine.prototype.ack = function () {
-        if (this._isRequested) {
-            this.cpu.irqLine++;
-            this._isRequested = false;
-        }
-    };
-    IrqLine.prototype.isRequested = function () {
-        return this._isRequested;
-    };
-    return IrqLine;
-})();
 var MemoryMapperFactory = (function () {
     function MemoryMapperFactory() {
     }
@@ -11301,8 +11301,9 @@ var CompoundMemory = (function () {
     return CompoundMemory;
 })();
 var NesEmulator = (function () {
-    function NesEmulator(nesImage, canvas, driver) {
+    function NesEmulator(nesImage, driver, controller) {
         var _this = this;
+        this.controller = controller;
         this.dmaRequested = false;
         this.idma = 0;
         this.icycle = 0;
@@ -11322,7 +11323,6 @@ var NesEmulator = (function () {
         this.ppu.setDriver(driver);
         this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
         this.cpu.reset();
-        this.controller = new Controller(canvas);
         window['nesemulator'] = this;
     }
     NesEmulator.prototype.step = function () {
@@ -11362,6 +11362,12 @@ var NesEmulator = (function () {
             }
             this.apu.step();
         }
+    };
+    NesEmulator.prototype.destroy = function () {
+        this.controller = null;
+        this.apu = null;
+        this.ppu = null;
+        this.cpu = null;
     };
     return NesEmulator;
 })();
@@ -12291,27 +12297,15 @@ var NesRunnerBase = (function () {
         div.innerHTML = st.replace(/\n/g, "<br/>");
         this.logElement.appendChild(div);
     };
-    NesRunnerBase.prototype.loadEmulator = function (onLoad) {
+    NesRunnerBase.prototype.loadUrl = function (url, onLoad) {
         var _this = this;
-        this.headerElement = document.createElement("h2");
-        this.container.appendChild(this.headerElement);
-        var canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 240;
-        this.container.appendChild(canvas);
-        var driver = new DriverFactory().createRenderer(canvas);
-        this.headerElement.innerText = this.url + " " + driver.tsto();
-        this.logElement = document.createElement("div");
-        this.logElement.classList.add('log');
-        this.container.appendChild(this.logElement);
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", this.url, true);
+        xhr.open("GET", url, true);
         xhr.responseType = "arraybuffer";
         xhr.onload = function (_) {
             try {
                 if (xhr.status > 99 && xhr.status < 299) {
-                    var blob = new Uint8Array(xhr.response);
-                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+                    onLoad(new Uint8Array(xhr.response));
                 }
                 else {
                     _this.logError("http error " + xhr.status);
@@ -12319,7 +12313,6 @@ var NesRunnerBase = (function () {
                 }
             }
             catch (e) {
-                canvas.remove();
                 _this.logError(e);
             }
         };
@@ -12330,13 +12323,56 @@ var NesRunnerBase = (function () {
     };
     NesRunnerBase.prototype.run = function () {
         var _this = this;
-        this.loadEmulator(function (nesEmulator) {
-            _this.nesEmulator = nesEmulator;
-            if (!nesEmulator)
+        this.headerElement = document.createElement("h2");
+        this.container.appendChild(this.headerElement);
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = 256;
+        this.canvas.height = 240;
+        this.container.appendChild(this.canvas);
+        this.controller = new Controller(this.canvas);
+        this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
+        this.container.appendChild(this.logElement);
+        this.driver = new DriverFactory().createRenderer(this.canvas);
+        this.initDnd();
+        this.loadUrl(this.url, function (rawBytes) {
+            _this.createEmulator(rawBytes);
+            if (!_this.nesEmulator)
                 _this.onEndCallback();
             else
                 _this.runI();
         });
+    };
+    NesRunnerBase.prototype.createEmulator = function (rawBytes) {
+        this.headerElement.innerText = this.url + " " + this.driver.tsto();
+        try {
+            var newEmulator = new NesEmulator(new NesImage(rawBytes), this.driver, this.controller);
+            if (this.nesEmulator)
+                this.nesEmulator.destroy();
+            this.nesEmulator = newEmulator;
+        }
+        catch (e) {
+            this.logError(e);
+        }
+    };
+    NesRunnerBase.prototype.initDnd = function () {
+        var _this = this;
+        if ('draggable' in this.container) {
+            this.container.ondragover = function () { _this.container.classList.add('hover'); return false; };
+            this.container.ondragend = function () { _this.container.classList.remove('hover'); return false; };
+            this.container.ondrop = function (e) {
+                _this.url = e.dataTransfer.files[0].name;
+                _this.container.classList.remove('hover');
+                e.preventDefault();
+                var fileReader = new FileReader();
+                fileReader.onload = function (progressEvent) {
+                    var arrayBufferNew = progressEvent.target.result;
+                    var rawBytes = new Uint8Array(arrayBufferNew);
+                    _this.createEmulator(rawBytes);
+                };
+                fileReader.readAsArrayBuffer(e.dataTransfer.files[0]);
+            };
+        }
     };
     NesRunnerBase.prototype.runI = function () {
         this.onEndCallback();
@@ -12434,17 +12470,18 @@ var NesRunner = (function (_super) {
     }
     NesRunner.prototype.runI = function () {
         var _this = this;
+        this.controller.registerKeyboardHandler('I'.charCodeAt(0), function () { _this.headerElement.classList.toggle('show'); });
+        requestAnimationFrame(this.callback);
+    };
+    NesRunner.prototype.createEmulator = function (rawBytes) {
+        _super.prototype.createEmulator.call(this, rawBytes);
         this.hpcStart = window.performance.now();
         this.iFrameStart = this.nesEmulator.ppu.iFrame;
         this.fpsElement = document.createElement("span");
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
-        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), function () { _this.headerElement.classList.toggle('show'); });
-        requestAnimationFrame(this.callback);
-        //setInterval(this.printFps.bind(this), 1000);
     };
-    NesRunner.prototype.printFps = function () {
-        var hpcNow = Date.now();
+    NesRunner.prototype.printFps = function (hpcNow) {
         var dt = hpcNow - this.hpcStart;
         if (dt > 1000) {
             var fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
@@ -12459,7 +12496,7 @@ var NesRunner = (function (_super) {
         var frameCurrent = ppu.iFrame;
         while (frameCurrent === ppu.iFrame)
             nesEmulator.step();
-        this.printFps();
+        this.printFps(hpcNow);
         requestAnimationFrame(this.callback);
     };
     return NesRunner;

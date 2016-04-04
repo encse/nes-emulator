@@ -5,13 +5,17 @@ class NesRunnerBase {
     headerElement: HTMLElement;
 
     nesEmulator: NesEmulator;
-
+    canvas:HTMLCanvasElement;
+    driver: IDriver;
+    controller: Controller;
 
     constructor(protected container: HTMLElement, private url: string) {
         const containerT = document.createElement('div');
         this.container.appendChild(containerT);
         this.container = containerT;
         this.onEndCallback = () => { };
+
+      
     }
 
     log(...args: Object[]) {
@@ -35,38 +39,20 @@ class NesRunnerBase {
         this.logElement.appendChild(div);
     }
 
-    private loadEmulator(onLoad) {
-        this.headerElement = document.createElement("h2");
-        this.container.appendChild(this.headerElement);
-
-        var canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 240;
-
-        this.container.appendChild(canvas);
-        const driver = new DriverFactory().createRenderer(canvas);
-
-        this.headerElement.innerText = `${this.url} ${driver.tsto()}`;
-
-        this.logElement = document.createElement("div");
-        this.logElement.classList.add('log');
-        this.container.appendChild(this.logElement);
-
+    private loadUrl(url:string, onLoad) {
+      
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", this.url, true);
+        xhr.open("GET", url, true);
         xhr.responseType = "arraybuffer";
         xhr.onload = _ => {
             try {
                 if (xhr.status > 99 && xhr.status < 299) {
-                    const blob = new Uint8Array(xhr.response);
-
-                    onLoad(new NesEmulator(new NesImage(blob), canvas, driver));
+                    onLoad(new Uint8Array(xhr.response));
                 } else {
                     this.logError("http error " + xhr.status);
                     onLoad(null);
                 }
             } catch (e) {
-                canvas.remove();
                 this.logError(e);
             }
         }
@@ -78,16 +64,70 @@ class NesRunnerBase {
     }
 
     run() {
-        this.loadEmulator((nesEmulator: NesEmulator) => {
-            this.nesEmulator = nesEmulator;
+        this.headerElement = document.createElement("h2");
+        this.container.appendChild(this.headerElement);
 
-            if (!nesEmulator)
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = 256;
+        this.canvas.height = 240;
+        this.container.appendChild(this.canvas);
+
+        this.controller = new Controller(this.canvas);
+
+        this.logElement = document.createElement("div");
+        this.logElement.classList.add('log');
+        this.container.appendChild(this.logElement);
+
+        this.driver = new DriverFactory().createRenderer(this.canvas);
+
+        this.initDnd();
+
+        this.loadUrl(this.url, rawBytes => {
+            this.createEmulator(rawBytes);
+            if (!this.nesEmulator)
                 this.onEndCallback();
             else
                 this.runI();
         });
     }
 
+    createEmulator(rawBytes: Uint8Array) {
+        this.headerElement.innerText = `${this.url} ${this.driver.tsto()}`;
+
+        try {
+            var newEmulator = new NesEmulator(new NesImage(rawBytes), this.driver, this.controller);
+            if (this.nesEmulator)
+                this.nesEmulator.destroy();
+            this.nesEmulator = newEmulator;
+
+        } catch (e) {
+            this.logError(e);
+        }
+    }
+
+    initDnd() {
+
+        if ('draggable' in this.container) {
+
+            this.container.ondragover = () => { this.container.classList.add('hover'); return false; };
+            this.container.ondragend = () => { this.container.classList.remove('hover'); return false; };
+            this.container.ondrop = e => {
+                this.url = e.dataTransfer.files[0].name;
+                this.container.classList.remove('hover');
+                e.preventDefault();
+                var fileReader = new FileReader();
+                fileReader.onload = progressEvent => {
+                    const arrayBufferNew = (<any>progressEvent.target).result;
+                    const rawBytes = new Uint8Array(arrayBufferNew);
+                    this.createEmulator(rawBytes);
+                };
+                fileReader.readAsArrayBuffer(e.dataTransfer.files[0]);
+            }
+        }
+
+        
+    }
+   
     protected runI() {
         this.onEndCallback();
     }

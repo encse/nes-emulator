@@ -11,9 +11,11 @@
 	</header>
 	<main>
 		<p>If doesn't work, try Chrome or a real NES.</p>
+		<p>You can drag your rom files (.nes) to the emulator.</p>
 		<div id="nesContainer"></div>
+		
 		<h2>Controls</h2>
-		<p>Start - Enter<br/>Select - Space<br/>Jump - A<br/>Fire - B</p>
+		<p>Start - Enter<br/>Select - Space<br/>Button A - A<br/>Button B - B</p>
 	</main>
 	<footer>
 		<p>2016 - <a href="https://csokavar.hu">csokavar.hu</a> - <a href="https://github.com/encse/nes-emulator/commit/<!--# include file="version.txt" -->"><!--# include file="version.txt" --></a></p>
@@ -21,7 +23,7 @@
 	<script src="js/app.js"></script>
 	<script>
 		var rom = window.location.hash.substring(1);
-		rom = rom ? rom : 'Super Mario Bros';
+		rom = rom ? rom : 'Pac-Man';
 		new NesRunner(document.getElementById('nesContainer'), 'roms/' + rom + '.nes').run();
 	</script>
 	<script>

@@ -8,21 +8,27 @@ class NesRunner extends NesRunnerBase {
     private fpsElement:HTMLElement;
 
     constructor(container: HTMLElement, url: string) {
-         super(container, url);
+        super(container, url);
+   
     }
 
     protected runI() {
+        this.controller.registerKeyboardHandler('I'.charCodeAt(0), () => { this.headerElement.classList.toggle('show') });
+        requestAnimationFrame(this.callback);
+    }
+
+    createEmulator(rawBytes: Uint8Array) {
+      
+
+        super.createEmulator(rawBytes);
+
         this.hpcStart = window.performance.now();
         this.iFrameStart = this.nesEmulator.ppu.iFrame;
         this.fpsElement = document.createElement("span");
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
-        this.nesEmulator.controller.registerKeyboardHandler('I'.charCodeAt(0), () => {this.headerElement.classList.toggle('show')});
-        requestAnimationFrame(this.callback);
-        //setInterval(this.printFps.bind(this), 1000);
     }
-    private printFps() {
-        var hpcNow = Date.now();
+    private printFps(hpcNow) {
         const dt = hpcNow - this.hpcStart;
         if (dt > 1000) {
             const fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
@@ -40,7 +46,7 @@ class NesRunner extends NesRunnerBase {
         while (frameCurrent === ppu.iFrame)
             nesEmulator.step();
       
-        this.printFps();
+        this.printFps(hpcNow);
         requestAnimationFrame(this.callback);
     }
 }
