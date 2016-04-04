@@ -11339,7 +11339,7 @@ var NesEmulator = (function () {
                 if (this.dmaRequested) {
                     this.dmaRequested = false;
                     this.idma = 512;
-                    if (this.cpu.icycle & 1)
+                    if (!(this.cpu.icycle & 1))
                         this.idma++;
                 }
                 else if (this.idma > 512) {

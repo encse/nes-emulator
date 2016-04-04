@@ -55,7 +55,7 @@
 
                     this.dmaRequested = false;
                     this.idma = 512;
-                    if (this.cpu.icycle & 1)
+                    if (!(this.cpu.icycle & 1))
                         this.idma++;
                 } else if (this.idma > 512) {
                     this.idma--;
