@@ -9,7 +9,6 @@ class NesRunner extends NesRunnerBase {
 
     constructor(container: HTMLElement, url: string) {
         super(container, url);
-   
     }
 
     protected runI() {
@@ -18,8 +17,6 @@ class NesRunner extends NesRunnerBase {
     }
 
     createEmulator(rawBytes: Uint8Array) {
-      
-
         super.createEmulator(rawBytes);
 
         this.hpcStart = window.performance.now();

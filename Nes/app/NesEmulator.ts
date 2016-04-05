@@ -26,7 +26,7 @@
         this.memoryMapper.setCpuAndPpu(this.cpu, this.ppu);
 
         this.cpu.reset();
-
+        this.controller.setPixelColorDelegate(this.ppu.getPixelColor.bind(this.ppu));
         window['nesemulator'] = this;
     }
 

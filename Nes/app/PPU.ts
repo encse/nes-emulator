@@ -515,6 +515,10 @@ class PPU {
         }
     }
 
+    getPixelColor(x: number, y: number) {
+        return this.data[y * 256 + x];
+    }
+
     getNameTable(i) {
         var st = '';
         for (var y = 0; y < 30; y++){
