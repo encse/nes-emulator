@@ -1,4 +1,4 @@
-///<reference path="Memory.ts"/>
+/// <reference path="Memory.ts"/>
 class CompoundMemory implements Memory {
     rgmemory: Memory[] = [];
     private setters: { addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void }[] = [];

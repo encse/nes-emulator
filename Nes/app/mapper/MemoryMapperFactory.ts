@@ -10,6 +10,8 @@
                 return new UxRom(nesImage);
             case 4:
                 return new Mmc3(nesImage);
+            case 7:
+                return new AxRom(nesImage);
             default:
                 throw 'unkown mapper ' + nesImage.mapperType;
         }

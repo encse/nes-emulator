@@ -1,4 +1,4 @@
-///<reference path="IDriver.ts"/>
+/// <reference path="IDriver.ts"/>
 class CanvasDriver implements IDriver {
 
     ctx: CanvasRenderingContext2D;

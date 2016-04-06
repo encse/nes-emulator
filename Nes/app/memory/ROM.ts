@@ -1,12 +1,12 @@
-///<reference path="Memory.ts"/>
-class ROM implements Memory {
+/// <reference path="Memory.ts"/>
+class Rom implements Memory {
     private memory: Uint8Array;
     constructor(size: number) {
         this.memory = new Uint8Array(size);
     }
 
     static fromBytes(memory: Uint8Array) {
-        var res = new ROM(0);
+        const res = new Rom(0);
         res.memory = memory;
         return res;
     }
@@ -23,6 +23,6 @@ class ROM implements Memory {
     }
 
     subArray(addr: number, size: number) {
-        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
+        return Rom.fromBytes(this.memory.subarray(addr, addr + size));
     }
 }

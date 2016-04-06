@@ -10436,7 +10436,7 @@ var Most6502Base = (function () {
     };
     return Most6502Base;
 })();
-///<reference path="Mos6502Base.ts"/>
+/// <reference path="Mos6502Base.ts"/>
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -10489,7 +10489,7 @@ var Mos6502 = (function (_super) {
     };
     return Mos6502;
 })(Most6502Base);
-///<reference path="IDriver.ts"/>
+/// <reference path="IDriver.ts"/>
 var CanvasDriver = (function () {
     function CanvasDriver(canvas) {
         this.ctx = canvas.getContext("2d");
@@ -10525,7 +10525,7 @@ var DriverFactory = (function () {
     };
     return DriverFactory;
 })();
-///<reference path="IDriver.ts"/>
+/// <reference path="IDriver.ts"/>
 var WebGlDriver = (function () {
     function WebGlDriver(canvas) {
         _a = [canvas.width, canvas.height], this.width = _a[0], this.height = _a[1];
@@ -10646,6 +10646,51 @@ var WebGlDriver = (function () {
         1.0, 0.0]);
     return WebGlDriver;
 })();
+/// <reference path="IMemoryMapper.ts"/>
+var AxRom = (function () {
+    function AxRom(nesImage) {
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        while (this.PRGBanks.length < 2)
+            this.PRGBanks.push(new Ram(0x4000));
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableA, this.nametableA, this.nametableA);
+        this.vmemory = new CompoundMemory(new Ram(0x2000), this.nametable, new Ram(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+    }
+    AxRom.prototype.setByte = function (addr, value) {
+        /*7  bit  0
+          ---- ----
+          xxxM xPPP
+             |  |||
+             |  +++- Select 32 KB PRG ROM bank for CPU $8000-$FFFF
+             +------ Select 1 KB VRAM page for all 4 nametables
+         */
+        this.memory.rgmemory[3] = this.PRGBanks[(value & 7) << 1];
+        this.memory.rgmemory[4] = this.PRGBanks[((value & 7) << 1) | 1];
+        this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametable.rgmemory[2] = this.nametable.rgmemory[3] =
+            (value >> 4) & 1 ? this.nametableB : this.nametableA;
+    };
+    AxRom.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    };
+    AxRom.prototype.setCpuAndPpu = function (cpu) {
+    };
+    AxRom.prototype.clk = function () { };
+    return AxRom;
+})();
 var MemoryMapperFactory = (function () {
     function MemoryMapperFactory() {
     }
@@ -10659,13 +10704,15 @@ var MemoryMapperFactory = (function () {
                 return new UxRom(nesImage);
             case 4:
                 return new Mmc3(nesImage);
+            case 7:
+                return new AxRom(nesImage);
             default:
                 throw 'unkown mapper ' + nesImage.mapperType;
         }
     };
     return MemoryMapperFactory;
 })();
-///<reference path="IMemoryMapper.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
 var Mmc0 = (function () {
     function Mmc0(nesImage) {
         if (nesImage.ROMBanks.length === 1) {
@@ -10691,7 +10738,7 @@ var Mmc0 = (function () {
     Mmc0.prototype.clk = function () { };
     return Mmc0;
 })();
-///<reference path="IMemoryMapper.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
 var Mmc1 = (function () {
     function Mmc1(nesImage) {
         this.iWrite = 0;
@@ -10923,7 +10970,7 @@ var Mmc1 = (function () {
     Mmc1.prototype.clk = function () { };
     return Mmc1;
 })();
-///<reference path="Memory.ts"/>
+/// <reference path="Memory.ts"/>
 var Ram = (function () {
     function Ram(sizeI) {
         this.sizeI = sizeI;
@@ -10945,32 +10992,32 @@ var Ram = (function () {
     };
     return Ram;
 })();
-///<reference path="Memory.ts"/>
-var ROM = (function () {
-    function ROM(size) {
+/// <reference path="Memory.ts"/>
+var Rom = (function () {
+    function Rom(size) {
         this.memory = new Uint8Array(size);
     }
-    ROM.fromBytes = function (memory) {
-        var res = new ROM(0);
+    Rom.fromBytes = function (memory) {
+        var res = new Rom(0);
         res.memory = memory;
         return res;
     };
-    ROM.prototype.size = function () {
+    Rom.prototype.size = function () {
         return this.memory.length;
     };
-    ROM.prototype.getByte = function (addr) {
+    Rom.prototype.getByte = function (addr) {
         return this.memory[addr];
     };
-    ROM.prototype.setByte = function (addr, value) {
+    Rom.prototype.setByte = function (addr, value) {
     };
-    ROM.prototype.subArray = function (addr, size) {
-        return ROM.fromBytes(this.memory.subarray(addr, addr + size));
+    Rom.prototype.subArray = function (addr, size) {
+        return Rom.fromBytes(this.memory.subarray(addr, addr + size));
     };
-    return ROM;
+    return Rom;
 })();
-///<reference path="IMemoryMapper.ts"/>
-///<reference path="../memory/Ram.ts"/>
-///<reference path="../memory/Rom.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
+/// <reference path="../memory/Ram.ts"/>
+/// <reference path="../memory/Rom.ts"/>
 var Mmc3 = (function () {
     function Mmc3(nesImage) {
         this.wasDown = true;
@@ -11147,7 +11194,7 @@ var Mmc3 = (function () {
     };
     return Mmc3;
 })();
-///<reference path="IMemoryMapper.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
 var UxRom = (function () {
     function UxRom(nesImage) {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
@@ -11204,7 +11251,7 @@ var UxRom = (function () {
     UxRom.prototype.clk = function () { };
     return UxRom;
 })();
-///<reference path="Memory.ts"/>
+/// <reference path="Memory.ts"/>
 var CleverRam = (function () {
     function CleverRam(sizeI, repeat) {
         if (repeat === void 0) { repeat = 1; }
@@ -11233,7 +11280,7 @@ var CleverRam = (function () {
     };
     return CleverRam;
 })();
-///<reference path="Memory.ts"/>
+/// <reference path="Memory.ts"/>
 var CompoundMemory = (function () {
     function CompoundMemory() {
         var _this = this;
@@ -11430,11 +11477,11 @@ var NesImage = (function () {
             this.RAMBanks[ibank] = new Ram(0x2000);
         }
         for (var ibank = 0; ibank < this.ROMBanks.length; ibank++) {
-            this.ROMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x4000));
+            this.ROMBanks[ibank] = Rom.fromBytes(rawBytes.slice(idx, idx + 0x4000));
             idx += 0x4000;
         }
         for (var ibank = 0; ibank < this.VRAMBanks.length; ibank++) {
-            this.VRAMBanks[ibank] = ROM.fromBytes(rawBytes.slice(idx, idx + 0x2000));
+            this.VRAMBanks[ibank] = Rom.fromBytes(rawBytes.slice(idx, idx + 0x2000));
             idx += 0x2000;
         }
     }
@@ -12407,7 +12454,7 @@ var NesRunnerBase = (function () {
     };
     return NesRunnerBase;
 })();
-///<reference path="NesRunnerBase.ts"/>
+/// <reference path="NesRunnerBase.ts"/>
 var CpuTestRunner = (function (_super) {
     __extends(CpuTestRunner, _super);
     function CpuTestRunner(container, url, checkForString) {
@@ -12487,7 +12534,7 @@ var CpuTestRunner = (function (_super) {
     };
     return CpuTestRunner;
 })(NesRunnerBase);
-///<reference path="NesRunnerBase.ts"/>
+/// <reference path="NesRunnerBase.ts"/>
 var NesRunner = (function (_super) {
     __extends(NesRunner, _super);
     function NesRunner(container, url) {

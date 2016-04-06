@@ -1,6 +1,6 @@
-///<reference path="IMemoryMapper.ts"/>
-///<reference path="../memory/Ram.ts"/>
-///<reference path="../memory/Rom.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
+/// <reference path="../memory/Ram.ts"/>
+/// <reference path="../memory/Rom.ts"/>
 class Mmc3 implements IMemoryMapper {
 
     wasDown = true;
@@ -193,7 +193,7 @@ class Mmc3 implements IMemoryMapper {
         }
     }
 
-    splitMemory(romBanks: ROM[], size: number): Memory[] {
+    splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
         for (let rom of romBanks) {
             let i = 0;

@@ -1,4 +1,4 @@
-///<reference path="Memory.ts"/>
+/// <reference path="Memory.ts"/>
 class CleverRam implements Memory {
     private memory: Uint8Array;
     public writeEnable: boolean = true;

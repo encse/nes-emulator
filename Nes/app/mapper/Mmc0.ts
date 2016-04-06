@@ -1,4 +1,4 @@
-///<reference path="IMemoryMapper.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
 class Mmc0 implements IMemoryMapper{
     memory: CompoundMemory;
     vmemory: CompoundMemory;

@@ -1,4 +1,4 @@
-///<reference path="IDriver.ts"/>
+/// <reference path="IDriver.ts"/>
 class WebGlDriver implements IDriver {
     buf8: Uint8ClampedArray;
     buf32: Uint32Array;

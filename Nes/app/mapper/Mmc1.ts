@@ -1,4 +1,4 @@
-///<reference path="IMemoryMapper.ts"/>
+/// <reference path="IMemoryMapper.ts"/>
 class Mmc1 implements IMemoryMapper {
 
     iWrite: number = 0;
@@ -212,7 +212,7 @@ class Mmc1 implements IMemoryMapper {
         }
     }
 
-    splitMemory(romBanks: ROM[], size: number): Memory[] {
+    splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
         for (let rom of romBanks) {
             let i = 0;
