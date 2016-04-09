@@ -8,6 +8,8 @@
                 return new Mmc1(nesImage);
             case 2:
                 return new UxRom(nesImage);
+            case 3:
+                return new CNROM(nesImage);
             case 4:
                 return new Mmc3(nesImage);
             case 7:

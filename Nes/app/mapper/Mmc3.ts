@@ -40,6 +40,9 @@ class Mmc3 implements IMemoryMapper {
 
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
 
+        while (this.CHRBanks.length < 8)
+            this.CHRBanks.push(new Ram(0x400));
+
         this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(
             new CleverRam(0x800, 4), //0x2000

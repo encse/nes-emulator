@@ -10691,6 +10691,59 @@ var AxRom = (function () {
     AxRom.prototype.clk = function () { };
     return AxRom;
 })();
+/// <reference path="IMemoryMapper.ts"/>
+var CNROM = (function () {
+    function CNROM(nesImage) {
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
+        while (this.PRGBanks.length < 2)
+            this.PRGBanks.push(new Ram(0x4000));
+        while (this.CHRBanks.length < 2)
+            this.CHRBanks.push(new Ram(0x1000));
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
+        if (nesImage.fVerticalMirroring) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        else {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametableA;
+            this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
+        }
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.nametable, new Ram(0x1000));
+        this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+    }
+    CNROM.prototype.setByte = function (addr, value) {
+        //7  bit  0
+        //---- ----
+        //cccc ccCC
+        //|||| ||||
+        //++++-++++- Select 8 KB CHR ROM bank for PPU $0000- $1FFF        
+        //CNROM only implements the lowest 2 bits, capping it at 32 KiB CHR. Other boards may implement 4 or more bits for larger CHR.
+        this.vmemory.rgmemory[0] = this.CHRBanks[(value & 0x3) << 1];
+        this.vmemory.rgmemory[1] = this.CHRBanks[((value & 0x3) << 1) + 1];
+    };
+    CNROM.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    };
+    CNROM.prototype.setCpuAndPpu = function (cpu) {
+    };
+    CNROM.prototype.clk = function () { };
+    return CNROM;
+})();
 var MemoryMapperFactory = (function () {
     function MemoryMapperFactory() {
     }
@@ -10702,6 +10755,8 @@ var MemoryMapperFactory = (function () {
                 return new Mmc1(nesImage);
             case 2:
                 return new UxRom(nesImage);
+            case 3:
+                return new CNROM(nesImage);
             case 4:
                 return new Mmc3(nesImage);
             case 7:
@@ -10715,24 +10770,40 @@ var MemoryMapperFactory = (function () {
 /// <reference path="IMemoryMapper.ts"/>
 var Mmc0 = (function () {
     function Mmc0(nesImage) {
-        if (nesImage.ROMBanks.length === 1) {
-            this.memory = new CompoundMemory(new Ram(0xc000), nesImage.ROMBanks[0]);
+        this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
+        this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
+        while (this.PRGBanks.length < 2)
+            this.PRGBanks.push(this.PRGBanks[0]);
+        while (this.CHRBanks.length < 2)
+            this.CHRBanks.push(new Ram(0x1000));
+        this.nametableA = new Ram(0x400);
+        this.nametableB = new Ram(0x400);
+        this.nametable = new CompoundMemory(this.nametableA, this.nametableB, this.nametableA, this.nametableB);
+        if (nesImage.fVerticalMirroring) {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[2] = this.nametableA;
+            this.nametable.rgmemory[1] = this.nametable.rgmemory[3] = this.nametableB;
         }
-        else if (nesImage.ROMBanks.length === 2) {
-            this.memory = new CompoundMemory(new Ram(0x8000), nesImage.ROMBanks[0], nesImage.ROMBanks[1]);
+        else {
+            this.nametable.rgmemory[0] = this.nametable.rgmemory[1] = this.nametableA;
+            this.nametable.rgmemory[2] = this.nametable.rgmemory[3] = this.nametableB;
         }
-        if (nesImage.VRAMBanks.length > 1)
-            throw 'unknown VRAMBanks';
-        if (nesImage.VRAMBanks.length === 1 && nesImage.VRAMBanks[0].size() !== 0x2000)
-            throw 'unknown VRAMBanks';
-        var patternTable = nesImage.VRAMBanks.length > 0 ? nesImage.VRAMBanks[0] : new Ram(0x2000);
-        var nameTableA = new Ram(0x400);
-        var nameTableB = nesImage.fFourScreenVRAM || nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
-        var nameTableC = nesImage.fFourScreenVRAM || !nesImage.fVerticalMirroring ? new Ram(0x400) : nameTableA;
-        var nameTableD = nesImage.fFourScreenVRAM ? new Ram(0x400) : nesImage.fVerticalMirroring ? nameTableB : nameTableC;
-        var rest = new Ram(0x1000);
-        this.vmemory = new CompoundMemory(patternTable, nameTableA, nameTableB, nameTableC, nameTableD, rest);
+        this.memory = new CompoundMemory(new CleverRam(0x800, 4), new Ram(0x2000), new Ram(0x4000), this.PRGBanks[0], this.PRGBanks[this.PRGBanks.length - 1]);
+        this.vmemory = new CompoundMemory(this.CHRBanks[0], this.CHRBanks[1], this.nametable, new Ram(0x1000));
     }
+    Mmc0.prototype.splitMemory = function (romBanks, size) {
+        var result = [];
+        for (var _i = 0; _i < romBanks.length; _i++) {
+            var rom = romBanks[_i];
+            var i = 0;
+            if (rom.size() % size)
+                throw 'cannot split memory';
+            while (i < rom.size()) {
+                result.push(rom.subArray(i, size));
+                i += size;
+            }
+        }
+        return result;
+    };
     Mmc0.prototype.setCpuAndPpu = function (cpu) {
     };
     Mmc0.prototype.clk = function () { };
@@ -11033,6 +11104,8 @@ var Mmc3 = (function () {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x400);
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
+        while (this.CHRBanks.length < 8)
+            this.CHRBanks.push(new Ram(0x400));
         this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(new CleverRam(0x800, 4), //0x2000
         new Ram(0x4000), this.prgRam, this.PRGBanks[0], this.PRGBanks[1], this.PRGBanks[this.PRGBanks.length - 2], this.PRGBanks[this.PRGBanks.length - 1]);
