@@ -1,26 +1,26 @@
 ﻿import {Mos6502} from "./Mos6502";
-export class IrqLine {
-    private _isRequested = false;
+ export class IrqLine {
+     private isRequestedI = false;
 
-    public constructor(private cpu: Mos6502) {
-        
-    }
+     public constructor(private cpu: Mos6502) {
 
-    request() {
-        if (!this._isRequested) {
-            this.cpu.irqLine--;
-            this._isRequested = true;
-        }
-    }
+     }
 
-    ack() {
-        if (this._isRequested) {
-            this.cpu.irqLine++;
-            this._isRequested = false;
-        }
-    }
+     public request() {
+         if (!this.isRequestedI) {
+             this.cpu.irqLine--;
+             this.isRequestedI = true;
+         }
+     }
 
-    isRequested() {
-        return this._isRequested;
-    }
-}
+     public ack() {
+         if (this.isRequestedI) {
+             this.cpu.irqLine++;
+             this.isRequestedI = false;
+         }
+     }
+
+     public isRequested() {
+         return this.isRequestedI;
+     }
+ }

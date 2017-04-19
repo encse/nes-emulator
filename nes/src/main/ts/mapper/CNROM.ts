@@ -1,18 +1,19 @@
-import {IMemoryMapper} from "./IMemoryMapper";
-import {CompoundMemory} from "../memory/CompoundMemory";
-import {Ram} from "../memory/RAM";
-import {Memory} from "../memory/Memory";
-import {NesImage} from "../NesImage";
-import {CleverRam} from "../memory/CleverRam";
 import {Mos6502} from "../cpu/Mos6502";
+import {CleverRam} from "../memory/CleverRam";
+import {CompoundMemory} from "../memory/CompoundMemory";
+import {Memory} from "../memory/Memory";
+import {Ram} from "../memory/RAM";
 import {Rom} from "../memory/ROM";
-export class CNROM implements IMemoryMapper {
+import {NesImage} from "../NesImage";
+import {MemoryMapper} from "./MemoryMapper";
+export class CNROM implements MemoryMapper {
 
-    memory: CompoundMemory;
-    vmemory: CompoundMemory;
-    private nametable:CompoundMemory;
-    private nametableA:Ram;
-    private nametableB:Ram;
+    public memory: CompoundMemory;
+    public vmemory: CompoundMemory;
+
+    private nametable: CompoundMemory;
+    private nametableA: Ram;
+    private nametableB: Ram;
     private PRGBanks: Memory[];
     private CHRBanks: Memory[];
 
@@ -20,20 +21,21 @@ export class CNROM implements IMemoryMapper {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
 
-        while (this.PRGBanks.length < 2)
+        while (this.PRGBanks.length < 2) {
             this.PRGBanks.push(new Ram(0x4000));
+        }
 
-        while (this.CHRBanks.length < 2)
+        while (this.CHRBanks.length < 2) {
             this.CHRBanks.push(new Ram(0x1000));
+        }
 
         this.memory = new CompoundMemory(
             new CleverRam(0x800, 4),
             new Ram(0x2000),
             new Ram(0x4000),
             this.PRGBanks[0],
-            this.PRGBanks[this.PRGBanks.length - 1]
+            this.PRGBanks[this.PRGBanks.length - 1],
         );
-      
 
         this.nametableA = new Ram(0x400);
         this.nametableB = new Ram(0x400);
@@ -51,32 +53,40 @@ export class CNROM implements IMemoryMapper {
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.nametable,
-            new Ram(0x1000)
+            new Ram(0x1000),
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
     }
 
+    public setCpuAndPpu(cpu: Mos6502) {
+        // noop
+    }
+
+    public clk() {
+        // noop
+    }
+
     private setByte(addr: number, value: number): void {
-    
-        //7  bit  0
-        //---- ----
-        //cccc ccCC
-        //|||| ||||
-        //++++-++++- Select 8 KB CHR ROM bank for PPU $0000- $1FFF        
-        //CNROM only implements the lowest 2 bits, capping it at 32 KiB CHR. Other boards may implement 4 or more bits for larger CHR.
+
+        // 7  bit  0
+        // ---- ----
+        // cccc ccCC
+        // |||| ||||
+        // ++++-++++- Select 8 KB CHR ROM bank for PPU $0000- $1FFF
+        // CNROM only implements the lowest 2 bits, capping it at 32 KiB CHR. Other boards may implement 4 or more bits for larger CHR.
 
         this.vmemory.rgmemory[0] = this.CHRBanks[(value & 0x3) << 1];
         this.vmemory.rgmemory[1] = this.CHRBanks[((value & 0x3) << 1) + 1];
     }
 
-
-    splitMemory(romBanks: Rom[], size: number): Memory[] {
+    private splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
-        for (let rom of romBanks) {
+        for (const rom of romBanks) {
             let i = 0;
-            if (rom.size() % size)
-                throw 'cannot split memory';
+            if (rom.size() % size) {
+                throw new Error("cannot split memory");
+            }
             while (i < rom.size()) {
                 result.push(rom.subArray(i, size));
                 i += size;
@@ -84,12 +94,4 @@ export class CNROM implements IMemoryMapper {
         }
         return result;
     }
-
-    setCpuAndPpu(cpu: Mos6502) {
-
-    }
-
-
-
-    clk() {}
 }

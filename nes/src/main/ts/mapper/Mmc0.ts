@@ -1,14 +1,14 @@
-import {IMemoryMapper} from "./IMemoryMapper";
-import {CompoundMemory} from "../memory/CompoundMemory";
-import {Ram} from "../memory/RAM";
-import {Memory} from "../memory/Memory";
-import {NesImage} from "../NesImage";
 import {Mos6502} from "../cpu/Mos6502";
-import {Rom} from "../memory/ROM";
 import {CleverRam} from "../memory/CleverRam";
-export class Mmc0 implements IMemoryMapper{
-    memory: CompoundMemory;
-    vmemory: CompoundMemory;
+import {CompoundMemory} from "../memory/CompoundMemory";
+import {Memory} from "../memory/Memory";
+import {Ram} from "../memory/RAM";
+import {Rom} from "../memory/ROM";
+import {NesImage} from "../NesImage";
+import {MemoryMapper} from "./MemoryMapper";
+export class Mmc0 implements MemoryMapper {
+    public memory: CompoundMemory;
+    public vmemory: CompoundMemory;
     private nametable: CompoundMemory;
     private nametableA: Ram;
     private nametableB: Ram;
@@ -19,11 +19,13 @@ export class Mmc0 implements IMemoryMapper{
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
         this.CHRBanks = this.splitMemory(nesImage.VRAMBanks, 0x1000);
 
-        while (this.PRGBanks.length < 2)
+        while (this.PRGBanks.length < 2) {
             this.PRGBanks.push(this.PRGBanks[0]);
+        }
 
-        while (this.CHRBanks.length < 2)
+        while (this.CHRBanks.length < 2) {
             this.CHRBanks.push(new Ram(0x1000));
+        }
 
         this.nametableA = new Ram(0x400);
         this.nametableB = new Ram(0x400);
@@ -42,24 +44,32 @@ export class Mmc0 implements IMemoryMapper{
             new Ram(0x2000),
             new Ram(0x4000),
             this.PRGBanks[0],
-            this.PRGBanks[this.PRGBanks.length - 1]
+            this.PRGBanks[this.PRGBanks.length - 1],
         );
 
         this.vmemory = new CompoundMemory(
             this.CHRBanks[0],
             this.CHRBanks[1],
             this.nametable,
-            new Ram(0x1000)
+            new Ram(0x1000),
         );
 
     }
 
-    splitMemory(romBanks: Rom[], size: number): Memory[] {
+    public setCpuAndPpu(cpu: Mos6502) {
+        // noop
+    }
+
+    public clk() {
+        // noop
+    }
+    private splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
-        for (let rom of romBanks) {
+        for (const rom of romBanks) {
             let i = 0;
-            if (rom.size() % size)
-                throw 'cannot split memory';
+            if (rom.size() % size) {
+                throw new Error("cannot split memory");
+            }
             while (i < rom.size()) {
                 result.push(rom.subArray(i, size));
                 i += size;
@@ -67,9 +77,4 @@ export class Mmc0 implements IMemoryMapper{
         }
         return result;
     }
-    setCpuAndPpu(cpu: Mos6502) {
-        
-    }
-
-    clk() {}
 }

@@ -1,10 +1,10 @@
-import {IDriver} from "./IDriver";
-export class CanvasDriver implements IDriver {
+import {Driver} from "./Driver";
+export class CanvasDriver implements Driver {
 
-    ctx: CanvasRenderingContext2D;
-    imageData: ImageData;
-    buf8: Uint8Array;
-    data: Uint32Array;
+    private ctx: CanvasRenderingContext2D;
+    private imageData: ImageData;
+    private buf8: Uint8Array;
+    private data: Uint32Array;
 
     constructor(canvas: HTMLCanvasElement) {
         this.ctx = canvas.getContext("2d");
@@ -13,16 +13,17 @@ export class CanvasDriver implements IDriver {
         this.buf8 = new Uint8ClampedArray(buf);
         this.data = new Uint32Array(buf);
     }
-    getBuffer(): Uint32Array {
+
+    public getBuffer(): Uint32Array {
         return this.data;
     }
 
-    render(): void {
-        (<any>this.imageData.data).set(this.buf8);
+    public render(): void {
+        (this.imageData.data as any).set(this.buf8);
         this.ctx.putImageData(this.imageData, 0, 0);
     }
 
-    tsto() {
+    public tsto() {
         return "Canvas driver";
     }
 }

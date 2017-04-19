@@ -1,30 +1,26 @@
-import {IMemoryMapper} from "./IMemoryMapper";
+import {IrqLine} from "../cpu/IrqLine";
+import {Mos6502} from "../cpu/Mos6502";
+import {CleverRam} from "../memory/CleverRam";
 import {CompoundMemory} from "../memory/CompoundMemory";
 import {Memory} from "../memory/Memory";
 import {Ram} from "../memory/RAM";
-import {CleverRam} from "../memory/CleverRam";
 import {Rom} from "../memory/ROM";
-import {IrqLine} from "../cpu/IrqLine";
 import {NesImage} from "../NesImage";
-import {Mos6502} from "../cpu/Mos6502";
 import {PPU} from "../PPU";
-export class Mmc3 implements IMemoryMapper {
+import {MemoryMapper} from "./MemoryMapper";
+export class Mmc3 implements MemoryMapper {
 
-    wasDown = true;
-    curA12 = 0;
-    prevA12 = 0;
+    public memory: CompoundMemory;
+    public vmemory: CompoundMemory;
 
-    memory: CompoundMemory;
-    vmemory: CompoundMemory;
-   
-    chrMode:number;
-    prgMode:number;
-
-    horizontalMirroring = 0;
-    fourScreenVram = 0;
-    temp: number;
-
-    r:number[];
+    private curA12 = 0;
+    private prevA12 = 0;
+    private chrMode: number;
+    private prgMode: number;
+    private horizontalMirroring = 0;
+    private fourScreenVram = 0;
+    private temp: number;
+    private r: number[];
     private PRGBanks: Memory[];
     private CHRBanks: Memory[];
     private nametable: CompoundMemory;
@@ -32,14 +28,13 @@ export class Mmc3 implements IMemoryMapper {
     private nametableB: Ram;
     private nametableC: Ram;
     private nametableD: Ram;
-
     private scanLineCounterStartValue = 0;
     private scanLineCounterRestartRequested = false;
     private scanLineCounter = 0;
     private irqEnabled = true;
     private irqLine: IrqLine;
-
     private prgRam: CleverRam;
+    private lastFall = 0;
 
     constructor(nesImage: NesImage) {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x2000);
@@ -47,18 +42,19 @@ export class Mmc3 implements IMemoryMapper {
 
         this.r = [0, 0, 0, 0, 0, 0, 0, 0];
 
-        while (this.CHRBanks.length < 8)
+        while (this.CHRBanks.length < 8) {
             this.CHRBanks.push(new Ram(0x400));
+        }
 
         this.prgRam = new CleverRam(0x2000);
         this.memory = new CompoundMemory(
-            new CleverRam(0x800, 4), //0x2000
-            new Ram(0x4000), 
+            new CleverRam(0x800, 4), // 0x2000
+            new Ram(0x4000),
             this.prgRam,
             this.PRGBanks[0],
             this.PRGBanks[1],
             this.PRGBanks[this.PRGBanks.length - 2],
-            this.PRGBanks[this.PRGBanks.length - 1]
+            this.PRGBanks[this.PRGBanks.length - 1],
         );
 
         this.nametableA = new Ram(0x400);
@@ -80,56 +76,84 @@ export class Mmc3 implements IMemoryMapper {
             this.CHRBanks[6],
             this.CHRBanks[7],
             this.nametable,
-            new Ram(0x1000)
+            new Ram(0x1000),
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
         this.update();
     }
-    
-    setCpuAndPpu(cpu: Mos6502, ppu:PPU) {
+
+    public setCpuAndPpu(cpu: Mos6502, ppu: PPU) {
         this.irqLine = new IrqLine(cpu);
+    }
+
+    public clk() {
+        this.curA12 = this.vmemory.lastAddr & 0x1000;
+
+        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
+
+            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
+                this.scanLineCounterRestartRequested = false;
+                if (!this.scanLineCounterStartValue && this.irqEnabled) {
+                    this.irqLine.request();
+                }
+                this.scanLineCounter = this.scanLineCounterStartValue;
+            } else if (this.scanLineCounter > 0) {
+                this.scanLineCounter--;
+                if (!this.scanLineCounter && this.irqEnabled) {
+                    this.irqLine.request();
+                }
+            }
+        }
+
+        if (this.curA12 === 0) {
+            this.lastFall++;
+        } else if (this.curA12 !== 0) {
+            this.lastFall = 0;
+        }
+        this.prevA12 = this.curA12;
     }
 
     private setByte(addr: number, value: number): void {
         if (addr <= 0x9ffe) {
-            if (addr & 1) { //bank data
+            if (addr & 1) {
+                // bank data
                 this.r[this.temp] = value;
                 this.update();
-            } else { //bank select
+            } else {
+                // bank select
                 this.temp = value & 7;
                 this.chrMode = (value >> 7) & 1;
                 this.prgMode = (value >> 6) & 1;
             }
-        }
-        else if (addr <= 0xbfff) {
-            if (addr & 1) { //prg ram protect
+        } else if (addr <= 0xbfff) {
+            if (addr & 1) {
+                // prg ram protect
                 this.prgRam.readEnable = !!((value >> 7) & 1);
                 this.prgRam.writeEnable = !((value >> 6) & 1);
-            } else { //mirroring
+            } else {
+                // mirroring
                 this.horizontalMirroring = value & 1;
                 this.update();
             }
-        }
-        else if (addr <= 0xdffe) {
+        } else if (addr <= 0xdffe) {
 
-            if (addr & 1) { //IRQ reload 
+            if (addr & 1) {
+                // IRQ reload
                 this.scanLineCounterRestartRequested = true;
-               
-                //console.log('irqCounterRestartRequested');
-            } else { //IRQ latch
+
+            } else {
+                // IRQ latch
                 this.scanLineCounterStartValue = value & 0xff;
-                //console.log('irqCounterStartValue', value);
             }
-        }
-        else if (addr <= 0xffff) {
-            if (addr & 1) { //irq enable
+        } else if (addr <= 0xffff) {
+            if (addr & 1) {
+                // irq enable
                 this.irqEnabled = true;
-                //console.log('irqEnabled', true);
-            } else { //irq disable
+            } else {
+                // irq disable
                 this.irqLine.ack();
                 this.irqEnabled = false;
-               // console.log('irqEnabled', false);
             }
         }
     }
@@ -137,7 +161,7 @@ export class Mmc3 implements IMemoryMapper {
     private update() {
 
         /*
-                           $8000   $A000   $C000   $E000  
+                           $8000   $A000   $C000   $E000
                          +-------+-------+-------+-------+
             PRG Mode 0:  |  R:6  |  R:7  | { -2} | { -1} |
                          +-------+-------+-------+-------+
@@ -149,8 +173,7 @@ export class Mmc3 implements IMemoryMapper {
             this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
             this.memory.rgmemory[5] = this.PRGBanks[this.PRGBanks.length - 2];
             this.memory.rgmemory[6] = this.PRGBanks[this.PRGBanks.length - 1];
-        }
-        else {
+        } else {
             this.memory.rgmemory[3] = this.PRGBanks[this.PRGBanks.length - 2];
             this.memory.rgmemory[4] = this.PRGBanks[this.r[7]];
             this.memory.rgmemory[5] = this.PRGBanks[this.r[6]];
@@ -158,7 +181,7 @@ export class Mmc3 implements IMemoryMapper {
         }
 
         /*
-                           $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00 
+                           $0000   $0400   $0800   $0C00   $1000   $1400   $1800   $1C00
                          +---------------+---------------+-------+-------+-------+-------+
             CHR Mode 0:  |     <R:0>     |     <R:1>     |  R:2  |  R:3  |  R:4  |  R:5  |
                          +---------------+---------------+---------------+---------------+
@@ -175,8 +198,7 @@ export class Mmc3 implements IMemoryMapper {
             this.vmemory.rgmemory[5] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[6] = this.CHRBanks[this.r[4]];
             this.vmemory.rgmemory[7] = this.CHRBanks[this.r[5]];
-        }
-        else {
+        } else {
             this.vmemory.rgmemory[0] = this.CHRBanks[this.r[2]];
             this.vmemory.rgmemory[1] = this.CHRBanks[this.r[3]];
             this.vmemory.rgmemory[2] = this.CHRBanks[this.r[4]];
@@ -193,8 +215,7 @@ export class Mmc3 implements IMemoryMapper {
                 this.nametable.rgmemory[1] = this.nametableA;
                 this.nametable.rgmemory[2] = this.nametableB;
                 this.nametable.rgmemory[3] = this.nametableB;
-            }
-            else {
+            } else {
                 this.nametable.rgmemory[0] = this.nametableA;
                 this.nametable.rgmemory[1] = this.nametableB;
                 this.nametable.rgmemory[2] = this.nametableA;
@@ -203,47 +224,18 @@ export class Mmc3 implements IMemoryMapper {
         }
     }
 
-    splitMemory(romBanks: Rom[], size: number): Memory[] {
+    private splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
-        for (let rom of romBanks) {
+        for (const rom of romBanks) {
             let i = 0;
-            if (rom.size() % size) 
-                throw 'cannot split memory';
+            if (rom.size() % size) {
+                throw new Error("cannot split memory");
+            }
             while (i < rom.size()) {
                 result.push(rom.subArray(i, size));
                 i += size;
             }
         }
         return result;
-    }
-
-    
-
-    lastFall = 0;
-    clk() {
-        this.curA12 = this.vmemory.lastAddr & 0x1000;
-
-        if (!this.prevA12 && this.curA12 && this.lastFall >= 16) {
-         
-            
-            if (!this.scanLineCounter || this.scanLineCounterRestartRequested) {
-                this.scanLineCounterRestartRequested = false;
-                if (!this.scanLineCounterStartValue && this.irqEnabled)
-                    this.irqLine.request();
-                this.scanLineCounter = this.scanLineCounterStartValue;
-            } else if (this.scanLineCounter > 0) {
-                this.scanLineCounter--;
-                if (!this.scanLineCounter && this.irqEnabled) {
-                    this.irqLine.request();
-                }
-            }
-        }
-
-        if (this.curA12 === 0) {
-            this.lastFall++;
-        } else if (this.curA12 !== 0) {
-            this.lastFall = 0;
-        }
-        this.prevA12 = this.curA12;
     }
 }

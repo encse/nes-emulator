@@ -14,19 +14,15 @@ task clean {
     }
 }
 
-task lint(type:NodeTask) {
-    dependsOn "npmInstall"
-    inputs.dir "$projectDir/src/main/ts"
-    outputs.dir "$projectDir/dist" //this is not correct, lint doesn't have outputs
-    script = file("node_modules/tslint/bin/tslint")
-    args = ["-p", ".", "--fix"]
+task generateSources{
+    dependsOn project.parent.findProject("codegen").tasks["generate"]
 }
 
+
 task compile(type: NodeTask) {
-//    dependsOn "lint"
     dependsOn "npmInstall"
 
-    dependsOn project.parent.findProject("codegen").tasks["generate"]
+    dependsOn generateSources
 
     inputs.dir "$projectDir/src/main/ts"
     inputs.file "$projectDir/webpack.config.js"
@@ -36,8 +32,17 @@ task compile(type: NodeTask) {
     script = file("node_modules/webpack/bin/webpack.js")
 }
 
-task build {
+
+task lint(type:NodeTask) {
     dependsOn "compile"
+    inputs.dir "$projectDir/src/main/ts"
+    // outputs.dir "$projectDir/dist" //this is not correct, lint doesn't have outputs
+    script = file("node_modules/tslint/bin/tslint")
+    args = ["-p", "$projectDir/src/main/ts", "-c", "$projectDir/../tslint.json", "--fix"]
+}
+
+task build {
+    dependsOn "lint"
     doLast {
         copy {
             from "$projectDir/src/main/web"

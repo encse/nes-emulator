@@ -1,33 +1,33 @@
-import {IMemoryMapper} from "./IMemoryMapper";
-import {CompoundMemory} from "../memory/CompoundMemory";
-import {Ram} from "../memory/RAM";
-import {Memory} from "../memory/Memory";
-import {NesImage} from "../NesImage";
-import {CleverRam} from "../memory/CleverRam";
 import {Mos6502} from "../cpu/Mos6502";
+import {CleverRam} from "../memory/CleverRam";
+import {CompoundMemory} from "../memory/CompoundMemory";
+import {Memory} from "../memory/Memory";
+import {Ram} from "../memory/RAM";
 import {Rom} from "../memory/ROM";
-export class AxRom implements IMemoryMapper {
+import {NesImage} from "../NesImage";
+import {MemoryMapper} from "./MemoryMapper";
+export class AxRom implements MemoryMapper {
 
-    memory: CompoundMemory;
-    vmemory: CompoundMemory;
-    private nametable:CompoundMemory;
-    private nametableA:Ram;
-    private nametableB:Ram;
+    public memory: CompoundMemory;
+    public vmemory: CompoundMemory;
+    private nametable: CompoundMemory;
+    private nametableA: Ram;
+    private nametableB: Ram;
     private PRGBanks: Memory[];
-    private CHRBanks: Memory[];
 
     constructor(nesImage: NesImage) {
         this.PRGBanks = this.splitMemory(nesImage.ROMBanks, 0x4000);
 
-        while (this.PRGBanks.length < 2)
+        while (this.PRGBanks.length < 2) {
             this.PRGBanks.push(new Ram(0x4000));
+        }
 
         this.memory = new CompoundMemory(
             new CleverRam(0x800, 4),
             new Ram(0x2000),
             new Ram(0x4000),
             this.PRGBanks[this.PRGBanks.length - 2],
-            this.PRGBanks[this.PRGBanks.length - 1]
+            this.PRGBanks[this.PRGBanks.length - 1],
         );
 
         this.nametableA = new Ram(0x400);
@@ -37,10 +37,18 @@ export class AxRom implements IMemoryMapper {
         this.vmemory = new CompoundMemory(
             new Ram(0x2000),
             this.nametable,
-            new Ram(0x1000)
+            new Ram(0x1000),
         );
 
         this.memory.shadowSetter(0x8000, 0xffff, this.setByte.bind(this));
+    }
+
+    public setCpuAndPpu(cpu: Mos6502) {
+        // noop
+    }
+
+    public clk() {
+        // noop
     }
 
     private setByte(addr: number, value: number): void {
@@ -58,13 +66,13 @@ export class AxRom implements IMemoryMapper {
             (value >> 4) & 1 ? this.nametableB : this.nametableA;
     }
 
-
-    splitMemory(romBanks: Rom[], size: number): Memory[] {
+    private splitMemory(romBanks: Rom[], size: number): Memory[] {
         const result = [];
-        for (let rom of romBanks) {
+        for (const rom of romBanks) {
             let i = 0;
-            if (rom.size() % size)
-                throw 'cannot split memory';
+            if (rom.size() % size) {
+                throw new Error("cannot split memory");
+            }
             while (i < rom.size()) {
                 result.push(rom.subArray(i, size));
                 i += size;
@@ -72,10 +80,4 @@ export class AxRom implements IMemoryMapper {
         }
         return result;
     }
-
-    setCpuAndPpu(cpu: Mos6502) {
-
-    }
-
-    clk() {}
 }

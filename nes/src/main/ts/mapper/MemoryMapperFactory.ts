@@ -1,14 +1,14 @@
-﻿import {IMemoryMapper} from "./IMemoryMapper";
-import {NesImage} from "../NesImage";
-import {Mmc0} from "./Mmc0";
-import {Mmc1} from "./Mmc1";
-import {UxRom} from "./UxROM";
-import {CNROM} from "./CNROM";
-import {Mmc3} from "./Mmc3";
-import {AxRom} from "./AxROM";
-export class MemoryMapperFactory {
+﻿ import {NesImage} from "../NesImage";
+  import {AxRom} from "./AxROM";
+  import {CNROM} from "./CNROM";
+  import {MemoryMapper} from "./MemoryMapper";
+  import {Mmc0} from "./Mmc0";
+  import {Mmc1} from "./Mmc1";
+  import {Mmc3} from "./Mmc3";
+  import {UxRom} from "./UxROM";
+  export class MemoryMapperFactory {
 
-    create(nesImage: NesImage):IMemoryMapper {
+    public create(nesImage: NesImage): MemoryMapper {
         switch (nesImage.mapperType) {
             case 0:
                 return new Mmc0(nesImage);
@@ -23,7 +23,7 @@ export class MemoryMapperFactory {
             case 7:
                 return new AxRom(nesImage);
             default:
-                throw 'unkown mapper ' + nesImage.mapperType;
+                throw new Error("unkown mapper " + nesImage.mapperType);
         }
     }
 }

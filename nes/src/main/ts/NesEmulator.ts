@@ -1,21 +1,28 @@
-﻿import {Mos6502} from "./cpu/Mos6502";
-import {PPU} from "./PPU";
-import {IMemoryMapper} from "./mapper/IMemoryMapper";
-import {APU} from "./APU";
-import {NesImage} from "./NesImage";
-import {IDriver} from "./driver/IDriver";
-import {Controller} from "./Controller";
-import {MemoryMapperFactory} from "./mapper/MemoryMapperFactory";
-import {IrqLine} from "./cpu/IrqLine";
-export class NesEmulator {
-    cpu: Mos6502;
-    memoryMapper: IMemoryMapper;
-    ppu: PPU;
-    apu: APU;
+﻿ import {APU} from "./APU";
+  import {Controller} from "./Controller";
+  import {IrqLine} from "./cpu/IrqLine";
+  import {Mos6502} from "./cpu/Mos6502";
+  import {Driver} from "./driver/Driver";
+  import {MemoryMapper} from "./mapper/MemoryMapper";
+  import {MemoryMapperFactory} from "./mapper/MemoryMapperFactory";
+  import {NesImage} from "./NesImage";
+  import {PPU} from "./PPU";
+  export class NesEmulator {
+    public cpu: Mos6502;
+    public memoryMapper: MemoryMapper;
+    public ppu: PPU;
+    public apu: APU;
+    private bDma: number;
+    private dmaRequested = false;
+    private addrDma: number;
+    private idma = 0;
+    private icycle = 0;
 
-    public constructor(nesImage: NesImage, driver:IDriver, public controller:Controller) {
-        if (nesImage.fPAL)
-            throw 'only NTSC images are supported';
+    public constructor(nesImage: NesImage, driver: Driver, public controller: Controller) {
+        if (nesImage.fPAL) {
+            throw new Error("only NTSC images are supported");
+        }
+
         this.memoryMapper = new MemoryMapperFactory().create(nesImage);
 
         this.memoryMapper.memory.shadowSetter(0x4014, 0x4014, (_, v) => {
@@ -23,9 +30,9 @@ export class NesEmulator {
             this.addrDma = v << 8;
         });
 
-        this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, () => { return this.controller.reg4016; });
+        this.memoryMapper.memory.shadowGetter(0x4016, 0x4016, () => this.controller.reg4016);
         this.memoryMapper.memory.shadowSetter(0x4016, 0x4016, (_, v) => { this.controller.reg4016 = v; });
-        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, () => { return this.controller.reg4017; });
+        this.memoryMapper.memory.shadowGetter(0x4017, 0x4017, () => this.controller.reg4017);
 
         this.cpu = new Mos6502(this.memoryMapper.memory);
         this.apu = new APU(this.memoryMapper.memory, new IrqLine(this.cpu));
@@ -36,16 +43,9 @@ export class NesEmulator {
 
         this.cpu.reset();
         this.controller.setPixelColorDelegate(this.ppu.getPixelColor.bind(this.ppu));
-        window['nesemulator'] = this;
     }
 
-  
-    private bDma: number;
-    private dmaRequested = false;
-    private addrDma: number;
-    private idma = 0;
-    private icycle = 0;
-    step() {
+    public step() {
         for (this.icycle = 0; this.icycle < 12; this.icycle++) {
 
             if ((this.icycle & 3) === 0) {
@@ -54,8 +54,9 @@ export class NesEmulator {
                 this.ppu.step();
                 this.memoryMapper.clk();
                 const nmiAfter = this.cpu.nmiLine;
-                if ((nmiBefore > nmiAfter) && this.icycle === 4)
+                if ((nmiBefore > nmiAfter) && this.icycle === 4) {
                     this.cpu.detectInterrupts();
+                }
             }
 
             if (this.icycle === 0) {
@@ -64,8 +65,9 @@ export class NesEmulator {
 
                     this.dmaRequested = false;
                     this.idma = 512;
-                    if (!(this.cpu.icycle & 1))
+                    if (!(this.cpu.icycle & 1)) {
                         this.idma++;
+                    }
                 } else if (this.idma > 512) {
                     this.idma--;
                 } else if (this.idma > 0) {

@@ -1,6 +1,6 @@
-﻿import {Rom} from "./memory/ROM";
-import {Ram} from "./memory/RAM";
-export class NesImage {
+﻿ import {Ram} from "./memory/RAM";
+  import {Rom} from "./memory/ROM";
+  export class NesImage {
     /*
      * 0-3      String "NES^Z" used to recognize .NES files.
         4        Number of 16kB ROM banks.
@@ -8,7 +8,7 @@ export class NesImage {
         6        bit 0     1 for vertical mirroring, 0 for horizontal mirroring.
                  bit 1     1 for battery-backed RAM at $6000-$7FFF.
                  bit 2     1 for a 512-byte trainer at $7000-$71FF.
-                 bit 3     1 for a four-screen VRAM layout. 
+                 bit 3     1 for a four-screen VRAM layout.
                  bit 4-7   Four lower bits of ROM Mapper Type.
         7        bit 0     1 for VS-System cartridges.
                  bit 1-3   Reserved, must be zeroes!
@@ -26,47 +26,53 @@ export class NesImage {
 
     private static magic = new Uint8Array([0x4e, 0x45, 0x53, 0x1a]);
 
-    ROMBanks:Rom[];
-    VRAMBanks: Rom[];
-    RAMBanks: Ram[];
-    fVerticalMirroring:boolean;
-    fBatteryPackedRAM:boolean;
-    trainer: Uint8Array = null;
-    fFourScreenVRAM:boolean;
-    mapperType:number;
-    fVSSystem:boolean;
-    fPAL:boolean;
-   
+    public ROMBanks: Rom[];
+    public VRAMBanks: Rom[];
+    public RAMBanks: Ram[];
+    public fVerticalMirroring: boolean;
+    public fBatteryPackedRAM: boolean;
+    public trainer: Uint8Array = null;
+    public fFourScreenVRAM: boolean;
+    public mapperType: number;
+    public fVSSystem: boolean;
+    public fPAL: boolean;
+
     public constructor(rawBytes: Uint8Array) {
-        for (let i = 0; i < 4; i++)
-            if (rawBytes[i] !== NesImage.magic[i])
-                throw 'invalid NES header';
+        for (let i = 0; i < 4; i++) {
+            if (rawBytes[i] !== NesImage.magic[i]) {
+                throw new Error("invalid NES header");
+            }
+        }
 
         this.ROMBanks = new Array(rawBytes[4]);
         this.VRAMBanks = new Array(rawBytes[5]);
 
         this.fVerticalMirroring = !!(rawBytes[6] & 1);
         this.fBatteryPackedRAM = !!(rawBytes[6] & 2);
-        var fTrainer = !!(rawBytes[6] & 4);
+        const fTrainer = !!(rawBytes[6] & 4);
         this.fFourScreenVRAM = !!(rawBytes[6] & 8);
         this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
         this.fVSSystem = !!(rawBytes[7] & 1);
-        if ((rawBytes[7] & 0x0e) !== 0)
-             throw 'invalid NES header';
-
+        if ((rawBytes[7] & 0x0e) !== 0) {
+            throw new Error("invalid NES header");
+        }
         this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
         this.fPAL = (rawBytes[9] & 1) === 1;
 
-        if ((rawBytes[9] & 0xfe) !== 0)
-            throw 'invalid NES header';
+        if ((rawBytes[9] & 0xfe) !== 0) {
+            throw new Error("invalid NES header");
+        }
 
-        for (let i = 0xa; i < 0x10; i++)
-            if(rawBytes[i] !== 0)
-                throw 'invalid NES header';
+        for (let i = 0xa; i < 0x10; i++) {
+            if (rawBytes[i] !== 0) {
+                throw new Error("invalid NES header");
+            }
+        }
 
-        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000)
-            throw 'invalid NES format';
-        
+        if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000) {
+            throw new Error("invalid NES format");
+        }
+
         let idx = 0x10;
         if (fTrainer) {
             this.trainer = rawBytes.slice(idx, idx + 0x100);

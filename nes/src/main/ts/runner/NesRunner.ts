@@ -1,22 +1,17 @@
-﻿import {NesRunnerBase} from './NesRunnerBase'
+﻿import {NesRunnerBase} from "./NesRunnerBase";
 
-export class NesRunner extends NesRunnerBase {
+ export class NesRunner extends NesRunnerBase {
 
     private callback = this.renderFrame.bind(this);
     private iFrameStart = 0;
     private hpcStart = 0;
-    private fpsElement:HTMLElement;
+    private fpsElement: HTMLElement;
 
     constructor(container: HTMLElement, url: string) {
         super(container, url);
     }
 
-    protected runI() {
-        this.controller.registerKeyboardHandler('I'.charCodeAt(0), () => { this.headerElement.classList.toggle('show') });
-        requestAnimationFrame(this.callback);
-    }
-
-    createEmulator(rawBytes: Uint8Array) {
+    protected createEmulator(rawBytes: Uint8Array) {
         super.createEmulator(rawBytes);
 
         this.hpcStart = window.performance.now();
@@ -25,7 +20,15 @@ export class NesRunner extends NesRunnerBase {
         this.headerElement.innerText += " ";
         this.headerElement.appendChild(this.fpsElement);
     }
-    private printFps(hpcNow) {
+
+    protected runI() {
+        this.controller.registerKeyboardHandler("I".charCodeAt(0), () => {
+            this.headerElement.classList.toggle("show");
+        });
+        requestAnimationFrame(this.callback);
+    }
+
+    private printFps(hpcNow: number) {
         const dt = hpcNow - this.hpcStart;
         if (dt > 1000) {
             const fps = (this.nesEmulator.ppu.iFrame - this.iFrameStart) / dt * 1000;
@@ -35,14 +38,15 @@ export class NesRunner extends NesRunnerBase {
         }
     }
 
-    private renderFrame(hpcNow) {
+    private renderFrame(hpcNow: number) {
         const nesEmulator = this.nesEmulator;
         const ppu = nesEmulator.ppu;
-        
+
         const frameCurrent = ppu.iFrame;
-        while (frameCurrent === ppu.iFrame)
+        while (frameCurrent === ppu.iFrame) {
             nesEmulator.step();
-      
+        }
+
         this.printFps(hpcNow);
         requestAnimationFrame(this.callback);
     }

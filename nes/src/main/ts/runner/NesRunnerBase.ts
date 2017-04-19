@@ -1,43 +1,45 @@
-﻿
-import {NesEmulator} from "../NesEmulator";
-import {IDriver} from "../driver/IDriver";
+
 import {Controller} from "../Controller";
-import {NesImage} from "../NesImage";
+import {Driver} from "../driver/Driver";
 import {DriverFactory} from "../driver/DriverFactory";
+import {NesEmulator} from "../NesEmulator";
+import {NesImage} from "../NesImage";
 
 export class NesRunnerBase {
-    onEndCallback: () => void;
-    logElement: HTMLElement;
-    headerElement: HTMLElement;
-
-    nesEmulator: NesEmulator;
-    canvas:HTMLCanvasElement;
-    driver: IDriver;
-    controller: Controller;
+    public onEndCallback: () => void;
+    public headerElement: HTMLElement;
+    public controller: Controller;
+    public nesEmulator: NesEmulator;
+    private logElement: HTMLElement;
+    private canvas: HTMLCanvasElement;
+    private driver: Driver;
 
     constructor(protected container: HTMLElement, private url: string) {
-        const containerT = document.createElement('div');
+        const containerT = document.createElement("div");
         this.container.appendChild(containerT);
         this.container = containerT;
-        this.onEndCallback = () => { };
+        this.onEndCallback = () => {
+            // noop
+        };
 
-      
     }
 
-    log(...args: Object[]) {
+    public log(...args: any[]) {
         let st = "";
-        for (let i = 0; i < args.length; i++)
-            st += " " + args[i];
+        for (const arg of args) {
+            st += " " + arg;
+        }
 
         const div = document.createElement("div");
         div.innerHTML = st.replace(/\n/g, "<br/>");
         this.logElement.appendChild(div);
     }
 
-    logError(...args:Object[]) {
+    public logError(...args: any[]) {
         let st = "";
-        for (let i = 0; i < args.length; i++)
-            st += " " + args[i];
+        for (const arg of args) {
+            st += " " + arg;
+        }
 
         const div = document.createElement("div");
         div.classList.add("error");
@@ -45,31 +47,11 @@ export class NesRunnerBase {
         this.logElement.appendChild(div);
     }
 
-    private loadUrl(url:string, onLoad) {
-      
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.responseType = "arraybuffer";
-        xhr.onload = _ => {
-            try {
-                if (xhr.status > 99 && xhr.status < 299) {
-                    onLoad(new Uint8Array(xhr.response));
-                } else {
-                    this.logError("http error " + xhr.status);
-                    onLoad(null);
-                }
-            } catch (e) {
-                this.logError(e);
-            }
-        }
-        xhr.send();
-    }
-
-    onEnd(callback: () => void) {
+    public onEnd(callback: () => void) {
         this.onEndCallback = callback;
     }
 
-    run() {
+    public run() {
         this.headerElement = document.createElement("h2");
         this.container.appendChild(this.headerElement);
 
@@ -81,29 +63,31 @@ export class NesRunnerBase {
         this.controller = new Controller(this.canvas);
 
         this.logElement = document.createElement("div");
-        this.logElement.classList.add('log');
+        this.logElement.classList.add("log");
         this.container.appendChild(this.logElement);
 
         this.driver = new DriverFactory().createRenderer(this.canvas);
 
         this.initDnd();
 
-        this.loadUrl(this.url, rawBytes => {
+        this.loadUrl(this.url, (rawBytes) => {
             this.createEmulator(rawBytes);
-            if (!this.nesEmulator)
+            if (!this.nesEmulator) {
                 this.onEndCallback();
-            else
+            } else {
                 this.runI();
+            }
         });
     }
 
-    createEmulator(rawBytes: Uint8Array) {
+    protected createEmulator(rawBytes: Uint8Array) {
         this.headerElement.innerText = `${this.url} ${this.driver.tsto()}`;
 
         try {
-            var newEmulator = new NesEmulator(new NesImage(rawBytes), this.driver, this.controller);
-            if (this.nesEmulator)
+            const newEmulator = new NesEmulator(new NesImage(rawBytes), this.driver, this.controller);
+            if (this.nesEmulator) {
                 this.nesEmulator.destroy();
+            }
             this.nesEmulator = newEmulator;
 
         } catch (e) {
@@ -111,30 +95,49 @@ export class NesRunnerBase {
         }
     }
 
-    initDnd() {
+    protected runI() {
+        this.onEndCallback();
+    }
 
-        if ('draggable' in this.container) {
+    private initDnd() {
 
-            this.container.ondragover = () => { this.container.classList.add('hover'); return false; };
-            this.container.ondragend = () => { this.container.classList.remove('hover'); return false; };
-            this.container.ondrop = e => {
+        if ("draggable" in this.container) {
+
+            this.container.ondragover = () => { this.container.classList.add("hover"); return false; };
+            this.container.ondragend = () => { this.container.classList.remove("hover"); return false; };
+            this.container.ondrop = (e) => {
                 this.url = e.dataTransfer.files[0].name;
-                this.container.classList.remove('hover');
+                this.container.classList.remove("hover");
                 e.preventDefault();
-                var fileReader = new FileReader();
-                fileReader.onload = progressEvent => {
-                    const arrayBufferNew = (<any>progressEvent.target).result;
+                const fileReader = new FileReader();
+                fileReader.onload = (progressEvent) => {
+                    const arrayBufferNew = (progressEvent.target as any).result;
                     const rawBytes = new Uint8Array(arrayBufferNew);
                     this.createEmulator(rawBytes);
                 };
                 fileReader.readAsArrayBuffer(e.dataTransfer.files[0]);
-            }
+            };
         }
 
-        
     }
-   
-    protected runI() {
-        this.onEndCallback();
+
+    private loadUrl(url: string, onLoad: (_: Uint8Array) => void) {
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = (_) => {
+            try {
+                if (xhr.status > 99 && xhr.status < 299) {
+                    onLoad(new Uint8Array(xhr.response));
+                } else {
+                    this.logError("http error " + xhr.status);
+                    onLoad(null);
+                }
+            } catch (e) {
+                this.logError(e);
+            }
+        };
+        xhr.send();
     }
 }
