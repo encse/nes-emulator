@@ -1,11 +1,11 @@
-import {Mos6502} from "../cpu/Mos6502";
-import {CleverRam} from "../memory/CleverRam";
-import {CompoundMemory} from "../memory/CompoundMemory";
-import {Memory} from "../memory/Memory";
-import {Ram} from "../memory/RAM";
-import {Rom} from "../memory/ROM";
-import {NesImage} from "../NesImage";
-import {MemoryMapper} from "./MemoryMapper";
+import {Mos6502} from '../cpu/Mos6502';
+import {CleverRam} from '../memory/CleverRam';
+import {CompoundMemory} from '../memory/CompoundMemory';
+import {Memory} from '../memory/Memory';
+import {Ram} from '../memory/RAM';
+import {Rom} from '../memory/ROM';
+import {NesImage} from '../NesImage';
+import {MemoryMapper} from './MemoryMapper';
 export class UxRom implements MemoryMapper {
 
     public memory: CompoundMemory;
@@ -88,7 +88,7 @@ export class UxRom implements MemoryMapper {
         for (const rom of romBanks) {
             let i = 0;
             if (rom.size() % size) {
-                throw new Error("cannot split memory");
+                throw new Error('cannot split memory');
             }
 
             while (i < rom.size()) {

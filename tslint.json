@@ -12,7 +12,9 @@
     "no-bitwise": [false],
     "no-eval": [false],
     "max-classes-per-file": [false],
-    "interface-name": [true, "never-prefix"]
+    "interface-name": [true, "never-prefix"],
+    "quotemark": [true, "single", "avoid-escape"],
+    "array-type": [true, "array"]
   },
   "rulesDirectory": []
 }

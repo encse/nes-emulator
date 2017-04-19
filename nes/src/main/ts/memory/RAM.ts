@@ -1,4 +1,4 @@
-import {Memory} from "./Memory";
+import {Memory} from './Memory';
 export class Ram implements Memory {
     public static fromBytes(memory: Uint8Array) {
         const res = new Ram(0);

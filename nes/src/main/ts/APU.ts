@@ -1,5 +1,5 @@
-﻿import {IrqLine} from "./cpu/IrqLine";
- import {CompoundMemory} from "./memory/CompoundMemory";
+﻿import {IrqLine} from './cpu/IrqLine';
+ import {CompoundMemory} from './memory/CompoundMemory';
  export class APU {
 
     private mode = 0;
@@ -213,7 +213,7 @@
                 break;
         }
 
-        this.tsto("set $" + addr.toString(16));
+        this.tsto('set $' + addr.toString(16));
 
     }
 
@@ -231,7 +231,7 @@
                 this.irqManager.request();
             }
 
-            this.tsto("clockSequencer " + this.isequencerStep);
+            this.tsto('clockSequencer ' + this.isequencerStep);
         }
         this.isequencerStep = (this.isequencerStep + 1) % (4 + this.mode);
 

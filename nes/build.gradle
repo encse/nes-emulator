@@ -38,7 +38,7 @@ task lint(type:NodeTask) {
     inputs.dir "$projectDir/src/main/ts"
     // outputs.dir "$projectDir/dist" //this is not correct, lint doesn't have outputs
     script = file("node_modules/tslint/bin/tslint")
-    args = ["-p", "$projectDir/src/main/ts", "-c", "$projectDir/../tslint.json", "--fix"]
+    args = ["-p", "$projectDir/src/main/ts", "-c", "$projectDir/../tslint.json"]
 }
 
 task build {

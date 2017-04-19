@@ -1,12 +1,12 @@
-﻿ import {APU} from "./APU";
-  import {Controller} from "./Controller";
-  import {IrqLine} from "./cpu/IrqLine";
-  import {Mos6502} from "./cpu/Mos6502";
-  import {Driver} from "./driver/Driver";
-  import {MemoryMapper} from "./mapper/MemoryMapper";
-  import {MemoryMapperFactory} from "./mapper/MemoryMapperFactory";
-  import {NesImage} from "./NesImage";
-  import {PPU} from "./PPU";
+﻿ import {APU} from './APU';
+  import {Controller} from './Controller';
+  import {IrqLine} from './cpu/IrqLine';
+  import {Mos6502} from './cpu/Mos6502';
+  import {Driver} from './driver/Driver';
+  import {MemoryMapper} from './mapper/MemoryMapper';
+  import {MemoryMapperFactory} from './mapper/MemoryMapperFactory';
+  import {NesImage} from './NesImage';
+  import {PPU} from './PPU';
   export class NesEmulator {
     public cpu: Mos6502;
     public memoryMapper: MemoryMapper;
@@ -20,7 +20,7 @@
 
     public constructor(nesImage: NesImage, driver: Driver, public controller: Controller) {
         if (nesImage.fPAL) {
-            throw new Error("only NTSC images are supported");
+            throw new Error('only NTSC images are supported');
         }
 
         this.memoryMapper = new MemoryMapperFactory().create(nesImage);

@@ -55,7 +55,7 @@ enum MemoryAccessPattern {
 }
 
 class Ctx {
-    st = "";
+    st = '';
     indentLevel = 0;
 
     public indented(body: () => void) {
@@ -78,9 +78,9 @@ class Ctx {
 
     writeLine(st: string) {
         for (let i = 0; i < this.indentLevel; i++) {
-            this.st += "    ";
+            this.st += '    ';
         }
-        this.st += st + "\n";
+        this.st += st + '\n';
     }
 
     public getOutput() {
@@ -110,7 +110,7 @@ class CycleCount {
     }
 
     toString() {
-        return this.c + (this.pageCross ? "pc " : "") + (this.branchTaken ? "bc " : "");
+        return this.c + (this.pageCross ? 'pc ' : '') + (this.branchTaken ? 'bc ' : '');
     }
 
 }
@@ -125,16 +125,16 @@ class Statement {
 
     getCycles(gen: Mos6502Gen): Cycle[] {
         const mcPayload = gen[StatementKind[this.statementKind]]();
-        const mcPostPayload = gen[StatementKind[this.statementKind] + "Post"] ? gen[StatementKind[this.statementKind] + "Post"]() : null;
+        const mcPostPayload = gen[StatementKind[this.statementKind] + 'Post'] ? gen[StatementKind[this.statementKind] + 'Post']() : null;
         if (mcPostPayload && this.memoryAccessPattern !== MemoryAccessPattern.ReadModifyWriteAndModifyRegister) {
-            throw new Error("should not have postpayload");
+            throw new Error('should not have postpayload');
         }
 
-        return gen["get" + AddressingMode[this.addressingMode] + "Cycles"](this, mcPayload, mcPostPayload);
+        return gen['get' + AddressingMode[this.addressingMode] + 'Cycles'](this, mcPayload, mcPostPayload);
     }
 
     get mnemonic() {
-        return StatementKind[this.statementKind] + " " + AddressingMode[this.addressingMode];
+        return StatementKind[this.statementKind] + ' ' + AddressingMode[this.addressingMode];
     }
 
     get regIn() {
@@ -165,7 +165,7 @@ class Statement {
 
             }
         }
-        throw new Error("regIn is not implemented for " + this.mnemonic);
+        throw new Error('regIn is not implemented for ' + this.mnemonic);
     }
 
     get regOut() {
@@ -226,7 +226,7 @@ class Statement {
                     return Register.A | Register.X;
             }
         }
-        throw new Error(("missing output register for " + this.mnemonic));
+        throw new Error(('missing output register for ' + this.mnemonic));
     }
 
     get memoryAccessPattern() {
@@ -289,7 +289,7 @@ class Statement {
                 return MemoryAccessPattern.ReadModifyWriteAndModifyRegister;
 
             default:
-                throw new Error("unknown statement kind " + StatementKind[this.statementKind]);
+                throw new Error('unknown statement kind ' + StatementKind[this.statementKind]);
         }
     }
 }
@@ -303,16 +303,16 @@ class Mc {
     }
 
     constructor(public st: string) {
-        if (st[st.length - 1] === ";") {
+        if (st[st.length - 1] === ';') {
             throw new Error(`Unexpected ';' in '${st}'`);
         }
-        if (st.indexOf("\n") !== -1) {
+        if (st.indexOf('\n') !== -1) {
             throw new Error(`Unexpected linebreak in '${st}'`);
         }
     }
 
     write(ctx: Ctx) {
-        ctx.writeLine(this.st + ";");
+        ctx.writeLine(this.st + ';');
     }
 
     then(mc: string | Mc): Mc {
@@ -334,7 +334,7 @@ class Mc {
             case Register.Y: return this.then(`this.b = this.rY`);
             case Register.SP: return this.then(`this.b = this.sp`);
             default:
-                throw new Error("unknown register to load from");
+                throw new Error('unknown register to load from');
         }
     }
 
@@ -363,7 +363,7 @@ class Mc {
 
 class McCons extends Mc {
     constructor(private mcA: Mc, private mcB: Mc) {
-        super("");
+        super('');
     }
 
     write(ctx: Ctx) {
@@ -373,18 +373,18 @@ class McCons extends Mc {
 }
 class McNextStatement extends Mc {
     constructor() {
-        super("this.t = 0");
+        super('this.t = 0');
     }
 }
 
 class McNextCycle extends Mc {
     constructor() {
-        super("this.t++");
+        super('this.t++');
     }
 }
 class McNop extends Mc {
     constructor() {
-        super("");
+        super('');
     }
 
     write(ctx: Ctx) {
@@ -408,7 +408,7 @@ class McIf extends Mc {
     public mcTrue: Mc;
     public mcFalse: Mc;
     constructor(public cond: string, mcTrue: string|Mc, mcFalse: string|Mc) {
-        super("");
+        super('');
         this.mcTrue = Mc.lift(mcTrue);
         this.mcFalse = Mc.lift(mcFalse);
     }
@@ -439,7 +439,7 @@ class Cycle {
 
     withDummyPcIncrement() {
         if (this.pcIncremented) {
-            throw new Error("PC is already incremented");
+            throw new Error('PC is already incremented');
         }
         this.pcIncremented++;
         return this;
@@ -447,7 +447,7 @@ class Cycle {
 
     thenIncrementPC() {
         this.withDummyPcIncrement();
-        this.mc = this.mc.then("this.ip++");
+        this.mc = this.mc.then('this.ip++');
         return this;
     }
 
@@ -793,7 +793,7 @@ export class Mos6502Gen {
 
         ];
         let res = `
-        import {Memory} from "../../../nes/src/main/ts/memory/Memory";
+        import {Memory} from '../../../nes/src/main/ts/memory/Memory';
 
 export class Most6502Base {
     public readonly addrReset = 0xfffc;
@@ -837,7 +837,7 @@ export class Most6502Base {
     private canSetFlgBreak = true;
     private addrBrk: number;
 
-    private opcodes: (()=>void)[] = [];
+    private opcodes: (() => void)[] = [];
     public constructor(public memory: Memory) {
         `;
         for (const stm of statements) {
@@ -895,7 +895,7 @@ export class Most6502Base {
         this.flgCarry = (byte >> 0) & 1;
     }
 
-    public trace(opcode:number) {
+    public trace(opcode: number) {
         // noop
     }
 
@@ -922,7 +922,6 @@ export class Most6502Base {
 `;
 
         res += `
-
         if (this.t === 0 && this.opcode !== 0x0) {
             if (this.enableInterruptPoll) {
                 this.pollInterrupts();
@@ -960,13 +959,12 @@ export class Most6502Base {
         }
 
         res += `
-
     private pushByte(byte: number): void {
         this.memory.setByte(0x100 + this.sp, byte & 0xff);
         this.sp = this.sp === 0 ? 0xff : this.sp - 1;
     }
 
-    private popByte():number {
+    private popByte(): number {
         this.sp = this.sp === 0xff ? 0 : this.sp + 1;
         return this.memory.getByte(0x100 + this.sp);
     }
@@ -1007,9 +1005,9 @@ export class Most6502Base {
             .then(`this.flgNegative = this.b >= 128 ? 1 : 0`);
     }
 
-    private AND(): Mc { return this.BinOp("&"); }
-    private EOR(): Mc { return this.BinOp("^"); }
-    private ORA(): Mc { return this.BinOp("|"); }
+    private AND(): Mc { return this.BinOp('&'); }
+    private EOR(): Mc { return this.BinOp('^'); }
+    private ORA(): Mc { return this.BinOp('|'); }
 
     private CMPReg(register: Register): Mc {
         return new McNop()
@@ -1094,14 +1092,14 @@ export class Most6502Base {
     private INX(): Mc { return this.INC(); }
     private INY(): Mc { return this.INC(); }
 
-    private BCC() { return new McExpr("!this.flgCarry"); }
-    private BCS() { return new McExpr("this.flgCarry"); }
-    private BEQ() { return new McExpr("this.flgZero"); }
-    private BMI() { return new McExpr("this.flgNegative"); }
-    private BNE() { return new McExpr("!this.flgZero"); }
-    private BPL() { return new McExpr("!this.flgNegative"); }
-    private BVC() { return new McExpr("!this.flgOverflow"); }
-    private BVS() { return new McExpr("this.flgOverflow"); }
+    private BCC() { return new McExpr('!this.flgCarry'); }
+    private BCS() { return new McExpr('this.flgCarry'); }
+    private BEQ() { return new McExpr('this.flgZero'); }
+    private BMI() { return new McExpr('this.flgNegative'); }
+    private BNE() { return new McExpr('!this.flgZero'); }
+    private BPL() { return new McExpr('!this.flgNegative'); }
+    private BVC() { return new McExpr('!this.flgOverflow'); }
+    private BVS() { return new McExpr('this.flgOverflow'); }
 
     private CLC(): Mc { return new Mc(`this.flgCarry = 0`); }
     private CLD(): Mc { return new Mc(`this.flgDecimalMode = 0`); }
@@ -1186,7 +1184,7 @@ export class Most6502Base {
         return new McNop()
             .then(`this.b = (this.b - 1) & 0xff`)
             .then(`this.flgCarry = this.rA >= this.b ? 1 : 0`)
-            .then(`this.flgZero = this.rA === this.b? 1 : 0`)
+            .then(`this.flgZero = this.rA === this.b ? 1 : 0`)
             .then(`this.flgNegative = (this.rA - this.b) & 0x80 ? 1 : 0`);
     }
 
@@ -1235,7 +1233,7 @@ export class Most6502Base {
     }
 
     private SYA(): Mc {
-        return new McIf("this.addrC",
+        return new McIf('this.addrC',
                 new McNop()
                 .then(`this.addrHi = this.rY & (this.addrHi + 1)`)
                 .then(`this.addr = (this.addrHi << 8) | this.addrLo`),
@@ -1244,7 +1242,7 @@ export class Most6502Base {
     }
 
     private SXA(): Mc {
-        return new McIf("this.addrC",
+        return new McIf('this.addrC',
             new McNop()
                 .then(`this.addrHi = this.rX & (this.addrHi + 1)`)
                 .then(`this.addr = (this.addrHi << 8) | this.addrLo`),
@@ -1276,17 +1274,17 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from effective address")
+                    new Cycle(3, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -1296,26 +1294,26 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from effective address")
+                    new Cycle(3, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "write the value back to effective address, and do the operation on it")
+                    new Cycle(4, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(5, "write the new value to effective address")
+                    new Cycle(5, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
@@ -1323,23 +1321,23 @@ export class Most6502Base {
 
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "write register to effective address")
+                    new Cycle(3, 'write register to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
@@ -1350,22 +1348,22 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from address, add index register to it")
+                    new Cycle(3, 'read from address, add index register to it')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(`this.addr = (${regAccess} + this.addr) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address")
+                    new Cycle(4, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -1375,59 +1373,59 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from address, add index register X/Y to it")
+                    new Cycle(3, 'read from address, add index register X/Y to it')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(`this.addr = (${regAccess} + this.addr) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address")
+                    new Cycle(4, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "write the value back to effective address, and do the operation on it")
+                    new Cycle(5, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(6, "write the new value to effective address")
+                    new Cycle(6, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch address, increment PC")
+                    new Cycle(2, 'fetch address, increment PC')
                         .then(`this.addr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from address, add index register X/Y to it")
+                    new Cycle(3, 'read from address, add index register X/Y to it')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(`this.addr = (${regAccess} + this.addr) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(3, "write register to effective address")
+                    new Cycle(3, 'write register to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
@@ -1443,39 +1441,39 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Jmp:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "copy low address byte to PCL, fetch high address byte to PCH")
+                    new Cycle(3, 'copy low address byte to PCL, fetch high address byte to PCH')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.ip = (this.addrHi << 8) + this.addrLo`).withDummyPcIncrement()
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, increment PC")
+                    new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
-                    new Cycle(4, "read from effective address")
+                    new Cycle(4, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -1484,61 +1482,61 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, increment PC")
+                    new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address")
+                    new Cycle(4, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "write the value back to effective address, and do the operation on it")
+                    new Cycle(5, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(6, "write the new value to effective address")
+                    new Cycle(6, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, increment PC")
+                    new Cycle(3, 'fetch high byte of address, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "write register to effective address")
+                    new Cycle(4, 'write register to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
@@ -1546,32 +1544,32 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Jmp:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.ptrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "copy low address byte to PCL, fetch high address byte to PCH")
+                    new Cycle(3, 'copy low address byte to PCL, fetch high address byte to PCH')
                         .then(`this.ptrHi = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch low address to latch")
+                    new Cycle(4, 'fetch low address to latch')
                         .then(`this.addrLo = this.memory.getByte( (this.ptrHi << 8) + this.ptrLo )`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch PCH copy latch to PCL")
+                    new Cycle(4, 'fetch PCH copy latch to PCL')
                         .then(`this.addrHi = this.memory.getByte( (this.ptrHi << 8) + ((this.ptrLo + 1) & 0xff) )`)
                         .then(`this.ip = (this.addrHi << 8) + this.addrLo`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
@@ -1580,17 +1578,17 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, add index register to low address byte, increment PC")
+                    new Cycle(3, 'fetch high byte of address, add index register to low address byte, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addrC = (this.addrLo + this.${rXY}) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.${rXY}) & 0xff`)
@@ -1598,7 +1596,7 @@ export class Most6502Base {
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address, fix the high byte of effective address")
+                    new Cycle(4, 'read from effective address, fix the high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -1606,7 +1604,7 @@ export class Most6502Base {
                             if: new Mc(`this.addr = (this.addr + (this.addrC << 8)) & 0xffff`).thenNextCycle(),
                         }),
 
-                    new Cycle(5, "re-read from effective address")
+                    new Cycle(5, 're-read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -1616,17 +1614,17 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, add index register to low address byte, increment PC")
+                    new Cycle(3, 'fetch high byte of address, add index register to low address byte, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addrC = (this.addrLo + this.${rXY}) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.${rXY}) & 0xff`)
@@ -1634,7 +1632,7 @@ export class Most6502Base {
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address, fix the high byte of effective address")
+                    new Cycle(4, 'read from effective address, fix the high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -1642,16 +1640,16 @@ export class Most6502Base {
                         })
                         .thenNextCycle(),
 
-                    new Cycle(5, "re-read from effective address")
+                    new Cycle(5, 're-read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(6, "write the value back to effective address, and do the operation on it")
+                    new Cycle(6, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(7, "write the new value to effective address")
+                    new Cycle(7, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
@@ -1659,17 +1657,17 @@ export class Most6502Base {
                 ];
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch low byte of address, increment PC")
+                    new Cycle(2, 'fetch low byte of address, increment PC')
                         .then(`this.addrLo = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch high byte of address, add index register to low address byte, increment PC")
+                    new Cycle(3, 'fetch high byte of address, add index register to low address byte, increment PC')
                         .then(`this.addrHi = this.memory.getByte(this.ip)`)
                         .then(`this.addrC = (this.addrLo + this.${rXY}) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.${rXY}) & 0xff`)
@@ -1677,7 +1675,7 @@ export class Most6502Base {
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(4, "read from effective address, fix the high byte of effective address")
+                    new Cycle(4, 'read from effective address, fix the high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -1685,34 +1683,34 @@ export class Most6502Base {
                         })
                         .thenNextCycle(),
 
-                    new Cycle(5, "write to effective address")
+                    new Cycle(5, 'write to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
 
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
 
     }
 
     private getAbsoluteXCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
-        return this.getAbsoluteXYCycles("rX", statement, mc, mcPost);
+        return this.getAbsoluteXYCycles('rX', statement, mc, mcPost);
     }
 
     private getAbsoluteYCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
-        return this.getAbsoluteXYCycles("rY", statement, mc, mcPost);
+        return this.getAbsoluteXYCycles('rY', statement, mc, mcPost);
     }
 
     private getImmediateCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
 
-            new Cycle(2, "fetch value, increment PC")
+            new Cycle(2, 'fetch value, increment PC')
                 .then(`this.b = this.memory.getByte(this.ip)`)
                 .thenIncrementPC()
                 .then(mc)
@@ -1723,11 +1721,11 @@ export class Most6502Base {
 
     private getAccumulatorCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
-            new Cycle(2, " read next instruction byte (and throw it away)")
+            new Cycle(2, ' read next instruction byte (and throw it away)')
                 .then(`this.memory.getByte(this.ip)`)
                 .thenMoveRegToB(statement.regIn)
                 .then(mc)
@@ -1739,23 +1737,23 @@ export class Most6502Base {
     private JSR(): Mc { return null; }
     private getJSRCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
-            new Cycle(2, "fetch low address byte, increment PC")
+            new Cycle(2, 'fetch low address byte, increment PC')
                 .then(`this.addrLo = this.memory.getByte(this.ip)`)
                 .thenIncrementPC()
                 .thenNextCycle(),
-            new Cycle(3, "internal operation (predecrement S?)")
+            new Cycle(3, 'internal operation (predecrement S?)')
                 .thenNextCycle(),
-            new Cycle(4, "push PCH on stack, decrement S")
+            new Cycle(4, 'push PCH on stack, decrement S')
                 .then(`this.pushByte(this.ip >> 8)`)
                 .thenNextCycle(),
-            new Cycle(5, "push PCL on stack, decrement S")
+            new Cycle(5, 'push PCL on stack, decrement S')
                 .then(`this.pushByte(this.ip & 0xff)`)
                 .thenNextCycle(),
-            new Cycle(6, "copy low address byte to PCL, fetch high address byte to PCH")
+            new Cycle(6, 'copy low address byte to PCL, fetch high address byte to PCH')
                 .then(`this.ip = (this.memory.getByte(this.ip) << 8) + this.addrLo`).withDummyPcIncrement()
                 .thenNextStatement(),
         ];
@@ -1764,22 +1762,22 @@ export class Most6502Base {
     private RTS(): Mc { return null; }
     private getRTSCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
-            new Cycle(2, "read next instruction byte (and throw it away)")
+            new Cycle(2, 'read next instruction byte (and throw it away)')
                 .then(`this.memory.getByte(this.ip)`)
                 .thenNextCycle(),
-            new Cycle(3, "increment S")
+            new Cycle(3, 'increment S')
                 .thenNextCycle(),
-            new Cycle(4, "pull PCL from stack, increment SS")
+            new Cycle(4, 'pull PCL from stack, increment SS')
                 .then(`this.ip = this.popByte()`)
                 .thenNextCycle(),
-            new Cycle(5, "pull PCH from stack")
+            new Cycle(5, 'pull PCH from stack')
                 .then(`this.ip |= this.popByte() << 8`)
                 .thenNextCycle(),
-            new Cycle(6, "increment PCH")
+            new Cycle(6, 'increment PCH')
                 .thenIncrementPC()
                 .thenNextStatement(),
         ];
@@ -1788,23 +1786,23 @@ export class Most6502Base {
     private BRK(): Mc { return null; }
     private getBRKCycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
-                .then(`if(this.enablePCIncrement) { this.ip++; }`)
+                .then(`if (this.enablePCIncrement) { this.ip++; }`)
                 .thenNextCycle(),
-            new Cycle(2, "read next instruction byte (and throw it away), inrement PC")
+            new Cycle(2, 'read next instruction byte (and throw it away), inrement PC')
                 .then(`this.memory.getByte(this.ip)`)
-                .then(`if(this.enablePCIncrement) { this.ip++; }`)
+                .then(`if (this.enablePCIncrement) { this.ip++; }`)
                 .thenNextCycle(),
-            new Cycle(3, "push PCH on stack (with B flag set), decrement S")
+            new Cycle(3, 'push PCH on stack (with B flag set), decrement S')
                 .then(`this.pushByte(this.ip >> 8)`)
                 .thenNextCycle(),
-            new Cycle(4, "push PCL on stack, decrement S")
+            new Cycle(4, 'push PCL on stack, decrement S')
                 .then(`this.pushByte(this.ip & 0xff)`)
                 .thenNextCycle(),
-            new Cycle(5, "push P on stack, decrement S")
+            new Cycle(5, 'push P on stack, decrement S')
                 .then(`this.pollInterrupts()`)
-                .then(`var nmi = this.nmiRequested`)
+                .then(`const nmi = this.nmiRequested`)
                 .then(`this.addrBrk = nmi ? this.addrNMI : this.addrIRQ`)
                 .then(`this.irqRequested = false`)
                 .then(`this.nmiRequested = false`)
@@ -1812,11 +1810,11 @@ export class Most6502Base {
                 .then(`this.pushByte(this.rP)`)
                 .then(`this.flgBreakCommand = 0`)
                 .thenNextCycle(),
-            new Cycle(6, "fetch PCL")
+            new Cycle(6, 'fetch PCL')
                 .then(`this.ip = this.memory.getByte(this.addrBrk)`)
                 .then(`this.flgInterruptDisable = 1`)
                 .thenNextCycle(),
-            new Cycle(7, "fetch PCH")
+            new Cycle(7, 'fetch PCH')
                 .then(`this.ip += this.memory.getByte(this.addrBrk + 1) << 8`)
                 .then(`this.enablePCIncrement = true`)
                 .then(`this.canSetFlgBreak = true`)
@@ -1827,22 +1825,22 @@ export class Most6502Base {
     private RTI(): Mc { return null; }
     private getRTICycles(statement: Statement, mc: Mc): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
-            new Cycle(2, "read next instruction byte (and throw it away)")
+            new Cycle(2, 'read next instruction byte (and throw it away)')
                 .then(`this.memory.getByte(this.ip)`)
                 .thenNextCycle(),
-            new Cycle(3, "increment S")
+            new Cycle(3, 'increment S')
                 .thenNextCycle(),
-            new Cycle(4, "pull P from stack, increment S")
+            new Cycle(4, 'pull P from stack, increment S')
                 .then(`this.rP = this.popByte()`)
                 .thenNextCycle(),
-            new Cycle(5, " pull PCL from stack, increment SL")
+            new Cycle(5, ' pull PCL from stack, increment SL')
                 .then(`this.ip = this.popByte()`)
                 .thenNextCycle(),
-            new Cycle(6, " pull PCH from stack")
+            new Cycle(6, ' pull PCH from stack')
                 .then(`this.ip |= this.popByte() << 8`)
                 .thenNextStatement(),
         ];
@@ -1853,39 +1851,39 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Push:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
-                    new Cycle(2, "read next instruction byte (and throw it away)")
+                    new Cycle(2, 'read next instruction byte (and throw it away)')
                         .then(`this.memory.getByte(this.ip)`)
                         .thenNextCycle(),
-                    new Cycle(3, "push register on stack, decrement S)")
+                    new Cycle(3, 'push register on stack, decrement S)')
                         .then(mc)
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.Pop:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
-                    new Cycle(2, "read next instruction byte (and throw it away)")
+                    new Cycle(2, 'read next instruction byte (and throw it away)')
                         .then(`this.memory.getByte(this.ip)`)
                         .thenNextCycle(),
-                    new Cycle(3, "increment S")
+                    new Cycle(3, 'increment S')
                         .thenNextCycle(),
-                    new Cycle(4, "pull register from stack")
+                    new Cycle(4, 'pull register from stack')
                         .then(mc)
                         .thenNextStatement(),
                 ];
             default:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
-                    new Cycle(2, "read next instruction byte (and throw it away)")
+                    new Cycle(2, 'read next instruction byte (and throw it away)')
                         .then(`this.memory.getByte(this.ip)`)
                         .then(mc)
                         .thenNextStatement(),
@@ -1897,31 +1895,31 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from the address, add X to it")
+                    new Cycle(3, 'read from the address, add X to it')
                         .then(`this.memory.getByte(this.addrPtr)`)
                         .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address low")
+                    new Cycle(4, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "fetch effective address high")
+                    new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(6, "read from effective address")
+                    new Cycle(6, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -1930,77 +1928,77 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from the address, add X to it")
+                    new Cycle(3, 'read from the address, add X to it')
                         .then(`this.memory.getByte(this.addrPtr)`)
                         .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address low")
+                    new Cycle(4, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "fetch effective address high")
+                    new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(6, "read from effective address")
+                    new Cycle(6, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(7, "write the value back to effective address, and do the operation on it")
+                    new Cycle(7, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(8, "write the new value to effective address")
+                    new Cycle(8, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
                 ];
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "read from the address, add X to it")
+                    new Cycle(3, 'read from the address, add X to it')
                         .then(`this.memory.getByte(this.addrPtr)`)
                         .then(`this.addrPtr = (this.addrPtr + this.rX) & 0xff`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address low")
+                    new Cycle(4, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "fetch effective address high")
+                    new Cycle(5, 'fetch effective address high')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(6, "write to effective address")
+                    new Cycle(6, 'write to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
@@ -2008,28 +2006,28 @@ export class Most6502Base {
         switch (statement.memoryAccessPattern) {
             case MemoryAccessPattern.Read:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch effective address low")
+                    new Cycle(3, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address high, add Y to low byte of effective address")
+                    new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addrC = (this.addrLo + this.rY) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.rY) & 0xff`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "read from effective address, fix high byte of effective address")
+                    new Cycle(5, 'read from effective address, fix high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -2037,7 +2035,7 @@ export class Most6502Base {
                             if: new Mc(`this.addr = (this.addr + (this.addrC << 8)) & 0xffff`).thenNextCycle(),
                         }),
 
-                    new Cycle(6, "read from effective address")
+                    new Cycle(6, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .then(mc)
                         .thenMoveBToReg(statement.regOut)
@@ -2046,28 +2044,28 @@ export class Most6502Base {
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch effective address low")
+                    new Cycle(3, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address high, add Y to low byte of effective address")
+                    new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addrC = (this.addrLo + this.rY) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.rY) & 0xff`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "read from effective address, fix high byte of effective address")
+                    new Cycle(5, 'read from effective address, fix high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -2075,16 +2073,16 @@ export class Most6502Base {
                         })
                         .thenNextCycle(),
 
-                    new Cycle(6, "read from effective address")
+                    new Cycle(6, 'read from effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenNextCycle(),
 
-                    new Cycle(7, "write the value back to effective address, and do the operation on it")
+                    new Cycle(7, 'write the value back to effective address, and do the operation on it')
                         // .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mc)
                         .thenNextCycle(),
 
-                    new Cycle(8, "write the new value to effective address")
+                    new Cycle(8, 'write the new value to effective address')
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .then(mcPost)
                         .thenNextStatement(),
@@ -2093,28 +2091,28 @@ export class Most6502Base {
 
             case MemoryAccessPattern.Write:
                 return [
-                    new Cycle(1, "fetch opcode, increment PC")
+                    new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(2, "fetch pointer address, increment PC")
+                    new Cycle(2, 'fetch pointer address, increment PC')
                         .then(`this.addrPtr = this.memory.getByte(this.ip)`)
                         .thenIncrementPC()
                         .thenNextCycle(),
 
-                    new Cycle(3, "fetch effective address low")
+                    new Cycle(3, 'fetch effective address low')
                         .then(`this.addrLo = this.memory.getByte(this.addrPtr)`)
                         .thenNextCycle(),
 
-                    new Cycle(4, "fetch effective address high, add Y to low byte of effective address")
+                    new Cycle(4, 'fetch effective address high, add Y to low byte of effective address')
                         .then(`this.addrHi = this.memory.getByte((this.addrPtr + 1) & 0xff)`)
                         .then(`this.addrC = (this.addrLo + this.rY) >> 8`)
                         .then(`this.addrLo = (this.addrLo + this.rY) & 0xff`)
                         .then(`this.addr = this.addrLo + (this.addrHi << 8)`)
                         .thenNextCycle(),
 
-                    new Cycle(5, "read from effective address, fix high byte of effective address")
+                    new Cycle(5, 'read from effective address, fix high byte of effective address')
                         .then(`this.b = this.memory.getByte(this.addr)`)
                         .thenIf({
                             cond: `this.addrC`,
@@ -2122,24 +2120,24 @@ export class Most6502Base {
                         })
                         .thenNextCycle(),
 
-                    new Cycle(6, "write to effective address")
+                    new Cycle(6, 'write to effective address')
                         .then(mc)
                         .then(`this.memory.setByte(this.addr, this.b)`)
                         .thenNextStatement(),
                 ];
             default:
-                throw new Error("not implemented");
+                throw new Error('not implemented');
         }
     }
 
     private getRelativeCycles(statement: Statement, mc: McExpr): Cycle[] {
         return [
-            new Cycle(1, "fetch opcode, increment PC")
+            new Cycle(1, 'fetch opcode, increment PC')
                 .fetchOpcode()
                 .thenIncrementPC()
                 .thenNextCycle(),
 
-            new Cycle(2, "fetch operand, increment PC")
+            new Cycle(2, 'fetch operand, increment PC')
                 .then(`this.pollInterrupts()`)
                 .then(`this.b = this.memory.getByte(this.ip)`)
                 .thenIncrementPC()
@@ -2149,12 +2147,12 @@ export class Most6502Base {
                     if: new McNextCycle(),
                 }),
 
-            new Cycle(3, "fetch opcode of next instruction, if branch is taken add operand to pc")
+            new Cycle(3, 'fetch opcode of next instruction, if branch is taken add operand to pc')
                 .then(`this.memory.getByte(this.ip)`)
                 .then(`this.b = this.b >= 128 ? this.b - 256 : this.b`)
                 .then(`this.ipC = ((this.ip & 0xff) + this.b) >> 8`)
                 .thenIf({
-                    cond: "((this.ip & 0xff) + this.b) >> 8",
+                    cond: '((this.ip & 0xff) + this.b) >> 8',
                     else: new McNop()
                         .then(`this.enableInterruptPoll = false`)
                         .then(`this.ip = (this.ip + this.b) & 0xffff`)
@@ -2163,7 +2161,7 @@ export class Most6502Base {
                         .thenNextCycle(),
                 }),
 
-            new Cycle(4, "Fix PCH.")
+            new Cycle(4, 'Fix PCH.')
                 .then(`this.ip = (this.ip + this.b) & 0xffff`)
                 .thenNextStatement(),
         ];
@@ -2177,22 +2175,22 @@ private op0x${statement.opcode.toString(16)}() {`);
         ctx.indent();
         const rgcycle = statement.getCycles(this);
 
-        ctx.writeLine("switch (this.t) {");
+        ctx.writeLine('switch (this.t) {');
         ctx.indented(() => {
             for (let icycle = 0; icycle < rgcycle.length; icycle++) {
                 const cycle = rgcycle[icycle];
                 ctx.writeLine(`case ${icycle}: {`);
                 ctx.indent();
                 cycle.mc.write(ctx);
-                ctx.writeLine("break;");
+                ctx.writeLine('break;');
                 ctx.unindent();
                 ctx.writeLine(`}`);
             }
         });
-        ctx.writeLine("}");
+        ctx.writeLine('}');
 
         ctx.unindent();
-        ctx.writeLine("}");
+        ctx.writeLine('}');
         return ctx.getOutput();
     }
 

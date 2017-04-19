@@ -1,17 +1,17 @@
-﻿import * as $ from "jquery";
- import {NesEmulator} from "../NesEmulator";
- import {NesRunnerBase} from "./NesRunnerBase";
+﻿import * as $ from 'jquery';
+ import {NesEmulator} from '../NesEmulator';
+ import {NesRunnerBase} from './NesRunnerBase';
 
  export class CpuTestRunner extends NesRunnerBase {
     private callback = this.renderFrame.bind(this);
 
     constructor(container: HTMLElement, url: string, private checkForString: string) {
         super(container, url);
-        this.container.classList.add("test-case");
-        const collapseButton = document.createElement("div");
-        collapseButton.className = "collapse-button";
+        this.container.classList.add('test-case');
+        const collapseButton = document.createElement('div');
+        collapseButton.className = 'collapse-button';
         collapseButton.onclick = (e: MouseEvent) => {
-            $(this.container).toggleClass("collapsed");
+            $(this.container).toggleClass('collapsed');
         };
         this.container.appendChild(collapseButton);
 
@@ -25,12 +25,12 @@
         ) {
             const resultCode = nesEmulator.cpu.getByte(0x6000);
             if (resultCode !== 0) {
-                this.log("res: " + resultCode.toString(16));
-                this.container.classList.add("failed");
+                this.log('res: ' + resultCode.toString(16));
+                this.container.classList.add('failed');
             } else {
-                this.container.classList.add("passed");
+                this.container.classList.add('passed');
             }
-            let res = "";
+            let res = '';
             let i = 0x6004;
             while (nesEmulator.cpu.getByte(i) !== 0) {
                 res += String.fromCharCode(nesEmulator.cpu.getByte(i));
@@ -51,9 +51,9 @@
             this.log(out);
 
             if (out.indexOf(this.checkForString) >= 0) {
-                this.container.classList.add("passed");
+                this.container.classList.add('passed');
             } else {
-                this.container.classList.add("failed");
+                this.container.classList.add('failed');
             }
             return true;
         }
@@ -70,7 +70,7 @@
         const ppu = nesEmulator.ppu;
 
         if (this.testFinished(nesEmulator)) {
-            this.container.classList.add("collapsed");
+            this.container.classList.add('collapsed');
             this.onEndCallback();
             return;
         }
@@ -81,7 +81,7 @@
                 nesEmulator.step();
             }
         } catch (e) {
-            this.container.classList.add("collapsed");
+            this.container.classList.add('collapsed');
             this.logError(e);
             this.onEndCallback();
             return;

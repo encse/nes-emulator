@@ -1,10 +1,10 @@
-import {Memory} from "./Memory";
+import {Memory} from './Memory';
 export class CompoundMemory implements Memory {
     public rgmemory: Memory[] = [];
     public lastAddr: number;
 
-    private setters: Array<{ addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void }> = [];
-    private getters: Array<{ addrFirst: number, addrLast: number, getter: (addr: number) => number }> = [];
+    private setters: { addrFirst: number, addrLast: number, setter: (addr: number, value: number) => void }[] = [];
+    private getters: { addrFirst: number, addrLast: number, getter: (addr: number) => number }[] = [];
     private sizeI: number;
 
     public constructor(...rgmemory: Memory[]) {
@@ -29,11 +29,11 @@ export class CompoundMemory implements Memory {
     }
 
     public getByte(addr: number): number {
-        throw new Error("address out of bounds");
+        throw new Error('address out of bounds');
     }
 
     public setByte(addr: number, value: number): void {
-        throw new Error("address out of bounds");
+        throw new Error('address out of bounds');
     }
 
     private initAccessors() {
@@ -42,10 +42,10 @@ export class CompoundMemory implements Memory {
     }
 
     private initGetter() {
-        let stGetters = "";
+        let stGetters = '';
         for (let i = 0; i < this.getters.length; i++) {
             const getter = this.getters[i];
-            let check = "";
+            let check = '';
             if (getter.addrFirst === getter.addrLast) {
                 check = `addr === ${getter.addrFirst}`;
             } else {
@@ -60,9 +60,9 @@ export class CompoundMemory implements Memory {
         for (let i = 0; i < this.rgmemory.length; i++) {
             const memory = this.rgmemory[i];
             addrLim += memory.size();
-            let modifiedAddr = "";
+            let modifiedAddr = '';
             if (!addrFirst) {
-                modifiedAddr = "addr";
+                modifiedAddr = 'addr';
             } else {
                 modifiedAddr = `addr - ${addrFirst}`;
             }
@@ -74,10 +74,10 @@ export class CompoundMemory implements Memory {
     }
 
     private initSetter() {
-        let stSetters = "";
+        let stSetters = '';
         for (let i = 0; i < this.setters.length; i++) {
             const setter = this.setters[i];
-            let check = "";
+            let check = '';
             if (setter.addrFirst === setter.addrLast) {
                 check = `addr === ${setter.addrFirst}`;
             } else {
@@ -91,9 +91,9 @@ export class CompoundMemory implements Memory {
         for (let i = 0; i < this.rgmemory.length; i++) {
             const memory = this.rgmemory[i];
             addrLim += memory.size();
-            let modifiedAddr = "";
+            let modifiedAddr = '';
             if (!addrFirst) {
-                modifiedAddr = "addr";
+                modifiedAddr = 'addr';
             } else {
                 modifiedAddr = `addr - ${addrFirst}`;
             }

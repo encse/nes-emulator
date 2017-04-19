@@ -1,4 +1,4 @@
-﻿import {Mos6502} from "./Mos6502";
+﻿import {Mos6502} from './Mos6502';
  export class IrqLine {
      private isRequestedI = false;
 

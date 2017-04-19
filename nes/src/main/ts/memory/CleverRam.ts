@@ -1,4 +1,4 @@
-import {Memory} from "./Memory";
+import {Memory} from './Memory';
 export class CleverRam implements Memory {
     public writeEnable: boolean = true;
     public readEnable: boolean = true;

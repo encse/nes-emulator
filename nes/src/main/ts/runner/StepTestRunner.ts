@@ -1,4 +1,4 @@
-﻿import {NesEmulator} from "../NesEmulator";
+﻿import {NesEmulator} from '../NesEmulator';
  export class StepTestRunner {
 
     private expectedOutput: string;
@@ -10,7 +10,7 @@
         this.ich = 0;
         let line = this.readLine();
 
-        nesemu.cpu.ip = parseInt(line.split(" ")[0], 16);
+        nesemu.cpu.ip = parseInt(line.split(' ')[0], 16);
         while (nesemu.cpu.ip !== 0x8014) {
             nesemu.cpu.stepInstr();
         }
@@ -33,7 +33,7 @@
                 prevLines.forEach((prevLine) => log(prevLine));
                 log(expected);
                 log(actual);
-                log(" ");
+                log(' ');
                 break;
             }
             prevLines.push(line);
@@ -50,25 +50,25 @@
             line = this.readLine();
         }
 
-        log("done");
+        log('done');
     }
 
     private tsto(ip: number, rA: number, rX: number, rY: number, rP: number, sp: number) {
      let stRP = rP.toString(2);
-     stRP = Array(Math.max(8 - stRP.length + 1, 0)).join("0") + stRP;
-     return "ip:" + ip.toString(16)
-         + " rA:" + rA.toString(16)
-         + " rX:" + rX.toString(16)
-         + " rY:" + rY.toString(16)
-         + " rP:" + stRP
-         + " sp:" + sp.toString(16)
+     stRP = Array(Math.max(8 - stRP.length + 1, 0)).join('0') + stRP;
+     return 'ip:' + ip.toString(16)
+         + ' rA:' + rA.toString(16)
+         + ' rX:' + rX.toString(16)
+         + ' rY:' + rY.toString(16)
+         + ' rP:' + stRP
+         + ' sp:' + sp.toString(16)
          ;
     }
 
     private readLine(): string {
-        let st = "";
+        let st = '';
         while (this.ich < this.expectedOutput.length) {
-            if (this.expectedOutput[this.ich] === "\n") {
+            if (this.expectedOutput[this.ich] === '\n') {
                 this.ich++;
                 return st;
             } else {

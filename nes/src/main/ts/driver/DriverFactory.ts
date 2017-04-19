@@ -1,6 +1,6 @@
-import {CanvasDriver} from "./CanvasDriver";
-import {Driver} from "./Driver";
-import {WebGlDriver} from "./WebGlDriver";
+import {CanvasDriver} from './CanvasDriver';
+import {Driver} from './Driver';
+import {WebGlDriver} from './WebGlDriver';
 export class DriverFactory {
 
     public createRenderer(canvas: HTMLCanvasElement): Driver {

@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
 export function rmdir(dir: string) {
     if (fs.existsSync(dir)) {
@@ -18,7 +18,7 @@ export function rmdir(dir: string) {
 }
 
 export function mkdir(dir: string) {
-    let dirT = "";
+    let dirT = '';
     for (const subDir of dir.split(path.sep)) {
         dirT += subDir + path.sep;
         if (!fs.existsSync(dirT)) {

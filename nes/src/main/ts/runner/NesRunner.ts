@@ -1,4 +1,4 @@
-﻿import {NesRunnerBase} from "./NesRunnerBase";
+﻿import {NesRunnerBase} from './NesRunnerBase';
 
  export class NesRunner extends NesRunnerBase {
 
@@ -16,14 +16,14 @@
 
         this.hpcStart = window.performance.now();
         this.iFrameStart = this.nesEmulator.ppu.iFrame;
-        this.fpsElement = document.createElement("span");
-        this.headerElement.innerText += " ";
+        this.fpsElement = document.createElement('span');
+        this.headerElement.innerText += ' ';
         this.headerElement.appendChild(this.fpsElement);
     }
 
     protected runI() {
-        this.controller.registerKeyboardHandler("I".charCodeAt(0), () => {
-            this.headerElement.classList.toggle("show");
+        this.controller.registerKeyboardHandler('I'.charCodeAt(0), () => {
+            this.headerElement.classList.toggle('show');
         });
         requestAnimationFrame(this.callback);
     }

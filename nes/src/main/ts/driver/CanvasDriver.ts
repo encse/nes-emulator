@@ -1,4 +1,4 @@
-import {Driver} from "./Driver";
+import {Driver} from './Driver';
 export class CanvasDriver implements Driver {
 
     private ctx: CanvasRenderingContext2D;
@@ -7,7 +7,7 @@ export class CanvasDriver implements Driver {
     private data: Uint32Array;
 
     constructor(canvas: HTMLCanvasElement) {
-        this.ctx = canvas.getContext("2d");
+        this.ctx = canvas.getContext('2d');
         this.imageData = this.ctx.getImageData(0, 0, 256, 240);
         const buf = new ArrayBuffer(this.imageData.data.length);
         this.buf8 = new Uint8ClampedArray(buf);
@@ -24,6 +24,6 @@ export class CanvasDriver implements Driver {
     }
 
     public tsto() {
-        return "Canvas driver";
+        return 'Canvas driver';
     }
 }

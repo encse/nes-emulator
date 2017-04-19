@@ -1,11 +1,11 @@
-﻿import {Most6502Base} from "../../../../../codegen/build/generated/Mos6502Base";
- import {Memory} from "../memory/Memory";
+﻿import {Most6502Base} from '../../../../../codegen/build/generated/Mos6502Base';
+ import {Memory} from '../memory/Memory';
  export class Mos6502 extends Most6502Base {
 
     public constructor(public memory: Memory) {
         super(memory);
         if (memory.size() !== 0x10000) {
-            throw new Error("invalid memory size");
+            throw new Error('invalid memory size');
         }
     }
 
@@ -52,7 +52,7 @@
 
         while (i > 0) {
             const opcode = this.memory.getByte(ip);
-            rgst.push("$" + ip.toString(16) + " " + this.opcodeToMnemonic(opcode));
+            rgst.push('$' + ip.toString(16) + ' ' + this.opcodeToMnemonic(opcode));
             ip += this.sizeFromOpcode(opcode);
             i--;
         }

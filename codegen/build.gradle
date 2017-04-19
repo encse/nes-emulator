@@ -27,7 +27,7 @@ task compile(type: NodeTask) {
 task lint(type:NodeTask) {
     dependsOn "compile"
     inputs.dir "$projectDir/src/main/ts"
-    outputs.dir "$buildDir/dist" //this is not correct, lint doesn't have outputs
+    //outputs.dir "$buildDir/dist" //this is not correct, lint doesn't have outputs
     script = file("node_modules/tslint/bin/tslint")
     args = ["-p", "$projectDir/src/main/ts", "-c", "$projectDir/../tslint.json", "--fix"]
 }

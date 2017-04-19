@@ -1,5 +1,5 @@
-﻿ import {Ram} from "./memory/RAM";
-  import {Rom} from "./memory/ROM";
+﻿ import {Ram} from './memory/RAM';
+  import {Rom} from './memory/ROM';
   export class NesImage {
     /*
      * 0-3      String "NES^Z" used to recognize .NES files.
@@ -40,7 +40,7 @@
     public constructor(rawBytes: Uint8Array) {
         for (let i = 0; i < 4; i++) {
             if (rawBytes[i] !== NesImage.magic[i]) {
-                throw new Error("invalid NES header");
+                throw new Error('invalid NES header');
             }
         }
 
@@ -54,23 +54,23 @@
         this.mapperType = (rawBytes[7] & 0xf0) + (rawBytes[6] >> 4);
         this.fVSSystem = !!(rawBytes[7] & 1);
         if ((rawBytes[7] & 0x0e) !== 0) {
-            throw new Error("invalid NES header");
+            throw new Error('invalid NES header');
         }
         this.RAMBanks = new Array(Math.min(1, rawBytes[8]));
         this.fPAL = (rawBytes[9] & 1) === 1;
 
         if ((rawBytes[9] & 0xfe) !== 0) {
-            throw new Error("invalid NES header");
+            throw new Error('invalid NES header');
         }
 
         for (let i = 0xa; i < 0x10; i++) {
             if (rawBytes[i] !== 0) {
-                throw new Error("invalid NES header");
+                throw new Error('invalid NES header');
             }
         }
 
         if (rawBytes.length !== 0x10 + (fTrainer ? 0x100 : 0) + this.ROMBanks.length * 0x4000 + this.VRAMBanks.length * 0x2000) {
-            throw new Error("invalid NES format");
+            throw new Error('invalid NES format');
         }
 
         let idx = 0x10;

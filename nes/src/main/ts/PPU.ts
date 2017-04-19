@@ -1,6 +1,6 @@
-﻿import {Mos6502} from "./cpu/Mos6502";
- import {Driver} from "./driver/Driver";
- import {CompoundMemory} from "./memory/CompoundMemory";
+﻿import {Mos6502} from './cpu/Mos6502';
+ import {Driver} from './driver/Driver';
+ import {CompoundMemory} from './memory/CompoundMemory';
  class SpriteRenderingInfo {
     public flgZeroSprite: boolean = false;
     public xCounter: number = -1000;
@@ -166,7 +166,7 @@
 
      constructor(memory: CompoundMemory, public vmemory: CompoundMemory, private cpu: Mos6502) {
          if (vmemory.size() !== 0x4000) {
-             throw new Error("insufficient Vmemory size");
+             throw new Error('insufficient Vmemory size');
          }
 
          memory.shadowSetter(0x2000, 0x3fff, this.ppuRegistersSetter.bind(this));
@@ -197,21 +197,21 @@
      }
 
      public getNameTable(i: number) {
-         let st = "";
+         let st = '';
          for (let y = 0; y < 30; y++) {
              for (let x = 0; x < 32; x++) {
                  st += String.fromCharCode(this.vmemory.getByte(0x2000 + (i * 0x400) + x + y * 32));
              }
-             st += "\n";
+             st += '\n';
          }
          return st;
      }
 
      public getPatternTable() {
-         const canvas: HTMLCanvasElement = document.createElement("canvas");
+         const canvas: HTMLCanvasElement = document.createElement('canvas');
          canvas.width = 256;
          canvas.height = 128;
-         const ctx = canvas.getContext("2d");
+         const ctx = canvas.getContext('2d');
          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
          const buf = new ArrayBuffer(imageData.data.length);
          const buf8 = new Uint8ClampedArray(buf);
@@ -239,7 +239,7 @@
      }
 
      public getAttributeTable(i: number) {
-         let st = "";
+         let st = '';
          for (let dy = 0; dy < 30; dy += 2) {
              for (let dx = 0; dx < 32; dx += 2) {
                  const x = this.coarseX + dx;
@@ -251,9 +251,9 @@
                  const y2 = (y >> 1) & 1; // second bit of coarse y
 
                  const p = (at >> ((y2 << 2) + (x2 << 1))) & 3;
-                 st += p + " ";
+                 st += p + ' ';
              }
-             st += "\n";
+             st += '\n';
          }
          console.log(st);
      }
@@ -375,7 +375,7 @@
                  return res;
              }
              default:
-                 console.error("unimplemented read from addr " + addr);
+                 console.error('unimplemented read from addr ' + addr);
                  return 0;
          }
      }

@@ -1,4 +1,4 @@
-import {Driver} from "./Driver";
+import {Driver} from './Driver';
 export class WebGlDriver implements Driver {
     // vertices representing entire viewport as two triangles which make up the whole
     // rectangle, in post-projection/clipspace coordinates
@@ -55,16 +55,16 @@ export class WebGlDriver implements Driver {
     }
 
     public tsto() {
-       return "WebGL driver";
+       return 'WebGL driver';
     }
 
     private initWebGl(canvas: HTMLCanvasElement) {
         const contextAttributes = { premultipliedAlpha: true };
-        this.glContext = (canvas.getContext("webgl", contextAttributes) ||
-        canvas.getContext("experimental-webgl", contextAttributes)) as WebGLRenderingContext;
+        this.glContext = (canvas.getContext('webgl', contextAttributes) ||
+        canvas.getContext('experimental-webgl', contextAttributes)) as WebGLRenderingContext;
 
         if (!this.glContext) {
-            throw new Error("WebGl is not supported");
+            throw new Error('WebGl is not supported');
         }
 
         // Set clear color to black, fully transparent
@@ -91,14 +91,14 @@ export class WebGlDriver implements Driver {
         const program = this.createProgram([vertexShader, fragmentShader]);
         this.glContext.useProgram(program);
 
-        const positionAttribute = this.glContext.getAttribLocation(program, "aPosition");
+        const positionAttribute = this.glContext.getAttribLocation(program, 'aPosition');
         this.glContext.enableVertexAttribArray(positionAttribute);
 
-        const textureCoordAttribute = this.glContext.getAttribLocation(program, "aTextureCoord");
+        const textureCoordAttribute = this.glContext.getAttribLocation(program, 'aTextureCoord');
         this.glContext.enableVertexAttribArray(textureCoordAttribute);
 
         // Associate the uniform texture sampler with TEXTURE0 slot
-        const textureSamplerUniform = this.glContext.getUniformLocation(program, "uSampler");
+        const textureSamplerUniform = this.glContext.getUniformLocation(program, 'uSampler');
         this.glContext.uniform1i(textureSamplerUniform, 0);
 
         // Create a buffer used to represent whole set of viewport vertices

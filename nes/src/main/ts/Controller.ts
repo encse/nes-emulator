@@ -24,18 +24,18 @@ export class Controller {
 
     private mouseState = {pressed: false, x: 0, y: 0};
 
-    private keyUpEvents: Array<() => void> = [];
+    private keyUpEvents: (() => void)[] = [];
     private getPixelColor: GetPixelColorDelegate;
 
     constructor(private canvas: HTMLCanvasElement) {
         canvas.tabIndex = 1;
         canvas.focus();
 
-        canvas.addEventListener("keydown", this.onKeyDown.bind(this), false);
-        canvas.addEventListener("keyup", this.onKeyUp.bind(this), false);
-        canvas.addEventListener("mousedown", this.onMouseDown.bind(this), false);
-        canvas.addEventListener("mouseup", this.onMouseUp.bind(this), false);
-        canvas.addEventListener("mousemove", this.onMouseMove.bind(this), false);
+        canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
+        canvas.addEventListener('keyup', this.onKeyUp.bind(this), false);
+        canvas.addEventListener('mousedown', this.onMouseDown.bind(this), false);
+        canvas.addEventListener('mouseup', this.onMouseUp.bind(this), false);
+        canvas.addEventListener('mousemove', this.onMouseMove.bind(this), false);
 
         this.registerKeyboardHandler(40, () => {
             this.keyStateA[ControllerKeys.Down] = 0;
