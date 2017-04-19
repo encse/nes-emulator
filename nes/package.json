@@ -1,7 +1,10 @@
 {
   "devDependencies": {
+    "@types/jquery": "2.0.41",
     "@types/node": "7.0.12",
+    "@types/webpack": "2.2.15",
     "awesome-typescript-loader": "3.1.2",
+    "imports-loader": "0.7.1",
     "source-map-loader": "0.2.1",
     "tslint": "5.0.0",
     "typescript": "2.2.2",
@@ -9,5 +12,8 @@
   },
   "scripts": {
     "run": "./gradlew run"
+  },
+  "dependencies": {
+    "jQuery": "^1.7.4"
   }
 }

@@ -1,0 +1,54 @@
+plugins {
+    id "com.moowork.node" version "1.1.1"
+}
+
+node {
+    version = "6.10.2"
+    download = true
+}
+
+task clean {
+    doFirst {
+        delete "${buildDir}"
+        delete "${projectDir}/node_modules/"
+    }
+}
+
+task lint(type:NodeTask) {
+    dependsOn "npmInstall"
+    inputs.dir "$projectDir/src/main/ts"
+    outputs.dir "$projectDir/dist" //this is not correct, lint doesn't have outputs
+    script = file("node_modules/tslint/bin/tslint")
+    args = ["-p", ".", "--fix"]
+}
+
+task compile(type: NodeTask) {
+//    dependsOn "lint"
+    inputs.dir "$projectDir/src/main/ts"
+    inputs.file "$projectDir/webpack.config.js"
+    inputs.file "$projectDir/tsconfig.json"
+    inputs.file "$projectDir/package.json"
+    outputs.dir "$projectDir/dist"
+    script = file("node_modules/webpack/bin/webpack.js")
+}
+
+task build{
+    dependsOn "compile"
+    doLast {
+        copy {
+            from "$projectDir/src/main/web"
+            into "$buildDir/web/"
+        }
+        copy {
+            from "$buildDir/dist"
+            into "$buildDir/web/dist"
+        }
+        if (true || project.hasProperty("debug")){
+            copy {
+                from "src/main/ts"
+                into "$buildDir/web/src/main/ts"
+            }
+        }
+    }
+}
+

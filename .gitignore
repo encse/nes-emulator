@@ -1,11 +1,6 @@
-NES/obj/
-NES/bin/
-.vs/
-NES/nes.csproj.user
-packages/
-codegen/obj/
-codegen/mos6502gen.js
-codegen/mos6502gen.js.map
-Nes/wwwroot/roms/
-codegen/.ntvs_analysis.dat
-version.txt
+.gradle
+build
+node_modules
+.idea
+npm-debug.log
+nes/src/main/web/roms
