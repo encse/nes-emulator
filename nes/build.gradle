@@ -24,15 +24,19 @@ task lint(type:NodeTask) {
 
 task compile(type: NodeTask) {
 //    dependsOn "lint"
+    dependsOn "npmInstall"
+
+    dependsOn project.parent.findProject("codegen").tasks["generate"]
+
     inputs.dir "$projectDir/src/main/ts"
     inputs.file "$projectDir/webpack.config.js"
     inputs.file "$projectDir/tsconfig.json"
     inputs.file "$projectDir/package.json"
-    outputs.dir "$projectDir/dist"
+    outputs.dir "$buildDir/dist"
     script = file("node_modules/webpack/bin/webpack.js")
 }
 
-task build{
+task build {
     dependsOn "compile"
     doLast {
         copy {

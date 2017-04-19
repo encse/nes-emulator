@@ -5,10 +5,11 @@ import {mkdir} from './Util';
 const res = new Gen.Mos6502Gen().run();
 
 mkdir('build/generated');
-fs.writeFile("build/generated/Mos6502Base.ts", res, function (err: any) {
+const fpat = "build/generated/Mos6502Base.ts";
+fs.writeFile(fpat, res, function (err: any) {
     if (err) {
         return console.log(err);
     }
 
-    console.log("The file was saved!");
+    console.log(`${fpat} was generated.`);
 });

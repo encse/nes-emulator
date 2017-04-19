@@ -11,9 +11,5 @@
     "webpack": "2.3.3"
   },
   "scripts": {
-    "run": "./gradlew run"
-  },
-  "dependencies": {
-    "jQuery": "^1.7.4"
   }
 }

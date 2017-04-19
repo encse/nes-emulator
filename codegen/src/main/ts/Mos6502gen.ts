@@ -1999,7 +1999,6 @@ op0x${statement.opcode.toString(16)}() {`);
         import {Memory} from "../../../nes/src/main/ts/memory/Memory";
 
 export class Most6502Base {
-
     addrReset = 0xfffc;
     addrIRQ = 0xfffe;
     addrNMI = 0xfffa;

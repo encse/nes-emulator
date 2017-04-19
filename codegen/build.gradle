@@ -17,23 +17,26 @@ task clean {
 task lint(type:NodeTask) {
     dependsOn "npmInstall"
     inputs.dir "$projectDir/src/main/ts"
-    outputs.dir "$projectDir/dist" //this is not correct, lint doesn't have outputs
+    outputs.dir "$buildDir/dist" //this is not correct, lint doesn't have outputs
     script = file("node_modules/tslint/bin/tslint")
     args = ["-p", ".", "--fix"]
 }
 
 task build(type: NodeTask) {
 //    dependsOn "lint"
+    dependsOn "npmInstall"
     inputs.dir "$projectDir/src/main/ts"
     inputs.file "$projectDir/webpack.config.js"
     inputs.file "$projectDir/tsconfig.json"
     inputs.file "$projectDir/package.json"
-    outputs.dir "$projectDir/dist"
+    outputs.dir "$buildDir/dist"
     script = file("node_modules/webpack/bin/webpack.js")
 }
 
-task run(type: NodeTask) {
+task generate(type: NodeTask) {
     dependsOn build
+    inputs.dir "$buildDir/dist"
+    outputs.dir "$buildDir/generated"
     script = file("$buildDir/dist/bundle.js")
     if (System.env.NODE_DEBUG_OPTION != null) {
         options = System.env.NODE_DEBUG_OPTION.tokenize(' ')
