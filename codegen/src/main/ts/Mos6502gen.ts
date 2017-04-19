@@ -1,3 +1,4 @@
+import {Formatter} from './Formatter';
 enum AddressingMode {
     Accumulator,
     Implied,
@@ -312,7 +313,11 @@ class Mc {
     }
 
     write(ctx: Ctx) {
-        ctx.writeLine(this.st + ';');
+        let res = this.st;
+        if (res[res.length - 1] !== '}') {
+            res += ';';
+        }
+        ctx.writeLine(res);
     }
 
     then(mc: string | Mc): Mc {
@@ -793,185 +798,189 @@ export class Mos6502Gen {
 
         ];
         let res = `
-        import {Memory} from '../../../nes/src/main/ts/memory/Memory';
+            import {Memory} from '../../../nes/src/main/ts/memory/Memory';
 
-export class Most6502Base {
-    public readonly addrReset = 0xfffc;
-    public nmiLine = 1;
-    public irqLine = 1;
-    public icycle = 0;
-    public ip: number = 0;
-    public ipCur: number = 0;
-    public sp: number = 0;
-    public t: number = 0;
-    public rA: number = 0;
-    public rX: number = 0;
-    public rY: number = 0;
+            export class Most6502Base {
+                public readonly addrReset = 0xfffc;
+                public nmiLine = 1;
+                public irqLine = 1;
+                public icycle = 0;
+                public ip: number = 0;
+                public ipCur: number = 0;
+                public sp: number = 0;
+                public t: number = 0;
+                public rA: number = 0;
+                public rX: number = 0;
+                public rY: number = 0;
 
-    private addrIRQ = 0xfffe;
-    private addrNMI = 0xfffa;
-    private opcode: number;
-    private b: number = 0;
-    private nmiLinePrev = 1;
-    private nmiRequested = false;
-    private nmiDetected: boolean;
-    private irqRequested = false;
-    private irqDetected: boolean;
-    private flgCarry: number = 0;
-    private flgZero: number = 0;
-    private flgNegative: number = 0;
-    private flgOverflow: number = 0;
-    private flgInterruptDisable: number = 1;
-    private flgDecimalMode: number = 0;
-    private flgBreakCommand: number = 0;
-    private addr: number;
-    private addrHi: number;
-    private addrLo: number;
-    private addrPtr: number;
-    private ptrLo: number;
-    private ptrHi: number;
-    private ipC: number;
-    private addrC: number;
-    private enablePCIncrement = true;
-    private enableInterruptPoll = true;
-    private canSetFlgBreak = true;
-    private addrBrk: number;
+                private addrIRQ = 0xfffe;
+                private addrNMI = 0xfffa;
+                private opcode: number;
+                private b: number = 0;
+                private nmiLinePrev = 1;
+                private nmiRequested = false;
+                private nmiDetected: boolean;
+                private irqRequested = false;
+                private irqDetected: boolean;
+                private flgCarry: number = 0;
+                private flgZero: number = 0;
+                private flgNegative: number = 0;
+                private flgOverflow: number = 0;
+                private flgInterruptDisable: number = 1;
+                private flgDecimalMode: number = 0;
+                private flgBreakCommand: number = 0;
+                private addr: number;
+                private addrHi: number;
+                private addrLo: number;
+                private addrPtr: number;
+                private ptrLo: number;
+                private ptrHi: number;
+                private ipC: number;
+                private addrC: number;
+                private enablePCIncrement = true;
+                private enableInterruptPoll = true;
+                private canSetFlgBreak = true;
+                private addrBrk: number;
 
-    private opcodes: (() => void)[] = [];
-    public constructor(public memory: Memory) {
+                private opcodes: (() => void)[] = [];
+                public constructor(public memory: Memory) {
         `;
         for (const stm of statements) {
             res += `this.opcodes[${stm.opcode}] = this.op0x${stm.opcode.toString(16)};
-`;
+            `;
         }
         res += `
-    }
+                }
 
-    public isFlgInterruptDisable(): boolean {
-        return this.flgInterruptDisable !== 0;
-    }
+                public isFlgInterruptDisable(): boolean {
+                    return this.flgInterruptDisable !== 0;
+                }
 
-    public pollInterrupts() {
-        if (this.nmiDetected) {
-            this.nmiRequested = true;
-            this.nmiDetected = false;
-            // console.log('nmi Requested');
-        }
-        if (this.irqDetected) {
-            // console.log('irq requested');
-            this.irqRequested = true;
-        }
-    }
+                public pollInterrupts() {
+                    if (this.nmiDetected) {
+                        this.nmiRequested = true;
+                        this.nmiDetected = false;
+                        // console.log('nmi Requested');
+                    }
+                    if (this.irqDetected) {
+                        // console.log('irq requested');
+                        this.irqRequested = true;
+                    }
+                }
 
-    public detectInterrupts() {
+                public detectInterrupts() {
 
-        if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
-            this.nmiDetected = true;
-        }
-        this.nmiLinePrev = this.nmiLine;
-        this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
-    }
+                    if (this.nmiLinePrev === 1 && this.nmiLine === 0) {
+                        this.nmiDetected = true;
+                    }
+                    this.nmiLinePrev = this.nmiLine;
+                    this.irqDetected = !this.irqLine && !this.flgInterruptDisable;
+                }
 
-    public get rP(): number {
-        return (this.flgNegative << 7) +
-            (this.flgOverflow << 6) +
-            (1 << 5) +
-            (this.flgBreakCommand << 4) +
-            (this.flgDecimalMode << 3) +
-            (this.flgInterruptDisable << 2) +
-            (this.flgZero << 1) +
-            (this.flgCarry << 0);
-    }
+                public get rP(): number {
+                    return (this.flgNegative << 7) +
+                        (this.flgOverflow << 6) +
+                        (1 << 5) +
+                        (this.flgBreakCommand << 4) +
+                        (this.flgDecimalMode << 3) +
+                        (this.flgInterruptDisable << 2) +
+                        (this.flgZero << 1) +
+                        (this.flgCarry << 0);
+                }
 
-    public set rP(byte: number) {
-        this.flgNegative = (byte >> 7) & 1;
-        this.flgOverflow = (byte >> 6) & 1;
-        // skip (byte >> 5) & 1;
-        // skip this.flgBreakCommand = (byte >> 4) & 1;
-        this.flgBreakCommand = 0;
-        this.flgDecimalMode = (byte >> 3) & 1;
-        this.flgInterruptDisable = (byte >> 2) & 1;
-        this.flgZero = (byte >> 1) & 1;
-        this.flgCarry = (byte >> 0) & 1;
-    }
+                public set rP(byte: number) {
+                    this.flgNegative = (byte >> 7) & 1;
+                    this.flgOverflow = (byte >> 6) & 1;
+                    // skip (byte >> 5) & 1;
+                    // skip this.flgBreakCommand = (byte >> 4) & 1;
+                    this.flgBreakCommand = 0;
+                    this.flgDecimalMode = (byte >> 3) & 1;
+                    this.flgInterruptDisable = (byte >> 2) & 1;
+                    this.flgZero = (byte >> 1) & 1;
+                    this.flgCarry = (byte >> 0) & 1;
+                }
 
-    public trace(opcode: number) {
-        // noop
-    }
+                public trace(opcode: number) {
+                    // noop
+                }
 
-    public clk() {
-        this.icycle++;
+                public clk() {
+                    this.icycle++;
 
-        if (this.t === 0) {
+                    if (this.t === 0) {
 
-            if (this.nmiRequested || this.irqRequested) {
-                this.canSetFlgBreak = false;
-                // console.log('processing irq/nmi');
-                this.enablePCIncrement = false;
-                this.opcode = 0;
-            } else {
-                this.opcode = this.memory.getByte(this.ip);
-            }
-            this.ipCur = this.ip;
-            this.trace(this.opcode);
+                        if (this.nmiRequested || this.irqRequested) {
+                            this.canSetFlgBreak = false;
+                            // console.log('processing irq/nmi');
+                            this.enablePCIncrement = false;
+                            this.opcode = 0;
+                        } else {
+                            this.opcode = this.memory.getByte(this.ip);
+                        }
+                        this.ipCur = this.ip;
+                        this.trace(this.opcode);
 
-            this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
-        }
+                        this.addr = this.addrHi = this.addrLo = this.addrPtr = this.ptrLo = this.ptrHi = this.ipC = this.addrC = 0;
+                    }
 
-        this.opcodes[this.opcode].call(this);
-`;
+                    this.opcodes[this.opcode].call(this);
 
-        res += `
-        if (this.t === 0 && this.opcode !== 0x0) {
-            if (this.enableInterruptPoll) {
-                this.pollInterrupts();
-            }
-            this.enableInterruptPoll = true;
-        }
+                    if (this.t === 0 && this.opcode !== 0x0) {
+                        if (this.enableInterruptPoll) {
+                            this.pollInterrupts();
+                        }
+                        this.enableInterruptPoll = true;
+                    }
 
-        this.detectInterrupts();
-    }
+                    this.detectInterrupts();
+                }
 
-    protected opcodeToMnemonic(opcode: number) {
-        ${(() => {
-            let resT = ``;
-            for (const stm of statements) {
-                resT += `if (opcode === ${stm.opcode}) { return '${stm.mnemonic}'; }\n`;
-            }
-            resT += `return '???';\n`;
-            return resT;
-        })()}
-    }
+                protected opcodeToMnemonic(opcode: number) {
+                    ${(() => {
+                        let resT = ``;
+                        for (const stm of statements) {
+                            resT += `if (opcode === ${stm.opcode}) {
+                                return '${stm.mnemonic}';
+                            }
+                            `;
+                        }
+                        resT += `return '???';\n`;
+                        return resT;
+                    })()}
+                }
 
-    protected sizeFromOpcode(opcode: number) {
-        ${(() => {
-            let resT = ``;
-            for (const stm of statements) {
-                resT += `if (opcode === ${stm.opcode}) { return ${stm.size};\n}`;
-            }
-            resT += `return 1;\n`;
-            return resT;
-        })()}
-    }
-`;
+                protected sizeFromOpcode(opcode: number) {
+                    ${(() => {
+                        let resT = ``;
+                        for (const stm of statements) {
+                            resT += `if (opcode === ${stm.opcode}) {
+                                return ${stm.size};
+                            }
+                            `;
+                        }
+                        resT += `return 1;\n`;
+                        return resT;
+                    })()}
+                }
+            `;
+
         for (const stm of statements) {
             res += this.genStatement(stm);
         }
 
         res += `
-    private pushByte(byte: number): void {
-        this.memory.setByte(0x100 + this.sp, byte & 0xff);
-        this.sp = this.sp === 0 ? 0xff : this.sp - 1;
-    }
+            private pushByte(byte: number): void {
+                this.memory.setByte(0x100 + this.sp, byte & 0xff);
+                this.sp = this.sp === 0 ? 0xff : this.sp - 1;
+            }
 
-    private popByte(): number {
-        this.sp = this.sp === 0xff ? 0 : this.sp + 1;
-        return this.memory.getByte(0x100 + this.sp);
-    }
+            private popByte(): number {
+                this.sp = this.sp === 0xff ? 0 : this.sp + 1;
+                return this.memory.getByte(0x100 + this.sp);
+            }
 
-}
-`;
-        return res;
+        }`;
+        return Formatter.format(res);
     }
 
     private getRegAccess(reg: Register) {
