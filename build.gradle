@@ -3,13 +3,11 @@ plugins {
 }
 
 allprojects {
+    apply plugin: "com.moowork.node"
 
-    task install(type: Exec) {
-        inputs.file "$projectDir/package.json"
-        outputs.dir "$projectDir/node_modules"
-
-        workingDir "$projectDir"
-        commandLine 'npm', 'install'
+    node {
+        version = "6.10.2"
+        download = true
     }
 
     task clean {
@@ -21,12 +19,6 @@ allprojects {
 }
 
 subprojects {
-    apply plugin: "com.moowork.node"
-
-    node {
-        version = "6.10.2"
-        download = true
-    }
 
     task lint(type:NodeTask) {
         inputs.dir "$projectDir/src/"
@@ -36,7 +28,7 @@ subprojects {
     }
 
     task compile(type: NodeTask) {
-        dependsOn install
+        dependsOn npmInstall
         inputs.file "$projectDir/api.ts"
         inputs.file "$projectDir/tsconfig.json"
         inputs.file "$projectDir/webpack.config.js"
@@ -46,7 +38,7 @@ subprojects {
     }
 
     task build {
-        dependsOn '::install'
+        dependsOn '::npmInstall'
         dependsOn lint
         dependsOn compile
     }
