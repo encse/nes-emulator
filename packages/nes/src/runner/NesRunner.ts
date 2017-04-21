@@ -22,9 +22,11 @@
     }
 
     protected runI() {
+
         this.controller.registerKeyboardHandler('I'.charCodeAt(0), () => {
             this.headerElement.classList.toggle('show');
         });
+
         requestAnimationFrame(this.callback);
     }
 

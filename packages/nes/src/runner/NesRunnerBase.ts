@@ -6,10 +6,10 @@ import {NesEmulator} from '../NesEmulator';
 import {NesImage} from '../NesImage';
 
 export class NesRunnerBase {
-    public onEndCallback: () => void;
     public headerElement: HTMLElement;
     public controller: Controller;
     public nesEmulator: NesEmulator;
+    protected onEndCallback: () => void;
     private logElement: HTMLElement;
     private canvas: HTMLCanvasElement;
     private driver: Driver;
@@ -47,36 +47,35 @@ export class NesRunnerBase {
         this.logElement.appendChild(div);
     }
 
-    public onEnd(callback: () => void) {
-        this.onEndCallback = callback;
-    }
+    public run(): Promise<void> {
+        return new Promise<void>((resolve) => {
+            this.headerElement = document.createElement('h2');
+            this.container.appendChild(this.headerElement);
 
-    public run() {
-        this.headerElement = document.createElement('h2');
-        this.container.appendChild(this.headerElement);
+            this.canvas = document.createElement('canvas');
+            this.canvas.width = 256;
+            this.canvas.height = 240;
+            this.container.appendChild(this.canvas);
 
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = 256;
-        this.canvas.height = 240;
-        this.container.appendChild(this.canvas);
+            this.controller = new Controller(this.canvas);
 
-        this.controller = new Controller(this.canvas);
+            this.logElement = document.createElement('div');
+            this.logElement.classList.add('log');
+            this.container.appendChild(this.logElement);
 
-        this.logElement = document.createElement('div');
-        this.logElement.classList.add('log');
-        this.container.appendChild(this.logElement);
+            this.driver = new DriverFactory().createRenderer(this.canvas);
 
-        this.driver = new DriverFactory().createRenderer(this.canvas);
+            this.initDnd();
 
-        this.initDnd();
-
-        this.loadUrl(this.url, (rawBytes) => {
-            this.createEmulator(rawBytes);
-            if (!this.nesEmulator) {
-                this.onEndCallback();
-            } else {
-                this.runI();
-            }
+            this.loadUrl(this.url, (rawBytes) => {
+                this.createEmulator(rawBytes);
+                if (!this.nesEmulator) {
+                    resolve();
+                } else {
+                    this.onEndCallback = resolve;
+                    this.runI();
+                }
+            });
         });
     }
 

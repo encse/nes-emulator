@@ -1,18 +1,15 @@
 import * as $ from 'jquery';
 import {CpuTestRunner} from '../../nes/api';
 
-function runAll(nesRunners: CpuTestRunner[]) {
-    let i = 0;
-    function runSingle() {
-        if (i < nesRunners.length) {
-            nesRunners[i].onEndCallback = () => {
-                i++;
-                window.setTimeout(runSingle(), 0);
-            };
-            nesRunners[i].run();
-        }
+async function sleep() {
+    return new Promise<void>((resolve) => { window.setTimeout(resolve, 0); });
+}
+
+async function runAll(nesRunners: CpuTestRunner[]) {
+    for (const nesRunner of nesRunners) {
+        await nesRunner.run();
+        await sleep();
     }
-    runSingle();
 }
 
 $('#btnTest').click(() => {
