@@ -1,13 +1,11 @@
 module.exports = {
-    target: "web",
-    entry: {
-        app: "./src/main/ts/app.ts",
-        test: "./src/main/ts/test.ts"
-    },
-
+    target: 'web',
+    entry: "./src/api.ts",
     output: {
-        filename: "[name]-bundle.js",
-        path: __dirname + "/build/dist"
+        filename: "nes-emulator.js",
+        path: __dirname + "/build/nes-emulator",
+        libraryTarget: "umd",
+        library: "nesemulator"
     },
 
     // Enable sourcemaps for debugging webpack's output.
@@ -33,8 +31,7 @@ module.exports = {
     // This is important because it allows us to avoid bundling all of our
     // dependencies, which allows browsers to cache those libraries between builds.
     externals: {
-        "jQuery": "$",
-        "window": "window"
+        "jquery": "$"
     }
 
 };

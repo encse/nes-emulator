@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "baseUrl": ".",
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "target": "es5",
+    "types": [
+      "jquery"
+    ],
+    "typeRoots": [
+      "../../node_modules/@types"
+    ]
+  },
+  "include": [
+  ]
+}

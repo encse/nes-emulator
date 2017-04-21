@@ -798,7 +798,7 @@ export class Mos6502Gen {
 
         ];
         let res = `
-            import {Memory} from '../../../nes/src/main/ts/memory/Memory';
+            import {Memory} from '../../../nes/src/memory/Memory';
 
             export class Most6502Base {
                 public readonly addrReset = 0xfffc;

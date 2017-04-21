@@ -6,15 +6,14 @@
     "noImplicitAny": true,
     "target": "es5",
     "types": [
-      "webpack",
-      "jquery"
+      "node"
     ],
     "typeRoots": [
-      "node_modules/@types"
+      "../../node_modules/@types"
+    ],
+    "lib": [
+      "ES5",
+      "ES2015.Promise"
     ]
-  },
-  "include": [
-    "src/main/ts/**/*",
-    "../codegen/build/generated"
-  ]
+  }
 }

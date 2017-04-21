@@ -1,0 +1,58 @@
+plugins {
+    id "com.moowork.node" version "1.1.1" apply false
+}
+
+allprojects {
+
+    task install(type: Exec) {
+        println projectDir
+
+        inputs.file "$projectDir/package.json"
+        outputs.dir "$projectDir/node_modules"
+
+        workingDir "$projectDir"
+        commandLine 'npm', 'install'
+    }
+
+    task clean {
+        doFirst {
+            delete "${buildDir}"
+            delete "$projectDir/node_modules"
+        }
+    }
+}
+
+subprojects {
+    apply plugin: "com.moowork.node"
+
+    node {
+        version = "6.10.2"
+        download = true
+    }
+
+    task lint(type:NodeTask) {
+        inputs.dir "$projectDir/src/"
+        outputs.dir "$buildDir/dist" //this is not correct, lint doesn't have outputs
+        script = file("../../node_modules/tslint/bin/tslint")
+        args = ["-p", "$projectDir/src", "-c", "$projectDir/../../tslint.json", "--fix"]
+    }
+
+    task compile(type: NodeTask) {
+        dependsOn install
+        inputs.file "$projectDir/tsconfig.json"
+        inputs.file "$projectDir/webpack.config.json"
+        inputs.dir "$projectDir/src/"
+        outputs.dir "$buildDir"
+        script = file("../../node_modules/webpack/bin/webpack.js")
+    }
+
+    task build {
+        dependsOn '::install'
+        dependsOn lint
+        dependsOn compile
+    }
+
+}
+
+
+

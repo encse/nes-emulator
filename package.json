@@ -1,13 +1,11 @@
 {
   "devDependencies": {
-    "@types/node": "7.0.12",
+    "typescript": "2.2.2",
     "awesome-typescript-loader": "3.1.2",
     "source-map-loader": "0.2.1",
+    "webpack": "2.3.3",
     "tslint": "5.0.0",
-    "typescript": "2.2.2",
-    "webpack": "2.3.3"
-  },
-  "scripts": {
-    "run": "./gradlew run"
+    "@types/jquery": "2.0.41",
+    "@types/node": "7.0.12"
   }
 }

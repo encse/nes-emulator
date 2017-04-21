@@ -1,9 +1,12 @@
 module.exports = {
-    target: 'node',
-    entry: "./src/main/ts/index.ts",
+    target: 'web',
+    entry: {
+        "app": "./src/app.ts",
+        "test": "./src/test.ts"
+    },
     output: {
-        filename: "bundle.js",
-        path: __dirname + "/build/dist"
+        filename: "[name].js",
+        path: __dirname + "/build/"
     },
 
     // Enable sourcemaps for debugging webpack's output.
@@ -29,6 +32,7 @@ module.exports = {
     // This is important because it allows us to avoid bundling all of our
     // dependencies, which allows browsers to cache those libraries between builds.
     externals: {
+        "jquery": "$"
     }
 
 };

@@ -1,3 +1,10 @@
+rootProject.name = 'nesemulator'
+
 include 'codegen'
+project(':codegen').projectDir = file('packages/codegen')
 include 'nes'
+project(':nes').projectDir = file('packages/nes')
+include 'webapp'
+project(':webapp').projectDir = file('packages/webapp')
+
 

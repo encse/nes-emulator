@@ -1,0 +1,10 @@
+build {
+    dependsOn ':nes:build'
+    doLast {
+        copy {
+            from "$projectDir/static"
+            into "$buildDir/"
+        }
+    }
+}
+

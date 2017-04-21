@@ -1,4 +1,4 @@
-import {NesRunner} from './runner/NesRunner';
+import {NesRunner} from '../../nes/src/runner/NesRunner';
 
 let rom = window.location.hash.substring(1);
 rom = rom ? rom : 'Super Mario Bros';
