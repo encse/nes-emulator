@@ -25,7 +25,7 @@ export class CleverRam implements Memory {
     public setByte(addr: number, value: number): void {
         if (this.writeEnable) {
             this.memory[addr > this.sizeI ? addr % this.sizeI : addr] = value & 0xff;
+
         }
     }
-
 }

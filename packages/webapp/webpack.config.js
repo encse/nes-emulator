@@ -6,7 +6,9 @@ module.exports = {
     },
     output: {
         filename: "[name].js",
-        path: __dirname + "/build/"
+        path: __dirname + "/build/",
+        libraryTarget: "umd"
+
     },
 
     // Enable sourcemaps for debugging webpack's output.
@@ -32,7 +34,14 @@ module.exports = {
     // This is important because it allows us to avoid bundling all of our
     // dependencies, which allows browsers to cache those libraries between builds.
     externals: {
-        "jquery": "$"
+        "jquery": {
+            root: "$" // indicates global variable
+        },
+
+        "../../nes/api":  {
+            amd: "NesEmulator"
+        }
+
     }
 
 };

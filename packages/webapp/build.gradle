@@ -3,7 +3,11 @@ build {
     doLast {
         copy {
             from "$projectDir/static"
-            into "$buildDir/"
+            into "$buildDir"
+        }
+        copy {
+            from "../nes/build/nes-emulator"
+            into "$buildDir"
         }
     }
 }

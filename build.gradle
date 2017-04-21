@@ -5,8 +5,6 @@ plugins {
 allprojects {
 
     task install(type: Exec) {
-        println projectDir
-
         inputs.file "$projectDir/package.json"
         outputs.dir "$projectDir/node_modules"
 
@@ -39,8 +37,9 @@ subprojects {
 
     task compile(type: NodeTask) {
         dependsOn install
+        inputs.file "$projectDir/api.ts"
         inputs.file "$projectDir/tsconfig.json"
-        inputs.file "$projectDir/webpack.config.json"
+        inputs.file "$projectDir/webpack.config.js"
         inputs.dir "$projectDir/src/"
         outputs.dir "$buildDir"
         script = file("../../node_modules/webpack/bin/webpack.js")

@@ -1,5 +1,5 @@
 import * as $ from 'jquery';
-import {CpuTestRunner} from '../../nes/src/runner/CpuTestRunner';
+import {CpuTestRunner} from '../../nes/api';
 
 function runAll(nesRunners: CpuTestRunner[]) {
     let i = 0;
