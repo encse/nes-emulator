@@ -34,14 +34,8 @@ module.exports = {
     // This is important because it allows us to avoid bundling all of our
     // dependencies, which allows browsers to cache those libraries between builds.
     externals: {
-        "jquery": {
-            root: "$" // indicates global variable
-        },
-
-        "../../nes/api":  {
-            amd: "NesEmulator"
-        }
-
+        "jquery": "jquery",
+        "../../nes/api": "nes-emulator"
     }
 
 };
