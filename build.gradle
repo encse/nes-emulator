@@ -23,8 +23,8 @@ subprojects {
     task lint(type:NodeTask) {
         inputs.dir "$projectDir/src/"
         outputs.dir "$buildDir/dist" //this is not correct, lint doesn't have outputs
-        script = file("../../node_modules/tslint/bin/tslint")
-        args = ["-p", "$projectDir/src", "-c", "$projectDir/../../tslint.json", "--fix"]
+        script = file("../../../node_modules/tslint/bin/tslint")
+        args = ["-p", "$projectDir/src", "-c", "$projectDir/../../../tslint.json", "--fix"]
     }
 
     task compile(type: NodeTask) {
@@ -34,7 +34,7 @@ subprojects {
         inputs.file "$projectDir/webpack.config.js"
         inputs.dir "$projectDir/src/"
         outputs.dir "$buildDir"
-        script = file("../../node_modules/webpack/bin/webpack.js")
+        script = file("../../../node_modules/webpack/bin/webpack.js")
     }
 
     task build {

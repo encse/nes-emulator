@@ -1,10 +1,10 @@
 rootProject.name = 'nesemulator'
 
 include 'codegen'
-project(':codegen').projectDir = file('packages/codegen')
+project(':codegen').projectDir = file('packages/node_modules/codegen')
 include 'nes'
-project(':nes').projectDir = file('packages/nes')
+project(':nes').projectDir = file('packages/node_modules/nes')
 include 'webapp'
-project(':webapp').projectDir = file('packages/webapp')
+project(':webapp').projectDir = file('packages/node_modules/webapp')
 
 

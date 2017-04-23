@@ -1,6 +1,7 @@
 .gradle
 build
 node_modules
+!packages/node_modules
+packages/node_modules/**/node_modules
 .idea
-npm-debug.log
 nes/src/main/web/roms
