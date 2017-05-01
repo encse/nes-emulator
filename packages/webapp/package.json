@@ -1,0 +1,10 @@
+{
+  "name": "webapp",
+  "scripts": {
+    "build": "npm run build:nes && npm run lint && webpack && npm run copy:static && npm run copy:nes",
+    "lint": "tslint -p tsconfig.json --fix",
+    "build:nes": "cd ../nes && npm run build",
+    "copy:static": "cp -r static build",
+    "copy:nes": "cp ../nes/build/nes-emulator/* build"
+  }
+}

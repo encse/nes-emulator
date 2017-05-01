@@ -8,5 +8,12 @@
     "tslint": "5.0.0",
     "typescript": "2.2.2",
     "webpack": "2.3.3"
+  },
+
+  "scripts": {
+    "build": "npm run build:webapp",
+    "build:codegen": "cd packages/codegen && npm run build",
+    "build:nes": "cd packages/nes && npm run build",
+    "build:webapp": "cd packages/webapp && npm run build"
   }
 }

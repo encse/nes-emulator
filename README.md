@@ -3,7 +3,9 @@
 ## Build:
 
 ```
-./gradlew build 
+npm install
+npm run build
 ```
+
 
 
