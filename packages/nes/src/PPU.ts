@@ -855,7 +855,9 @@ export class PPU {
                  this.flgSpriteZeroHit = true;
              }
 
-             if (!spriteTransparent && (bgTransparent || !spriteBehindBg)) {
+             if (this.sx < 8 || this.sy < 8 || this.sx > 256 - 8 || this.sy > 240 - 8) {
+                this.data[this.dataAddr] = this.colors[0x0f];
+             } else if (!spriteTransparent && (bgTransparent || !spriteBehindBg)) {
                  this.data[this.dataAddr] = this.colors[icolorSprite];
              } else {
                  this.data[this.dataAddr] = this.colors[icolorBg];
