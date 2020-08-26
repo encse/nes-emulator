@@ -4,7 +4,7 @@
     "baseUrl": ".",
     "sourceMap": true,
     "noImplicitAny": true,
-    "target": "es5",
+    "target": "es2015",
     "types": [
       "node"
     ],
@@ -12,7 +12,7 @@
       "../../node_modules/@types"
     ],
     "lib": [
-      "ES5",
+      "ES2015",
       "ES2015.Promise"
     ]
   }

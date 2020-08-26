@@ -9,7 +9,6 @@
     "typescript": "2.2.2",
     "webpack": "2.3.3"
   },
-
   "scripts": {
     "build": "npm run build:webapp",
     "build:codegen": "cd packages/codegen && npm run build",

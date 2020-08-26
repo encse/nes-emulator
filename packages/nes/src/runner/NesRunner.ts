@@ -41,6 +41,8 @@ export class NesRunner extends NesRunnerBase {
     }
 
     private renderFrame(hpcNow: number) {
+        requestAnimationFrame(this.callback);
+
         const nesEmulator = this.nesEmulator;
         const ppu = nesEmulator.ppu;
 
@@ -50,6 +52,5 @@ export class NesRunner extends NesRunnerBase {
         }
 
         this.printFps(hpcNow);
-        requestAnimationFrame(this.callback);
     }
 }

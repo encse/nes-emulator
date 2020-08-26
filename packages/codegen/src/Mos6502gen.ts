@@ -1,4 +1,4 @@
-import {Formatter} from './Formatter';
+import { Formatter } from './Formatter';
 enum AddressingMode {
     Accumulator,
     Implied,
@@ -122,7 +122,7 @@ class Statement {
         public statementKind: StatementKind,
         public addressingMode: AddressingMode,
         public size: number,
-        public cycleCount: CycleCount) {}
+        public cycleCount: CycleCount) { }
 
     getCycles(gen: Mos6502Gen): Cycle[] {
         const mcPayload = gen[StatementKind[this.statementKind]]();
@@ -296,7 +296,7 @@ class Statement {
 }
 
 class Mc {
-    public static lift(mc: string|Mc): Mc {
+    public static lift(mc: string | Mc): Mc {
         if (mc instanceof Mc) {
             return mc;
         }
@@ -412,7 +412,7 @@ class McExpr extends Mc {
 class McIf extends Mc {
     public mcTrue: Mc;
     public mcFalse: Mc;
-    constructor(public cond: string, mcTrue: string|Mc, mcFalse: string|Mc) {
+    constructor(public cond: string, mcTrue: string | Mc, mcFalse: string | Mc) {
         super('');
         this.mcTrue = Mc.lift(mcTrue);
         this.mcFalse = Mc.lift(mcFalse);
@@ -508,28 +508,28 @@ export class Mos6502Gen {
 
         const statements = [
             new Statement(0x69, StatementKind.ADC, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0x65, StatementKind.ADC, AddressingMode.ZeroPage , 2, new CycleCount(3)),
+            new Statement(0x65, StatementKind.ADC, AddressingMode.ZeroPage, 2, new CycleCount(3)),
             new Statement(0x75, StatementKind.ADC, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0x6d, StatementKind.ADC, AddressingMode.Absolute , 3, new CycleCount(4)),
+            new Statement(0x6d, StatementKind.ADC, AddressingMode.Absolute, 3, new CycleCount(4)),
             new Statement(0x7d, StatementKind.ADC, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0x79, StatementKind.ADC, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
             new Statement(0x61, StatementKind.ADC, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0x71, StatementKind.ADC, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
 
             new Statement(0x29, StatementKind.AND, AddressingMode.Immediate, 2, new CycleCount(2)),
-            new Statement(0x25, StatementKind.AND, AddressingMode.ZeroPage , 2, new CycleCount(3)),
+            new Statement(0x25, StatementKind.AND, AddressingMode.ZeroPage, 2, new CycleCount(3)),
             new Statement(0x35, StatementKind.AND, AddressingMode.ZeroPageX, 2, new CycleCount(4)),
-            new Statement(0x2d, StatementKind.AND, AddressingMode.Absolute , 3, new CycleCount(4)),
+            new Statement(0x2d, StatementKind.AND, AddressingMode.Absolute, 3, new CycleCount(4)),
             new Statement(0x3d, StatementKind.AND, AddressingMode.AbsoluteX, 3, new CycleCount(4).withPageCross()),
             new Statement(0x39, StatementKind.AND, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
             new Statement(0x21, StatementKind.AND, AddressingMode.IndirectX, 2, new CycleCount(6)),
             new Statement(0x31, StatementKind.AND, AddressingMode.IndirectY, 2, new CycleCount(5).withPageCross()),
 
             new Statement(0x0a, StatementKind.ASL, AddressingMode.Accumulator, 1, new CycleCount(2)),
-            new Statement(0x06, StatementKind.ASL, AddressingMode.ZeroPage   , 2, new CycleCount(5)),
-            new Statement(0x16, StatementKind.ASL, AddressingMode.ZeroPageX  , 2, new CycleCount(6)),
-            new Statement(0x0e, StatementKind.ASL, AddressingMode.Absolute   , 3, new CycleCount(6)),
-            new Statement(0x1e, StatementKind.ASL, AddressingMode.AbsoluteX  , 3, new CycleCount(7)),
+            new Statement(0x06, StatementKind.ASL, AddressingMode.ZeroPage, 2, new CycleCount(5)),
+            new Statement(0x16, StatementKind.ASL, AddressingMode.ZeroPageX, 2, new CycleCount(6)),
+            new Statement(0x0e, StatementKind.ASL, AddressingMode.Absolute, 3, new CycleCount(6)),
+            new Statement(0x1e, StatementKind.ASL, AddressingMode.AbsoluteX, 3, new CycleCount(7)),
 
             new Statement(0x90, StatementKind.BCC, AddressingMode.Relative, 2, new CycleCount(2).withBranchTaken().withPageCross()),
             new Statement(0xb0, StatementKind.BCS, AddressingMode.Relative, 2, new CycleCount(2).withBranchTaken().withPageCross()),
@@ -797,6 +797,9 @@ export class Mos6502Gen {
             new Statement(0xbb, StatementKind.LAR, AddressingMode.AbsoluteY, 3, new CycleCount(4).withPageCross()),
 
         ];
+
+        this.foo(statements);
+
         let res = `
             export interface Memory {
                 getByte(addr: number): number;
@@ -941,30 +944,30 @@ export class Mos6502Gen {
 
                 protected opcodeToMnemonic(opcode: number) {
                     ${(() => {
-                        let resT = ``;
-                        for (const stm of statements) {
-                            resT += `if (opcode === ${stm.opcode}) {
+                let resT = ``;
+                for (const stm of statements) {
+                    resT += `if (opcode === ${stm.opcode}) {
                                 return '${stm.mnemonic}';
                             }
                             `;
-                        }
-                        resT += `return '???';\n`;
-                        return resT;
-                    })()}
+                }
+                resT += `return '???';\n`;
+                return resT;
+            })()}
                 }
 
                 protected sizeFromOpcode(opcode: number) {
                     ${(() => {
-                        let resT = ``;
-                        for (const stm of statements) {
-                            resT += `if (opcode === ${stm.opcode}) {
+                let resT = ``;
+                for (const stm of statements) {
+                    resT += `if (opcode === ${stm.opcode}) {
                                 return ${stm.size};
                             }
                             `;
-                        }
-                        resT += `return 1;\n`;
-                        return resT;
-                    })()}
+                }
+                resT += `return 1;\n`;
+                return resT;
+            })()}
                 }
             `;
 
@@ -1048,7 +1051,7 @@ export class Mos6502Gen {
             .then(`this.flgNegative = this.b & 128 ? 1 : 0`)
             .then(`this.flgOverflow = this.b & 64 ? 1 : 0`)
             .then(`this.flgZero = !(this.rA & this.b) ? 1 : 0`)
-          ;
+            ;
     }
 
     private ASL(): Mc {
@@ -1247,10 +1250,10 @@ export class Mos6502Gen {
 
     private SYA(): Mc {
         return new McIf('this.addrC',
-                new McNop()
+            new McNop()
                 .then(`this.addrHi = this.rY & (this.addrHi + 1)`)
                 .then(`this.addr = (this.addrHi << 8) | this.addrLo`),
-                new McNop())
+            new McNop())
             .then(`this.b = this.rY & ((this.addrHi) + 1)`);
     }
 
@@ -1626,7 +1629,7 @@ export class Mos6502Gen {
                 ];
             case MemoryAccessPattern.ReadModifyWrite:
             case MemoryAccessPattern.ReadModifyWriteAndModifyRegister:
-               return [
+                return [
                     new Cycle(1, 'fetch opcode, increment PC')
                         .fetchOpcode()
                         .thenIncrementPC()
@@ -1901,7 +1904,7 @@ export class Mos6502Gen {
                         .then(mc)
                         .thenNextStatement(),
                 ];
-           }
+        }
     }
 
     private getIndirectXCycles(statement: Statement, mc: Mc, mcPost: Mc): Cycle[] {
