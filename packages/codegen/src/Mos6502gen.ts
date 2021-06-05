@@ -798,8 +798,6 @@ export class Mos6502Gen {
 
         ];
 
-        this.foo(statements);
-
         let res = `
             export interface Memory {
                 getByte(addr: number): number;
