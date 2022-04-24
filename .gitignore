@@ -1,6 +1,5 @@
 .gradle
 build
-!packages/webapp/build
 node_modules
 !packages/node_modules
 packages/node_modules/**/node_modules
