@@ -5,7 +5,7 @@
     "@types/node": "7.0.12",
     "awesome-typescript-loader": "^3.1.2",
     "source-map-loader": "0.2.1",
-    "tslint": "5.0.0",
+    "tslint": "5.20.1",
     "typescript": "2.2.2",
     "webpack": "2.3.3"
   },
